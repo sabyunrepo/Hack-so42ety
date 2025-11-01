@@ -13,6 +13,7 @@ typing_extensions==4.15.0
 uvicorn==0.37.0
 python-multipart==0.0.20
 aiofiles==24.1.0
+google-genai
 pillow
 pydantic-settings>=2.0.0
 # python-dotenv>=1.0.0

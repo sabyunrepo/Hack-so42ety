@@ -9,17 +9,17 @@ from typing import List, Optional
 from fastapi import (
     FastAPI,
     HTTPException,
+    BackgroundTasks,
     UploadFile,
     File,
     Form,
     Depends,
 )
-
+from .domain.models import Book
 from .core.logging import setup_logging, get_logger
 from .core.lifespan import lifespan
-from .core.dependencies import (
-    get_book_repository,
-)
+from .core.dependencies import get_book_repository, get_book_service
+from .services import BookOrchestratorService
 from .api.schemas import (
     BooksListResponse,
     BookDetailResponse,
@@ -40,6 +40,39 @@ app = FastAPI(
 )
 
 setup_middleware(app)
+
+
+async def background_create_full_book(
+    book_id: str,
+    stories: List[str],
+    images_data: List[dict],
+    voice_id: Optional[str],
+    book_service: BookOrchestratorService,
+    book_repository: InMemoryBookRepository,
+):
+    try:
+
+        # 기존 create_book_with_tts 활용 (이미지 생성 + TTS 생성 + 기타 작업)
+        book = await book_service.create_book_with_tts(
+            stories=stories, images=images_data, book_id=book_id, voice_id=voice_id
+        )
+
+        # Repository 업데이트 (status="success" 또는 "error")
+        await book_repository.update(book_id, book)
+
+        logger.info(f"[Background] Book creation completed: {book_id}")
+
+    except Exception as e:
+        logger.error(f"[Background] Failed to create book {book_id}: {e}")
+
+        # 에러 발생 시 status="error"로 변경
+        try:
+            book = await book_repository.get(book_id)
+            if book:
+                book.status = "error"
+                await book_repository.update(book_id, book)
+        except Exception as update_error:
+            logger.error(f"[Background] Failed to update status: {update_error}")
 
 
 @app.get("/health")
@@ -68,14 +101,62 @@ async def read_root():
     "/storybook/create",
 )
 async def create_book(
+    background_tasks: BackgroundTasks,
     stories: List[str] = Form(
         ..., description="각 페이지의 텍스트 배열 (같은 키 'stories'를 반복 전송)"
     ),
     images: List[UploadFile] = File(
         ..., description="각 페이지의 이미지 파일 배열 (같은 키 'images'를 반복 전송)"
     ),
+    voice_id: Optional[str] = Form(default=None, description="TTS 음성 ID"),
+    book_repository: InMemoryBookRepository = Depends(get_book_repository),
+    book_service: BookOrchestratorService = Depends(get_book_service),
 ):
-    return {"message": "This endpoint is create book"}
+
+    book = Book(
+        title="",  # 기본 제목
+        cover_image="",  # 나중에 설정
+        status="process",
+        voice_id=voice_id,
+        pages=[],  # 빈 페이지
+    )
+
+    # 2. Repository에 저장 (빈 Book)
+    saved_book = await book_repository.create(book)
+
+    # 3. UploadFile을 bytes로 변환 (메모리에 미리 읽기)
+    images_data = []
+    total_image_size = 0
+    for image in images:
+        content = await image.read()
+        image_size = len(content)
+        total_image_size += image_size
+        images_data.append(
+            {
+                "filename": image.filename,
+                "content": content,  # bytes
+                "content_type": image.content_type,
+            }
+        )
+
+    background_tasks.add_task(
+        background_create_full_book,
+        book_id=saved_book.id,
+        stories=stories,
+        voice_id=voice_id,
+        images_data=images_data,  # bytes 전달
+        book_service=book_service,  # DI
+        book_repository=book_repository,  # DI
+    )
+
+    return BookDetailResponse(
+        id=saved_book.id,
+        title=saved_book.title,
+        cover_image=saved_book.cover_image,
+        status="process",  # 진행 중
+        pages=[],  # 빈 페이지
+        created_at=saved_book.created_at,
+    )
 
 
 @app.get(
