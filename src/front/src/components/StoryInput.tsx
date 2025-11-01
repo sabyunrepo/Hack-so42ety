@@ -67,12 +67,18 @@ export default function StoryInput({
 
       {/* 텍스트 입력 영역 */}
       <div className="flex-1 flex flex-col">
-        <textarea
-          value={page.story}
-          onChange={handleStoryChange}
-          placeholder="여기에 이야기를 입력하세요..."
-          className="w-full h-32 border border-gray-200 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
-        />
+        <div className="relative">
+          <textarea
+            value={page.story}
+            onChange={handleStoryChange}
+            placeholder="여기에 이야기를 입력하세요..."
+            className="w-full h-32 border border-gray-200 rounded-lg p-3 pr-16 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+            maxLength={100}
+          />
+          <div className="absolute bottom-2 right-2 text-gray-600 text-sm bg-white px-1 rounded">
+            {page.story.length}/100
+          </div>
+        </div>
       </div>
     </div>
   );
