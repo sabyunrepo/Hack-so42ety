@@ -39,8 +39,8 @@ function DeleteButton({ onClick }: DeleteButtonProps) {
   );
 }
 
-export default function BookCard({ 
-  book, 
+export default function BookCard({
+  book,
   isEditing = false,
   onDelete,
   onClick
@@ -93,7 +93,7 @@ export default function BookCard({
         />
       </div>
       {/* 책 제목 배경 (하단 흰색 영역) */}
-      <div className="absolute bottom-0 left-0 right-0 top-[78.07%]">
+      <div className="absolute bottom-0 left-0 right-0 top-[78.07%] rounded-b-[13px]">
         <div className="w-full h-full bg-white border-[2px] border-black rounded-b-[13px]" />
       </div>
 
@@ -105,11 +105,11 @@ export default function BookCard({
       {/* 생성중 오버레이 */}
       {isProcessing && (
         <div className="absolute inset-0 bg-black opacity-90 rounded-[13px] flex flex-col items-center justify-center z-20 pointer-events-none">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mb-3"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mb-3 "></div>
           <p className="text-white font-bold text-lg">생성중...</p>
         </div>
       )}
-      
+
       {/* 편집 모드일 때 삭제 버튼 (생성중이 아닐 때만) */}
       {isEditing && !isProcessing && onDelete && <DeleteButton onClick={onDelete} />}
     </div>
