@@ -1,7 +1,19 @@
 import apiClient from "./client";
 
+export type BookStatus = "process" | "success" | "error";
+export interface Book {
+  id: string;
+  title: string;
+  cover_image: string;
+  status: BookStatus;
+}
+
+interface AllStorybooksResponse {
+  books: Book[];
+}
+
 // 전체 책 조회
-export const getAllStorybooks = async () => {
+export const getAllStorybooks = async (): Promise<AllStorybooksResponse> => {
   try {
     const response = await apiClient.get("/storybook/books");
 

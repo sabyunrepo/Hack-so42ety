@@ -1,22 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
-import BookCard from "../components/BookCard";
-import { useEffect, useState } from 'react';
-import { deleteBook, getAllStorybooks } from '../api/index';
-
-// 일단 간단한 타입으로 시작
-interface Book {
-  id: string;
-  title?: string;
-  cover_image?: string;
-  status?: string;
-  // 나머지는 any로 허용
-  [key: string]: any;
-}
-
-interface ApiResponse {
-  books: Book[];
-  [key: string]: any; // 유연하게 시작
-}
+import BookCard, { type Book } from "../components/BookCard";
+import { useEffect, useState } from "react";
+import { deleteBook, getAllStorybooks } from "../api/index";
 
 export default function Bookshelf() {
   const navigate = useNavigate();
@@ -30,7 +15,7 @@ export default function Bookshelf() {
     const fetchBooks = async () => {
       try {
         setIsLoading(true);
-        const data = await getAllStorybooks() as ApiResponse;
+        const data = await getAllStorybooks();
         setBooks(data.books);
         console.log(data);
         setError(null);
@@ -47,10 +32,10 @@ export default function Bookshelf() {
 
   //책 클릭 핸들러
   const handleBookClick = (bookId: string) => {
-      if (!isEditing) {
-        navigate(`/book/${bookId}`);
+    if (!isEditing) {
+      navigate(`/book/${bookId}`);
     }
-  }
+  };
 
   //책 삭제 핸들러
   const handleDeleteBook = async (bookId: string) => {
@@ -64,26 +49,26 @@ export default function Bookshelf() {
       setBooks(previous);
       alert("책 삭제에 실패했습니다.");
     }
-  }
+  };
 
   // 편집 모드 토글
   const toggleEditMode = () => {
     setIsEditing(!isEditing);
-  }
+  };
 
   // 책과 생성 버튼을 포함해서 4개씩 그룹으로 나누는 함수
   const groupBooksIntoShelves = (books: Book[]): Book[][] => {
-    const  totalItems = books.length + 1; // 책 + 생성 버튼
+    const totalItems = books.length + 1; // 책 + 생성 버튼
     const shelves: Book[][] = [];
     for (let i = 0; i < totalItems; i += 4) {
       shelves.push(books.slice(i, i + 4));
     }
     return shelves;
-  }
+  };
 
   const bookShelves = groupBooksIntoShelves(books);
 
-    if (isLoading) {
+  if (isLoading) {
     return (
       <div className="p-8 bg-orange-50 min-h-screen flex items-center justify-center">
         <div className="text-xl font-medium">책장을 불러오는 중...</div>
@@ -110,7 +95,7 @@ export default function Bookshelf() {
         </button>
       </div>
       <div className="space-y-8">
-                {bookShelves.map((shelf, shelfIndex) => (
+        {bookShelves.map((shelf, shelfIndex) => (
           <div key={shelfIndex} className="relative">
             <div className="grid grid-cols-4 gap-1 w-full justify-items-center mb-0">
               {shelf.map((book) => (
@@ -131,7 +116,6 @@ export default function Bookshelf() {
                   </div>
                 </Link>
               )}
-              
             </div>
 
             {/* 선반 */}
