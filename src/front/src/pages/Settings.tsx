@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Mic, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createVoiceClone } from "../api/index";
+import Modal from "../components/Modal";
 
 // 허용되는 오디오 파일 확장자
 const ALLOWED_AUDIO_TYPES = [".mp3", ".wav", ".m4a", ".flac", ".ogg"];
@@ -14,6 +15,7 @@ export default function Settings() {
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [showModal, setShowModal] = useState<boolean>(false);
   const navigate = useNavigate();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,15 +61,15 @@ export default function Settings() {
     setError("");
 
     try {
+      // API 호출
       await createVoiceClone({
         name,
         file,
         description: description.trim() || undefined, // 빈 문자열이면 undefined로
       });
 
-      setMessage(
-        "✅ 목소리 생성 요청이 접수되었습니다! 백그라운드에서 처리 중입니다."
-      );
+      // 성공 시 모달 표시
+      setShowModal(true);
       // 폼 초기화
       handleReset();
     } catch (err: unknown) {
@@ -97,6 +99,10 @@ export default function Settings() {
     // 파일 input 초기화
     const fileInput = document.getElementById("fileInput") as HTMLInputElement;
     if (fileInput) fileInput.value = "";
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
   };
 
   return (
@@ -222,6 +228,17 @@ export default function Settings() {
           </ul>
         </div>
       </div>
+
+      {/* 성공 모달 */}
+      <Modal
+        isOpen={showModal}
+        onClose={closeModal}
+        title="안내"
+        message="목소리 생성 요청이 성공적으로 접수되었습니다."
+        submessage="생성완료까지 약 3분 소요됩니다. 백그라운드에서 처리 중이므로 다른 작업을 계속하셔도 됩니다."
+        buttonText="확인"
+        redirectTo="/"
+      />
     </div>
   )
 }
