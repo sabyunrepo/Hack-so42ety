@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Mic, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createVoiceClone } from "../api/index";
+import SuccessModal from "../components/SuccessModal";
 
 // 허용되는 오디오 파일 확장자
 const ALLOWED_AUDIO_TYPES = [".mp3", ".wav", ".m4a", ".flac", ".ogg"];
@@ -229,44 +230,14 @@ export default function Settings() {
       </div>
 
       {/* 성공 모달 */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 max-w-md mx-4 shadow-2xl">
-            {/* 아이콘 */}
-            <div className="flex justify-center items-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex justify-center items-center">
-                <div className="text-green-500 text-2xl">✅</div>
-              </div>
-            </div>
-            
-            {/* 제목 */}
-            <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">
-              목소리 생성 요청 완료!
-            </h3>
-            
-            {/* 메시지 */}
-            <div className="text-center mb-6">
-              <p className="text-gray-600 mb-2">
-                목소리 생성 요청이 성공적으로 접수되었습니다.
-              </p>
-              <p className="text-lg font-semibold text-yellow-600">
-                생성완료까지 약 3분 소요됩니다
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                백그라운드에서 처리 중이므로 다른 작업을 계속하셔도 됩니다.
-              </p>
-            </div>
-            
-            {/* 확인 버튼 */}
-            <button
-              onClick={closeSuccessModal}
-              className="w-full py-3 bg-yellow-400 text-white font-semibold rounded-lg hover:bg-yellow-500 transition-colors"
-            >
-              확인
-            </button>
-          </div>
-        </div>
-      )}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={closeSuccessModal}
+        title="목소리 생성 요청 완료!"
+        message="목소리 생성 요청이 성공적으로 접수되었습니다."
+        submessage="생성완료까지 약 3분 소요됩니다. 백그라운드에서 처리 중이므로 다른 작업을 계속하셔도 됩니다."
+        buttonText="확인"
+      />
     </div>
   )
 }
