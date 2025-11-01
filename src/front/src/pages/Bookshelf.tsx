@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getAllStorybooks } from '../api/index';
+import BookCard from "../components/BookCard";
 
 // 일단 간단한 타입으로 시작
 interface Book {
@@ -17,7 +18,7 @@ interface ApiResponse {
 }
 
 export default function Bookshelf() {
-  // 책 목록 상태
+  const [isEditing, setIsEditing] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
 
   // 책 목록 불러오기
@@ -63,8 +64,24 @@ export default function Bookshelf() {
   const bookShelves = groupBooksIntoShelves(books);
 
   return (
-    <div>
-      Bookshelf
+    <div className="p-8 bg-orange-50 min-h-screen">
+      <div className="space-y-8">
+                {bookShelves.map((shelf, shelfIndex) => (
+          <div key={shelfIndex} className="relative">
+            <div className="grid grid-cols-4 gap-1 w-full justify-items-center mb-0">
+              {shelf.map((book) => (
+                <BookCard
+                  key={book.id}
+                  book={book}
+                  isEditing={isEditing}
+                  onDelete={() => handleDeleteBook(book.id)}
+                  onClick={() => handleBookClick(book.id)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
