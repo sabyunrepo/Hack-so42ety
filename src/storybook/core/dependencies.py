@@ -6,6 +6,7 @@ Shared Dependencies Module
 from functools import lru_cache
 from ..repositories import FileBookRepository, InMemoryBookRepository
 from ..storage import LocalStorageService
+from ..services import BookOrchestratorService
 from .config import settings
 from .logging import get_logger
 
@@ -40,3 +41,15 @@ def get_book_repository() -> InMemoryBookRepository:
     """InMemoryBookRepository 싱글톤 인스턴스 반환"""
     file_repository = get_file_repository()
     return InMemoryBookRepository(file_repository=file_repository)
+
+
+@lru_cache()
+def get_book_service() -> BookOrchestratorService:
+    """
+    BookOrchestratorService 싱글톤 인스턴스 반환
+
+    모든 하위 서비스를 DI로 주입받아 조립
+    """
+    return BookOrchestratorService(
+        storage_service=get_storage_service(),
+    )
