@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { getAllStorybooks } from '../api/index';
 import BookCard from "../components/BookCard";
+import { useEffect, useState } from 'react';
+import { deleteBook, getAllStorybooks } from '../api/index';
 
 // 일단 간단한 타입으로 시작
 interface Book {
@@ -42,13 +42,22 @@ export default function Bookshelf() {
   }
 
   //책 삭제 핸들러
-  const handleDeleteBook = (bookId: string) => {
-    // 책 삭제 로직
+  const handleDeleteBook = async (bookId: string) => {
+    const previous = books;
+    setBooks((prev) => prev.filter((book) => book.id !== bookId));
+    try {
+      await deleteBook(bookId);
+      alert("책 삭제에 성공했습니다.");
+    } catch (err) {
+      console.error("Failed to delete book:", err);
+      setBooks(previous);
+      alert("책 삭제에 실패했습니다.");
+    }
   }
 
   // 편집 모드 토글
   const toggleEditMode = () => {
-    // 편집 모드 토글 로직
+    setIsEditing(!isEditing);
   }
 
   // 책과 생성 버튼을 포함해서 4개씩 그룹으로 나누는 함수
@@ -65,6 +74,14 @@ export default function Bookshelf() {
 
   return (
     <div className="p-8 bg-orange-50 min-h-screen">
+      <div className="flex justify-end mb-6">
+        <button
+          onClick={toggleEditMode}
+          className="bg-amber-300 text-gray-800 font-semibold px-5 py-2 rounded-full shadow-sm hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isEditing ? "편집 완료" : "편집"}
+        </button>
+      </div>
       <div className="space-y-8">
                 {bookShelves.map((shelf, shelfIndex) => (
           <div key={shelfIndex} className="relative">

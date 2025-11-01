@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 
 // Book 타입 정의 (BookCard에서 사용하는 필드들)
 interface Book {
@@ -5,6 +6,11 @@ interface Book {
   title: string;
   cover_image?: string;
   status?: "success" | "process" | "error";
+}
+
+// DeleteButton props 타입
+interface DeleteButtonProps {
+  onClick: () => void;
 }
 
 // BookCard props 타입
@@ -15,10 +21,29 @@ interface BookCardProps {
   onClick?: () => void;
 }
 
+// 삭제 버튼 컴포넌트
+function DeleteButton({ onClick }: DeleteButtonProps) {
+  const handleDelete = () => {
+    if (window.confirm('정말로 이 책을 삭제하시겠습니까?')) {
+      onClick();
+    }
+  };
+
+  return (
+    <button
+      onClick={handleDelete}
+      className="absolute -top-2 -right-2 border-[2px] bg-white text-black rounded-full p-1 hover:bg-red-600 transition-colors z-10"
+    >
+      <X className="w-4 h-4" />
+    </button>
+  );
+}
+
 export default function BookCard({ 
   book, 
-  isEditing = false, 
-  onClick 
+  isEditing = false,
+  onDelete,
+  onClick
 }: BookCardProps) {
   const isProcessing = book.status === "process";
 
@@ -77,6 +102,8 @@ export default function BookCard({
         <p className="line-clamp-2 text-center wrap-break-word overflow-hidden">{book.title}</p>
       </div>
       
+      {/* 편집 모드일 때 삭제 버튼 (생성중이 아닐 때만) */}
+      {isEditing && !isProcessing && onDelete && <DeleteButton onClick={onDelete} />}
     </div>
   );
 }
