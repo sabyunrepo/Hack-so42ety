@@ -4,15 +4,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import HTMLFlipBook from "react-pageflip";
 import { X } from "lucide-react";
 import MoriAI_Icon from "../assets/MoriAI_Icon.svg";
-
-// 1. API 함수와 컴포넌트 임포트
-// A_TODO: 'api/index' 파일이 .ts로 변환되었는지, getStorybookById 함수가
-// Promise<BookData>를 반환하도록 타입이 지정되었는지 확인하세요.
 import { getStorybookById } from "../api/index";
 import ClickableText from "../components/ClickableText";
 import AudioPlayer from "../components/AudioPlayer";
-// import AudioPlayer from "../components/AudioPlayer";
-// import ClickableText from "../components/ClickableText";
 
 // --- 타입 정의 ---
 
