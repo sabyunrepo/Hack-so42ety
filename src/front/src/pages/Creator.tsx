@@ -39,11 +39,10 @@ export default function Creator() {
         setVoices(voiceList);
         if (voiceList.length > 0) {
           setSelectedVoice(voiceList[0].voice_id);
+        } else {
+          alert("목소리부터 넣고오세요");
+          navigate("/settings");
         }
-        // else{
-        //   alert("목소리부터 넣고오세요")
-        //   navigate("/settings")
-        // }
       } catch (error) {
         console.error("음성 목록 불러오기 실패:", error);
       }
@@ -118,11 +117,11 @@ export default function Creator() {
   return (
     <div className=" min-h-screen p-8 font-sans relative">
       <div className="max-w-3xl mx-auto ">
-        <BackButton/>
+        <BackButton />
         {/* 상단 컨트롤 */}
         <div className="flex items-center justify-between gap-4 pt-24">
           {/* 음성 선택 */}
-          {voices.length >= 0 && (
+          {voices.length > 0 && (
             <div className="flex items-center gap-2">
               <label
                 htmlFor="voice-select"
