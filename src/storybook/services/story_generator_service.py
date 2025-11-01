@@ -10,7 +10,6 @@ from google.genai import types
 from ..core.config import settings
 from ..core.logging import get_logger
 from ..prompts.generate_story_prompt import GenerateStoryPrompt
-from ..api.schemas import create_stories_response_schema
 from ..prompts.generate_tts_expression_prompt import EnhanceAudioPrompt
 from ..api.schemas import create_stories_response_schema, TTSExpressionResponse
 
@@ -90,11 +89,11 @@ class StoryGeneratorService:
 
             # TTS Expression 가공 단계 (자동 실행)
             logger.info("[StoryGeneratorService] Starting TTS expression generation")
-
             enhanced_result = await self._generate_expression_with_story(story_result)
 
             # 감정 태그가 추가된 스토리 반환
             return enhanced_result
+
         except Exception as e:
             logger.error(
                 f"[StoryGeneratorService] GenAI story generation failed: {e}",
