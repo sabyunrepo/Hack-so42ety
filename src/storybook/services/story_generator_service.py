@@ -6,7 +6,7 @@ AI 기반 스토리 생성 및 페이지 조립 전담 서비스
 from typing import List, Optional
 from google import genai
 from google.genai import types
-
+import json
 from ..core.config import settings
 from ..core.logging import get_logger
 from ..prompts.generate_story_prompt import GenerateStoryPrompt
@@ -84,9 +84,28 @@ class StoryGeneratorService:
                     response_schema=response_schema,
                 ),
             )
-            logger.info(f"[StoryGeneratorService] GenAI API call completed: {response}")
             parsed = response.parsed
-            story_result = {"stories": parsed.stories, "title": parsed.title}
+            if parsed:
+                # 2. 자동 파싱이 성공했다면 (parsed is not None)
+                story_result = {"stories": parsed.stories, "title": parsed.title}
+            else:
+                # 3. 자동 파싱이 실패했다면(parsed is None),
+                #    로그에서 확인된 텍스트를 직접 파싱합니다.
+                logger.warning(
+                    "[StoryGeneratorService] response.parsed is None. Attempting manual parse."
+                )
+
+                # 로그에서 확인된 정확한 텍스트 위치
+                raw_text = response.candidates[0].content.parts[0].text
+
+                # JSON 문자열을 Python 딕셔너리로 변환
+                data = json.loads(raw_text)
+
+                # .get()을 사용하여 안전하게 값 추출
+                story_result = {
+                    "stories": data.get("stories", []),
+                    "title": data.get("title", "Untitled Story"),
+                }
 
             # TTS Expression 가공 단계 (자동 실행)
             logger.info("[StoryGeneratorService] Starting TTS expression generation")
@@ -122,11 +141,6 @@ class StoryGeneratorService:
 
             # 프롬프트 생성
             prompt = EnhanceAudioPrompt(stories=stories, title=title).render()
-            logger.info(
-                "[StoryGeneratorService] Calling GenAI API for TTS expression generation"
-            )
-            logger.debug(f"[StoryGeneratorService] TTS Expression Prompt: {prompt}")
-
             # GenAI API 호출 (정적 스키마 사용)
             response = await self.genai_client.aio.models.generate_content(
                 model="gemini-2.5-flash",
