@@ -1,11 +1,36 @@
-import { useEffect } from 'react';
-import { isDeepStrictEqual } from 'util';
+import { useEffect, useState } from 'react';
+import { getAllStorybooks } from '../api/index';
+
+// 일단 간단한 타입으로 시작
+interface Book {
+  id: string;
+  title?: string;
+  cover_image?: string;
+  status?: string;
+  // 나머지는 any로 허용
+  [key: string]: any;
+}
+
+interface ApiResponse {
+  books: Book[];
+  [key: string]: any; // 유연하게 시작
+}
 
 export default function Bookshelf() {
+  // 책 목록 상태
+  const [books, setBooks] = useState<Book[]>([]);
+
   // 책 목록 불러오기
   useEffect(() => {
     const fetchBooks = async () => {
-      // API 호출로 책 목록 가져오기
+      try {
+        const data = await getAllStorybooks() as ApiResponse;
+        setBooks(data.books || []);
+        console.log(data);
+      } catch (error) {
+        console.error('Failed to fetch books:', error);
+        setBooks([]);
+      }
     };
     fetchBooks();
   }, []);
