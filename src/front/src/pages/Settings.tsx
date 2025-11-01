@@ -1,3 +1,5 @@
+import { Mic } from "lucide-react";
+
 export default function Settings() {
 
   return (
@@ -5,7 +7,11 @@ export default function Settings() {
       {/* 메인 카드 */}
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-10">
         {/* 아이콘 */}
-        <div className="flex justify-center items-center mb-4"></div>
+        <div className="flex justify-center items-center mb-4">
+          <div className="w-20 h-20 rounded-full bg-yellow-100 flex justify-center items-center shadow-md">
+            <Mic className="w-12 h-12 text-yellow-400" />
+          </div>
+        </div>
 
         {/* 제목 */}
         <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
