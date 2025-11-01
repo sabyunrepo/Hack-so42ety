@@ -9,14 +9,14 @@ from core.config import settings
 from core.logging import setup_logging, get_logger
 from core.middleware import setup_middleware
 from core.registry import RouterRegistry
-from shared.dependencies import get_tts_generator
+# from shared.dependencies import get_tts_generator
 
 # Feature 라우터 자동 등록을 위한 import (Registry에 등록됨)
 import features.health.api  # noqa: F401
-import features.tts_generation.api  # noqa: F401
-import features.word_tts.api  # noqa: F401
-import features.voice_management.api  # noqa: F401
-import features.voice_clone.api  # noqa: F401
+# import features.tts_generation.api  # noqa: F401
+# import features.word_tts.api  # noqa: F401
+# import features.voice_management.api  # noqa: F401
+# import features.voice_clone.api  # noqa: F401
 
 # 로깅 설정
 setup_logging()
@@ -35,8 +35,8 @@ async def lifespan(_: FastAPI):
     logger.info(f"Version: {settings.app_version}")
 
     # TTS Generator 초기화 확인
-    tts_generator = get_tts_generator()
-    logger.info(f"TTS Generator Stats: {tts_generator.get_stats()}")
+    # tts_generator = get_tts_generator()
+    # logger.info(f"TTS Generator Stats: {tts_generator.get_stats()}")
 
     logger.info("=" * 50)
 
