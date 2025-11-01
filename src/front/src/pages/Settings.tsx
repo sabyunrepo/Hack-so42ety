@@ -85,6 +85,21 @@ export default function Settings() {
               className="w-full p-2 text-sm border border-gray-300 rounded-lg cursor-pointer focus:ring-2 focus:ring-yellow-400 focus:border-transparent disabled:opacity-60"
               disabled={loading}
             />
+
+            
+            {/* 선택된 파일 정보 */}
+            {file && (
+              <div className="p-2 bg-gray-100 border border-gray-200 rounded-lg text-xs text-gray-700">
+                📎 {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
+              </div>
+            )}
+            
+            {/* 파일 안내 */}
+            <div className="text-xs text-gray-600 leading-relaxed">
+              • 허용 형식: mp3, wav, m4a, flac, ogg<br />
+              • 최대 크기: 30MB<br />
+              • 오디오 길이: 2분 30초 ~ 3분 (3분 초과 시 자동 트리밍)
+            </div>
           </div>
 
           {/* 버튼 그룹 */}
