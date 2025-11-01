@@ -104,8 +104,8 @@ services:
         condition: service_completed_successfully
       tts-api:
         condition: service_healthy
-      storybook-api:
-        condition: service_healthy
+      # storybook-api:
+      #   condition: service_healthy
     restart: unless-stopped
 
 networks:

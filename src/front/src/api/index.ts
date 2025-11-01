@@ -1,7 +1,19 @@
 import apiClient from "./client";
 
+export type BookStatus = "process" | "success" | "error";
+export interface Book {
+  id: string;
+  title: string;
+  cover_image: string;
+  status: BookStatus;
+}
+
+interface AllStorybooksResponse {
+  books: Book[];
+}
+
 // 전체 책 조회
-export const getAllStorybooks = async () => {
+export const getAllStorybooks = async (): Promise<AllStorybooksResponse> => {
   try {
     const response = await apiClient.get("/storybook/books");
 
@@ -108,11 +120,7 @@ export const createStorybook = async ({
     console.log("스토리", stories);
     console.log("이미지", images);
     console.log("보이스 아이디", voice_id);
-    const response = await apiClient.post("/storybook/create", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const response = await apiClient.post("/storybook/create", formData);
 
     return response.data;
   } catch (error) {
@@ -149,13 +157,8 @@ export const createVoiceClone = async ({
 
   // Axios를 사용하면 non-2xx 응답은 자동으로 에러를 throw 합니다.
   // 따라서 try/catch는 이 함수를 '호출하는' 곳(handleSubmit)에서 처리합니다.
-  const response = await apiClient.post<VoiceCloneResponse>("/tts/clone/create", formData, {
-    headers: {
-      // 'multipart/form-data'는 브라우저가 FormData와 함께 자동으로 설정해줍니다.
-      // (명시적으로 적어도 문제는 없습니다.)
-      "Content-Type": "multipart/form-data",
-    },
-  });
+  // FormData 사용 시 axios가 자동으로 Content-Type과 boundary를 설정합니다.
+  const response = await apiClient.post<VoiceCloneResponse>("/tts/clone/create", formData);
 
   // 성공 시 (201 Created) response.data를 반환합니다.
   return response.data;

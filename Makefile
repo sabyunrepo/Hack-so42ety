@@ -12,30 +12,7 @@ KEY_FILE = $(CERTS_DIR)/nginx.key
 # 기본 타겟
 .DEFAULT_GOAL := help
 
-## certs: SSL 인증서 생성 (SAN 포함)
-certs:
-	@echo "==================================================="
-	@echo "  SSL 인증서 생성 중..."
-	@echo "==================================================="
-	@mkdir -p $(CERTS_DIR)
-	@if [ ! -f "$(CERT_FILE)" ]; then \
-		echo "🔐 Generating SSL certificate with SAN..."; \
-		openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-			-keyout $(KEY_FILE) \
-			-out $(CERT_FILE) \
-			-subj "/C=KR/ST=Seoul/L=Seoul/O=MoriAI/OU=Development/CN=localhost" \
-			-addext "subjectAltName=DNS:localhost,DNS:*.localhost,IP:127.0.0.1,IP:::1"; \
-		chmod 644 $(CERT_FILE); \
-		chmod 600 $(KEY_FILE); \
-		echo "✅ Certificate: $(CERT_FILE)"; \
-		echo "✅ Private Key: $(KEY_FILE)"; \
-	else \
-		echo "✅ SSL 인증서가 이미 존재합니다."; \
-	fi
-	@echo "==================================================="
-
-## up: 모든 서비스 시작 (detached mode)
-up: certs
+up:
 	@echo "==================================================="
 	@echo "  Docker 이미지 빌드 및 서비스 시작 중..."
 	@echo "==================================================="
