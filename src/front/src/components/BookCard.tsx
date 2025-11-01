@@ -73,8 +73,8 @@ export default function BookCard({
       </div>
 
       {/* 책 제목 */}
-      <div className="absolute flex flex-col font-normal inset-[82.89%_8.77%_5.26%_8.77%] justify-center leading-[0] text-[14px] text-black text-center text-nowrap">
-        <p className="leading-[26.576px] whitespace-pre">{book.title}</p>
+      <div className="absolute flex flex-col font-normal inset-[82.89%_8.77%_5.26%_8.77%] justify-center items-center text-[12px] text-black text-center leading-tight px-1">
+        <p className="line-clamp-2 text-center wrap-break-word overflow-hidden">{book.title}</p>
       </div>
       
     </div>
