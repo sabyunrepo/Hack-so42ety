@@ -13,6 +13,7 @@ from ..domain.models import Book, Page, Dialogue
 from ..storage import AbstractStorageService
 from .story_generator_service import StoryGeneratorService
 from .image_generator_service import ImageGeneratorService
+from .video_generator_service import VideoGeneratorService
 from .tts_service import TtsService
 
 logger = get_logger(__name__)
@@ -26,11 +27,13 @@ class BookOrchestratorService:
         story_generator: StoryGeneratorService,
         tts_service: TtsService,
         image_generator: ImageGeneratorService,
+        video_generator: VideoGeneratorService,
     ):
         self.storage = storage_service
         self.story_generator = story_generator
         self.tts_service = tts_service
         self.image_generator = image_generator
+        self.video_generator = video_generator
 
         logger.info("BookOrchestratorService initialized (DI mode)")
 
@@ -138,11 +141,20 @@ class BookOrchestratorService:
             image_url = await self.image_generator.generate_image_with_genai(
                 index, story, image, book_id, page_id
             )
+        if settings.use_template_mode:
+            video_url = await self.video_generator.generate_video_from_template(
+                index, story, image_url, book_id, page_id
+            )
+        else:
+            # Kling API 사용 (GenAI 대신)
+            video_url = await self.video_generator.generate_video_with_kling(
+                index, story, image_url, book_id, page_id
+            )
 
         # 2. 비디오 생성 (템플릿 또는 Kling API)
 
         # 3. Page 객체 조립
-        page = await self._assemble_page(index, image_url, video_url=None)
+        page = await self._assemble_page(index, image_url, video_url=video_url)
 
         return page
 
