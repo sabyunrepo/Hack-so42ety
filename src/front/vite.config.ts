@@ -1,90 +1,109 @@
-// import { defineConfig } from 'vite'
-// import react from '@vitejs/plugin-react'
-// import tailwindcss from '@tailwindcss/vite'
-
-// // https://vite.dev/config/
-// export default defineConfig({
-//   plugins: [react(), tailwindcss()],
-// })
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import fs from "fs";
 import path from "path";
-import type { ServerOptions } from "https";
 
-export default defineConfig(() => {
-  const certPath = path.resolve(__dirname, "../../docker/nginx/certs");
-  const keyFile = path.join(certPath, "nginx.key");
-  const certFile = path.join(certPath, "nginx.crt");
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [
+    react(),
+    tailwindcss(),
+    // 로컬 개발 환경: /data 폴더 직접 서빙
+    {
+      name: "serve-data-folder",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url?.startsWith("/data/")) {
+            // data 디렉토리 절대 경로 (projectMori/data)
+            const dataDir = path.resolve(__dirname, "../../data");
 
-  // 인증서 파일 존재 여부 및 유효성 확인
-  let httpsConfig: ServerOptions | undefined = undefined;
+            // 요청된 파일 경로
+            const requestPath = req.url.replace("/data/", "");
+            const filePath = path.join(dataDir, requestPath);
 
-  // HTTPS 활성화 옵션 (true: HTTPS, false: HTTP)
-  const enableHttps = true; // nginx 인증서 사용
+            // 보안: Path Traversal 방지
+            if (!filePath.startsWith(dataDir)) {
+              res.statusCode = 403;
+              res.end("Forbidden");
+              return;
+            }
 
-  if (enableHttps && fs.existsSync(keyFile) && fs.existsSync(certFile)) {
-    try {
-      httpsConfig = {
-        key: fs.readFileSync(keyFile),
-        cert: fs.readFileSync(certFile),
-      };
-      console.log("✅ HTTPS enabled with nginx certificates");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn("⚠️  Certificate read error, falling back to HTTP:", errorMessage);
-    }
-  } else {
-    console.log(enableHttps ? "ℹ️  No certificates found, using HTTP" : "ℹ️  HTTP mode (HTTPS disabled)");
-  }
+            // 파일 존재 확인
+            if (fs.existsSync(filePath)) {
+              const stat = fs.statSync(filePath);
 
-  return {
-    plugins: [react(), tailwindcss()],
+              if (stat.isFile()) {
+                // MIME 타입 설정
+                const ext = path.extname(filePath).toLowerCase();
+                const mimeTypes: Record<string, string> = {
+                  ".mp3": "audio/mpeg",
+                  ".wav": "audio/wav",
+                  ".ogg": "audio/ogg",
+                  ".mp4": "video/mp4",
+                  ".webm": "video/webm",
+                  ".jpg": "image/jpeg",
+                  ".jpeg": "image/jpeg",
+                  ".png": "image/png",
+                  ".gif": "image/gif",
+                  ".svg": "image/svg+xml",
+                  ".webp": "image/webp",
+                  ".json": "application/json",
+                  ".pdf": "application/pdf",
+                  ".txt": "text/plain",
+                };
 
-    server: {
-      port: 5173,
-      host: true, // Docker 환경 대응
-      https: httpsConfig,
+                const contentType = mimeTypes[ext] || "application/octet-stream";
+                res.setHeader("Content-Type", contentType);
+                res.setHeader("Accept-Ranges", "bytes");
 
-      // 개발 서버 Proxy 설정 (nginx를 통한 백엔드 접근)
-      proxy: {
-        // TTS API 프록시 (nginx 경유)
-        "/tts": {
-          target: "https://localhost",
-          changeOrigin: true,
-          secure: false, // self-signed 인증서 허용
-          configure: (proxy) => {
-            proxy.on("proxyReq", (_proxyReq, req) => {
-              console.log("[Proxy] TTS API:", req.method, req.url);
-            });
-          },
-        },
+                // 파일 스트리밍 (대용량 파일 대응)
+                const stream = fs.createReadStream(filePath);
+                stream.on("error", () => {
+                  res.statusCode = 500;
+                  res.end("Internal Server Error");
+                });
+                stream.pipe(res);
+                return;
+              } else if (stat.isDirectory()) {
+                // 디렉토리 접근 방지
+                res.statusCode = 403;
+                res.end("Directory listing not allowed");
+                return;
+              }
+            }
 
-        // Storybook API 프록시 (nginx 경유)
-        "/storybook": {
-          target: "https://localhost",
-          changeOrigin: true,
-          secure: false, // self-signed 인증서 허용
-          configure: (proxy) => {
-            proxy.on("proxyReq", (_proxyReq, req) => {
-              console.log("[Proxy] Storybook API:", req.method, req.url);
-            });
-          },
-        },
+            // 파일 없음
+            res.statusCode = 404;
+            res.end("Not Found");
+            return;
+          }
 
-        // 정적 파일 프록시 (nginx)
-        "/data": {
-          target: "https://localhost",
-          changeOrigin: true,
-          secure: false, // self-signed 인증서 허용
-          configure: (proxy) => {
-            proxy.on("proxyReq", (_proxyReq, req) => {
-              console.log("[Proxy] Static File:", req.method, req.url);
-            });
-          },
-        },
+          // /data로 시작하지 않으면 다음 미들웨어로
+          next();
+        });
       },
     },
-  };
+  ],
+
+  server: {
+    port: 5173,
+    host: true,
+
+    // 로컬 개발 시 로컬 백엔드 API 프록시 (Docker)
+    proxy: {
+      // TTS API 프록시 (로컬 Docker)
+      "/tts": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+
+      // Storybook API 프록시 (로컬 Docker)
+      "/storybook": {
+        target: "http://localhost:8001",
+        changeOrigin: true,
+      },
+      // /data는 플러그인이 직접 서빙하므로 프록시 불필요
+    },
+  },
 });

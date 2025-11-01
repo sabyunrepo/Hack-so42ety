@@ -1,16 +1,63 @@
-.PHONY: up down logs build rebuild clean help certs
+.PHONY: up down logs build rebuild clean help dev prod tunnel-logs
 
 # Docker Compose 설정
 COMPOSE_FILE = docker-compose.yml
 COMPOSE = docker compose -f $(COMPOSE_FILE)
 
-# 인증서 설정
-CERTS_DIR = docker/nginx/certs
-CERT_FILE = $(CERTS_DIR)/nginx.crt
-KEY_FILE = $(CERTS_DIR)/nginx.key
-
 # 기본 타겟
 .DEFAULT_GOAL := help
+
+## dev: 로컬 개발 환경 시작 (백엔드 + 프론트엔드)
+dev:
+	@echo "==================================================="
+	@echo "  로컬 개발 환경 시작"
+	@echo "==================================================="
+	@echo ""
+	@echo "🚀 백엔드 API 시작 중 (Docker)..."
+	@docker compose -f docker-compose.dev.yml up -d
+	@echo ""
+	@echo "✅ 백엔드 API 시작 완료!"
+	@echo "   - TTS API: http://localhost:8000"
+	@echo "   - Storybook API: http://localhost:8001"
+	@echo ""
+	@echo "==================================================="
+
+## dev-down: 로컬 개발 환경 중지
+dev-down:
+	@echo "==================================================="
+	@echo "  로컬 개발 환경 중지"
+	@echo "==================================================="
+	@docker compose -f docker-compose.dev.yml down
+	@echo "✅ 백엔드 API 중지 완료"
+	@echo "==================================================="
+
+## prod: 프로덕션 환경 시작 (Cloudflare Tunnel)
+prod:
+	@echo "==================================================="
+	@echo "  프로덕션 환경 시작 (Cloudflare Tunnel)"
+	@echo "==================================================="
+	@if [ -z "$$CLOUDFLARE_TUNNEL_TOKEN" ]; then \
+		echo "❌ Error: CLOUDFLARE_TUNNEL_TOKEN이 .env에 설정되지 않았습니다."; \
+		exit 1; \
+	fi
+	@echo "🚀 Docker Compose 서비스 시작 중..."
+	$(COMPOSE) up -d --build
+	@echo ""
+	@echo "✅ 프로덕션 환경 시작 완료!"
+	@echo ""
+	@echo "📋 서비스 상태:"
+	@$(COMPOSE) ps
+	@echo ""
+	@echo "📋 Cloudflare Tunnel 로그:"
+	@echo "   make tunnel-logs"
+	@echo ""
+	@echo "🌍 접속 URL:"
+	@echo "   https://moriai.kr"
+	@echo "==================================================="
+
+## tunnel-logs: Cloudflare Tunnel 로그 확인
+tunnel-logs:
+	@docker logs -f cloudflared
 
 up:
 	@echo "==================================================="
