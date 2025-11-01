@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 from elevenlabs import ElevenLabs
-from utils.audio_processor import AudioProcessor
+from utills.audio_processor import AudioProcessor
 
 
 # 환경 변수 로드
