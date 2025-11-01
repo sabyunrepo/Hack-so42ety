@@ -184,3 +184,110 @@ class ErrorResponse(BaseModel):
 
     class Config:
         json_schema_extra = {"example": {"detail": "Book not found"}}
+
+
+class StoriesListResponse(BaseModel):
+    """
+    동화책 시나리오 리스트 응답
+
+    Attributes:
+        stories: 각 페이지별 시나리오 텍스트 배열 (2차원 리스트)
+    """
+
+    stories: List[List[str]] = Field(
+        default_factory=list,
+    )
+
+
+# ============================================================
+# Dynamic Schema Factory
+# ============================================================
+
+
+def create_stories_response_schema(
+    max_pages: int, max_dialogues_per_page: int = None, max_title_length: int = 20
+) -> Type[BaseModel]:
+    """
+    동적으로 StoriesListResponse 스키마 생성
+
+    Args:
+        max_pages: 최대 페이지 수
+        max_dialogues_per_page: 페이지당 최대 대사 수 (선택 사항)
+        max_title_length: 제목 최대 길이 (기본값: 20)
+
+    Returns:
+        Type[BaseModel]: 동적으로 생성된 Pydantic 모델 클래스
+
+    Example:
+        >>> schema = create_stories_response_schema(max_pages=5, max_dialogues_per_page=3, max_title_length=20)
+        >>> response = genai_client.models.generate_content(
+        ...     model="gemini-2.5-flash",
+        ...     contents=prompt,
+        ...     config={"response_schema": schema}
+        ... )
+    """
+    if max_dialogues_per_page:
+        # 페이지당 대사 수도 제한
+        stories_type = List[
+            Annotated[List[str], Field(max_length=max_dialogues_per_page)]
+        ]
+        description = (
+            f"최대 {max_pages}페이지, 페이지당 최대 {max_dialogues_per_page}개 대사"
+        )
+    else:
+        # 페이지 수만 제한
+        stories_type = List[List[str]]
+        description = f"최대 {max_pages}페이지"
+
+    stories_field = Field(
+        default_factory=list,
+        max_length=max_pages,
+        description=description,
+    )
+
+    # title 필드 정의 (필수)
+    title_field = Field(
+        ...,
+        max_length=max_title_length,
+        description=f"Story title (max {max_title_length} characters)",
+    )
+
+    return create_model(
+        "DynamicStoriesListResponse",
+        title=(str, title_field),
+        stories=(stories_type, stories_field),
+        __base__=BaseModel,
+    )
+
+
+class TTSExpressionResponse(BaseModel):
+    """
+    TTS 감정 표현용 정적 스키마
+
+    Attributes:
+        title: 동화책 제목
+        stories: 감정 태그가 추가된 스토리 대사 목록 (2차원 리스트)
+    """
+
+    title: str = Field(..., description="동화책 제목")
+    stories: List[List[str]] = Field(
+        ...,
+        description="감정 태그가 추가된 스토리 대사 목록 (각 페이지는 여러 대사를 포함)",
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "My Fun Day",
+                "stories": [
+                    [
+                        "[excited] I wake up. Good morning!",
+                        "[playful] Splash, splash! [giggles]",
+                    ],
+                    [
+                        "[happy] Make a lunchbox. Yum, yum food inside.",
+                        "[excited] Crunch, crunch!",
+                    ],
+                ],
+            }
+        }
