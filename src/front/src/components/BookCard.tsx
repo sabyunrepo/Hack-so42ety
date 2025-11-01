@@ -67,6 +67,16 @@ export default function BookCard({
           className="absolute border-[2px] border-black border-solid inset-0 rounded-[13px]"
         />
       </div>
+      {/* 책 제목 배경 (하단 흰색 영역) */}
+      <div className="absolute bottom-0 left-0 right-0 top-[78.07%]">
+        <div className="w-full h-full bg-white border-[2px] border-black rounded-b-[13px]" />
+      </div>
+
+      {/* 책 제목 */}
+      <div className="absolute flex flex-col font-normal inset-[82.89%_8.77%_5.26%_8.77%] justify-center leading-[0] text-[14px] text-black text-center text-nowrap">
+        <p className="leading-[26.576px] whitespace-pre">{book.title}</p>
+      </div>
+      
     </div>
   );
 }
