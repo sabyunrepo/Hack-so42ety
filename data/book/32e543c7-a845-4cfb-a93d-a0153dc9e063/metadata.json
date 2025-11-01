@@ -1,0 +1,70 @@
+{
+  "id": "32e543c7-a845-4cfb-a93d-a0153dc9e063",
+  "title": "My Mountain Adventure",
+  "cover_image": "/data/image/32e543c7-a845-4cfb-a93d-a0153dc9e063/0_page_1.png",
+  "voice_id": "uzyfnLLlKo55AbgBU5uH",
+  "status": "success",
+  "pages": [
+    {
+      "id": "53fb6abc-1708-44d8-bf66-158f7ffb6b58",
+      "index": 1,
+      "type": "video",
+      "content": "/data/video/32e543c7-a845-4cfb-a93d-a0153dc9e063/page_1.mp4",
+      "dialogues": [
+        {
+          "id": "31245bae-cbaa-47ca-a3dd-7d9423a3eb60",
+          "index": 1,
+          "text": "I go to the mountain. With Daddy and Grandpa. Yay! So fun!",
+          "part_audio_url": "/data/sound/01b8ea85-3b15-43f1-b9e0-9c35ffa51914/c8d9e32d-db4b-4925-b62b-901c91b4fa20.mp3"
+        }
+      ],
+      "fallback_image": "/data/image/32e543c7-a845-4cfb-a93d-a0153dc9e063/0_page_1.png"
+    },
+    {
+      "id": "e3fc5537-e18d-4970-ac9a-7bfba5872745",
+      "index": 2,
+      "type": "video",
+      "content": "/data/video/32e543c7-a845-4cfb-a93d-a0153dc9e063/page_2.mp4",
+      "dialogues": [
+        {
+          "id": "7defa911-ae8f-48e0-b7b3-627fefe84d1d",
+          "index": 1,
+          "text": "Daddy gives me a piggyback ride. Up, up, up! Daddy is the best!",
+          "part_audio_url": "/data/sound/01b8ea85-3b15-43f1-b9e0-9c35ffa51914/a31822a3-a6f1-437d-8286-ba8d49834f88.mp3"
+        }
+      ],
+      "fallback_image": "/data/image/32e543c7-a845-4cfb-a93d-a0153dc9e063/1_page_2.png"
+    },
+    {
+      "id": "ad56a4f4-8c9f-4b74-8dfa-81f485da1817",
+      "index": 3,
+      "type": "video",
+      "content": "/data/video/32e543c7-a845-4cfb-a93d-a0153dc9e063/page_3.mp4",
+      "dialogues": [
+        {
+          "id": "b970fbe5-e1df-401b-b09f-27c2d77da569",
+          "index": 1,
+          "text": "At the stream, I throw rocks. Splash, splash! I put my feet in the water. So cool!",
+          "part_audio_url": "/data/sound/01b8ea85-3b15-43f1-b9e0-9c35ffa51914/4f09ade2-bd3d-42f3-8706-b50eacb5006b.mp3"
+        }
+      ],
+      "fallback_image": "/data/image/32e543c7-a845-4cfb-a93d-a0153dc9e063/2_page_3.png"
+    },
+    {
+      "id": "aeb0a3f9-59a9-4885-9cbd-a0eaa6d207be",
+      "index": 4,
+      "type": "video",
+      "content": "/data/video/32e543c7-a845-4cfb-a93d-a0153dc9e063/page_4.mp4",
+      "dialogues": [
+        {
+          "id": "78a7a45a-0baa-4460-94bb-d43175a5d20e",
+          "index": 1,
+          "text": "We sit on chairs by the stream. I eat yummy corn. Yum, yum! So good!",
+          "part_audio_url": "/data/sound/01b8ea85-3b15-43f1-b9e0-9c35ffa51914/9c1062f6-b510-462e-bff5-4c00646850c7.mp3"
+        }
+      ],
+      "fallback_image": "/data/image/32e543c7-a845-4cfb-a93d-a0153dc9e063/3_page_4.png"
+    }
+  ],
+  "created_at": "2025-11-01T18:06:48.565181"
+}
