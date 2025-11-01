@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { createStorybook, getVoices } from "../api/index";
 import StoryInput from "../components/StoryInput";
 import BackButton from "../components/BackButton";
@@ -23,7 +22,6 @@ interface GetVoicesResponse {
 }
 
 export default function Creator() {
-  const navigate = useNavigate();
   const [pages, setPages] = useState<Page[]>([
     { id: 1, image: null, story: "" },
   ]);
@@ -58,26 +56,21 @@ export default function Creator() {
   }, []);
 
   const addPage = () => {
-        console.log("현재 페이지 수:", pages.length);
-
     if (pages.length > 9) {
-      console.log("페이지 추가 제한: 최대 페이지 수 도달");
-      alert("동화는 최대 10페이지까지 만들 수 있어요.");
+      setShowMaxPageModal(true);
       return;
     }
     const newPage: Page = { id: Date.now(), image: null, story: "" };
     setPages([...pages, newPage]);
-        console.log("현재 페이지 수:", pages.length);
-    console.log("pages:", pages);
   };
 
   const removePage = (id: number) => {
-        console.log("현재 페이지 수:", pages.length);
+    console.log("현재 페이지 수:", pages.length);
 
     if (pages.length > 1) {
       setPages(pages.filter((page) => page.id !== id));
     } else {
-      alert("최소 한 페이지는 있어야 해요.");
+      setShowMinPageModal(true);
     }
   };
 
@@ -100,7 +93,7 @@ export default function Creator() {
     const images = pages.map((page) => page.image) as File[];
 
     if (images.some((img) => !img) || stories.some((s) => s.trim() === "")) {
-      alert("모든 페이지에 이미지와 이야기를 채워주세요.");
+      setShowValidationModal(true);
       setIsSubmitting(false);
       return;
     }
@@ -112,11 +105,10 @@ export default function Creator() {
         voice_id: selectedVoice,
       });
 
-      alert("생성 완료까지 10분 걸림");
-      navigate("/");
+      setShowSuccessModal(true);
     } catch (error) {
       console.error("전송 실패:", error);
-      alert("오류가 발생했어요. 다시 시도해주세요.");
+      setShowErrorModal(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -267,6 +259,52 @@ export default function Creator() {
         message="목소리부터 넣고오세요"
         buttonText="목소리 설정하러 가기"
         redirectTo="/settings"
+      />
+
+      {/* 최대 페이지 제한 모달 */}
+      <Modal
+        isOpen={showMaxPageModal}
+        onClose={() => setShowMaxPageModal(false)}
+        title="페이지 제한"
+        message="동화는 최대 10페이지까지 만들 수 있어요."
+        buttonText="확인"
+      />
+
+      {/* 최소 페이지 제한 모달 */}
+      <Modal
+        isOpen={showMinPageModal}
+        onClose={() => setShowMinPageModal(false)}
+        title="페이지 제한"
+        message="최소 한 페이지는 있어야 해요."
+        buttonText="확인"
+      />
+
+      {/* 검증 실패 모달 */}
+      <Modal
+        isOpen={showValidationModal}
+        onClose={() => setShowValidationModal(false)}
+        title="입력 확인"
+        message="모든 페이지에 이미지와 이야기를 채워주세요."
+        buttonText="확인"
+      />
+
+      {/* 성공 모달 */}
+      <Modal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title="동화책 생성"
+        message="생성 완료까지 10분 걸림"
+        buttonText="확인"
+        redirectTo="/"
+      />
+
+      {/* 에러 모달 */}
+      <Modal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        title="오류 발생"
+        message="오류가 발생했어요. 다시 시도해주세요."
+        buttonText="확인"
       />
     </div>
   );
