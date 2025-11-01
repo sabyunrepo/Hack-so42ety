@@ -43,7 +43,7 @@ export default function Bookshelf() {
       const previous = books;
       setBooks((prev) => prev.filter((book) => book.id !== bookId));
       try {
-        // await deleteBook(bookId);
+        await deleteBook(bookId);
         alert("책 삭제에 성공했습니다.");
       } catch (err) {
         console.error("Failed to delete book:", err);
