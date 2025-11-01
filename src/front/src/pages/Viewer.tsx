@@ -9,6 +9,8 @@ import MoriAI_Icon from "../assets/MoriAI_Icon.svg";
 // A_TODO: 'api/index' 파일이 .ts로 변환되었는지, getStorybookById 함수가
 // Promise<BookData>를 반환하도록 타입이 지정되었는지 확인하세요.
 import { getStorybookById } from "../api/index";
+import ClickableText from "../components/ClickableText";
+import AudioPlayer from "../components/AudioPlayer";
 // import AudioPlayer from "../components/AudioPlayer";
 // import ClickableText from "../components/ClickableText";
 
@@ -156,7 +158,7 @@ const Viewer: React.FC = () => {
         drawShadow={true}
         showPageCorners={true}
         flippingTime={800}
-        disableFlipByClick={false}
+        disableFlipByClick={true}
         clickEventForward={false}
         size="fixed"
       >
@@ -238,8 +240,8 @@ const Viewer: React.FC = () => {
                 onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                 onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
               >
-                {/* <ClickableText text={dialogue.text} book_id={bookId!} />
-                <AudioPlayer src={`${dialogue.part_audio_url}`} /> */}
+                <ClickableText text={dialogue.text} book_id={bookId!} />
+                <AudioPlayer src={`${dialogue.part_audio_url}`} />
               </div>
             ))}
           </Page>,
