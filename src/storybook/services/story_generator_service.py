@@ -61,6 +61,7 @@ class StoryGeneratorService:
             response_schema = create_stories_response_schema(
                 max_pages=max_pages,
                 max_dialogues_per_page=max_dialogues_per_page,
+                max_chars_per_dialogue=85,
                 max_title_length=20,
             )
 
