@@ -6,9 +6,11 @@ const ALLOWED_AUDIO_TYPES = [".mp3", ".wav", ".m4a", ".flac", ".ogg"];
 const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
 
 export default function Settings() {
+  const [name, setName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,6 +38,17 @@ export default function Settings() {
     setError("");
   };
 
+  const handleReset = () => {
+    setName("");
+    setDescription("");
+    setFile(null);
+    setMessage("");
+    setError("");
+    // 파일 input 초기화
+    const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-5 font-sans">
       {/* 메인 카드 */}
@@ -56,7 +69,7 @@ export default function Settings() {
         </p>
 
         {/* 설정 폼 */}
-        <form className="space-y-5"></form>
+        <form className="space-y-5">
           {/* 이름 입력 */}
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">
@@ -103,7 +116,28 @@ export default function Settings() {
           </div>
 
           {/* 버튼 그룹 */}
-          <div className="flex gap-3 mt-6"></div>
+          <div className="flex gap-3 mt-6">
+            <button
+              type="submit"
+              className={`flex-1 py-3.5 text-sm font-semibold border-none rounded-lg transition-all ${
+                loading
+                  ? "bg-yellow-300 text-white opacity-60 cursor-not-allowed"
+                  : "bg-yellow-400 text-white hover:bg-yellow-500"
+              }`}
+              disabled={loading}
+            >
+              {loading ? "업로드 중..." : "생성 요청"}
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="flex-1 py-3.5 text-sm font-semibold bg-gray-200 text-gray-700 border-none rounded-lg hover:bg-gray-300 transition-all disabled:opacity-60"
+              disabled={loading}
+            >
+              초기화
+            </button>
+          </div>
+        </form>
 
           {/* 안내 사항 */}
       </div>
