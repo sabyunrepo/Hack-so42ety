@@ -410,23 +410,24 @@ class TtsGenerator:
         voices = []
         for x in response.voices:
             pprint.pprint(x)
-            if x.category in "cloned":
-                temp_data = {
-                    "voice_label": x.name,
-                    "voice_id": x.voice_id,
-                    "description": x.description or "",
-                    "category": (x.category if hasattr(x, "category") else "unknown"),
-                    "preview_url": (
-                        x.preview_url if hasattr(x, "preview_url") else "unknown"
-                    ),
-                    "labels": (x.labels if hasattr(x, "labels") and x.labels else {}),
-                }
-                # preview_url이 None이면 processing, 아니면 success
-                if x.preview_url is None:
-                    temp_data["state"] = "processing"
-                else:
-                    temp_data["state"] = "success"
-                voices.append(temp_data)
+            if x.category == "premade":
+                continue
+            temp_data = {
+                "voice_label": x.name,
+                "voice_id": x.voice_id,
+                "description": x.description or "",
+                "category": (x.category if hasattr(x, "category") else "unknown"),
+                "preview_url": (
+                    x.preview_url if hasattr(x, "preview_url") else "unknown"
+                ),
+                "labels": (x.labels if hasattr(x, "labels") and x.labels else {}),
+            }
+            # preview_url이 None이면 processing, 아니면 success
+            if x.preview_url is None:
+                temp_data["state"] = "processing"
+            else:
+                temp_data["state"] = "success"
+            voices.append(temp_data)
 
         return voices
 
