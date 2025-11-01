@@ -151,8 +151,16 @@ export default function Settings() {
             {error}
           </div>
         )}
-        
+
         {/* 안내 사항 */}
+        <div className="mt-8 p-5 bg-yellow-50 border border-yellow-300 rounded-lg">
+          <h3 className="text-base font-semibold text-black mb-3">안내사항</h3>
+          <ul className="m-0 pl-5 text-xs text-gray-800 leading-loose space-y-1">
+            <li>🟡 목소리 생성 완료까지 약 3분 소요됩니다.</li>
+            <li>🟡 2분 30초 미만의 오디오는 거부됩니다.</li>
+            <li>🟡 3분 이상의 오디오는 자동으로 2분 59초로 트리밍됩니다.</li>
+          </ul>
+        </div>
       </div>
     </div>
   )
