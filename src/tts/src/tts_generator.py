@@ -409,7 +409,6 @@ class TtsGenerator:
 
         voices = []
         for x in response.voices:
-            pprint.pprint(x)
             if x.category == "premade":
                 continue
             temp_data = {
