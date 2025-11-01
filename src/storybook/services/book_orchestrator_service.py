@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from ..core.config import settings
 from ..core.logging import get_logger
-from ..domain.models import Book, Page
+from ..domain.models import Book, Page, Dialogue
 from ..storage import AbstractStorageService
 from .story_generator_service import StoryGeneratorService
 from .image_generator_service import ImageGeneratorService
@@ -50,6 +50,20 @@ class BookOrchestratorService:
                 f"Stories and images count mismatch: {len(stories)} vs {len(images)}"
             )
 
+        # 객체 초기화 (status='process')
+        if book_id:
+            # 기존 Book ID 사용 (BackgroundTasks에서 호출 시)
+            book = Book(
+                id=book_id,
+                title="",  # 기본 제목 (나중에 업데이트 가능)
+                cover_image="",
+                status="success",
+                pages=[],
+            )
+        else:
+            # 새 Book 생성 (일반 호출 시)
+            book = Book(title="", cover_image="", status="success", pages=[])
+
         result = await self.story_generator.generate_story_with_ai(stories)
         stories = result["stories"]
 
@@ -69,20 +83,32 @@ class BookOrchestratorService:
         logger.info(f"tts_results: {tts_results}")
         logger.info(f"page_results: {page_results}")
 
-        # Book 객체 초기화 (status='process')
-        if book_id:
-            # 기존 Book ID 사용 (BackgroundTasks에서 호출 시)
-            book = Book(
-                id=book_id,
-                title="",  # 기본 제목 (나중에 업데이트 가능)
-                cover_image="",
-                status="success",
-                pages=[],
-            )
-        else:
-            # 새 Book 생성 (일반 호출 시)
-            book = Book(title="", cover_image="", status="success", pages=[])
+        # 5. TTS 결과를 각 Page의 Dialogue로 추가
+        for page_idx, (page, story_dialogues, tts_urls) in enumerate(
+            zip(page_results, stories, tts_results)
+        ):
+            # 각 대사마다 Dialogue 객체 생성
+            for dialogue_idx, (text, audio_url) in enumerate(
+                zip(story_dialogues, tts_urls if tts_urls else [])
+            ):
+                # 감정 태그 제거 (예: "[excited] Hello!" -> "Hello!")
+                clean_text = re.sub(r"\[[\w\s]+\]\s*", "", text).strip()
 
+                dialogue = Dialogue(
+                    index=dialogue_idx + 1,
+                    text=clean_text,
+                    part_audio_url=audio_url if audio_url else "",
+                )
+                page.dialogues.append(dialogue)
+
+            logger.info(
+                f"[BookOrchestratorService] Page {page_idx + 1}: {len(page.dialogues)} dialogues added"
+            )
+
+            # 6. Book 객체 조합
+            book.pages = page_results
+
+        # Book
         return book
 
     async def _generate_page(

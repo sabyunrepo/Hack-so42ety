@@ -11,6 +11,8 @@ from ..core.config import settings
 from ..core.logging import get_logger
 from ..prompts.generate_story_prompt import GenerateStoryPrompt
 from ..api.schemas import create_stories_response_schema
+from ..prompts.generate_tts_expression_prompt import EnhanceAudioPrompt
+from ..api.schemas import create_stories_response_schema, TTSExpressionResponse
 
 logger = get_logger(__name__)
 
@@ -89,12 +91,67 @@ class StoryGeneratorService:
             # TTS Expression 가공 단계 (자동 실행)
             logger.info("[StoryGeneratorService] Starting TTS expression generation")
 
-            # 감정 태그가 추가된 스토리 반환
-            return story_result
+            enhanced_result = await self._generate_expression_with_story(story_result)
 
+            # 감정 태그가 추가된 스토리 반환
+            return enhanced_result
         except Exception as e:
             logger.error(
                 f"[StoryGeneratorService] GenAI story generation failed: {e}",
                 exc_info=True,
             )
             return {"stories": [[] for _ in input_texts], "title": "Untitled Story"}
+
+    async def _generate_expression_with_story(self, story: dict) -> dict:
+        """
+        생성된 스토리에 TTS용 감정/표현 태그를 추가
+
+        Args:
+            story: {"stories": List[List[str]], "title": str} 형태의 스토리 데이터
+
+        Returns:
+            dict: {"stories": List[List[str]], "title": str} 감정 태그가 추가된 스토리
+        """
+        if not self.genai_client:
+            logger.error("GenAI client is not initialized")
+            return story
+
+        try:
+            stories = story["stories"]
+            title = story["title"]
+
+            # 프롬프트 생성
+            prompt = EnhanceAudioPrompt(stories=stories, title=title).render()
+            logger.info(
+                "[StoryGeneratorService] Calling GenAI API for TTS expression generation"
+            )
+            logger.debug(f"[StoryGeneratorService] TTS Expression Prompt: {prompt}")
+
+            # GenAI API 호출 (정적 스키마 사용)
+            response = await self.genai_client.aio.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    thinking_config=types.ThinkingConfig(
+                        thinking_budget=0
+                    ),  # Disables thinking
+                    temperature=0.1,
+                    response_mime_type="application/json",
+                    response_schema=TTSExpressionResponse,
+                ),
+            )
+            logger.info(
+                f"[StoryGeneratorService] TTS Expression API call completed: {response}"
+            )
+
+            # 파싱된 응답 반환
+            parsed = response.parsed
+            return {"stories": parsed.stories, "title": parsed.title}
+
+        except Exception as e:
+            logger.error(
+                f"[StoryGeneratorService] TTS expression generation failed: {e}",
+                exc_info=True,
+            )
+            # 실패 시 원본 스토리 반환
+            return story
