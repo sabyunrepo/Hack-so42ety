@@ -1,23 +1,9 @@
-# HTTP Server - Redirect to HTTPS
+# Production Nginx Configuration (Cloudflare Tunnel - HTTP Only)
+# Cloudflare Tunnel이 HTTPS를 처리하므로 Nginx는 HTTP만 사용
+
 server {
     listen 80;
     server_name localhost;
-    return 301 https://$server_name$request_uri;
-}
-
-# HTTPS Server
-server {
-    listen 443 ssl;
-    server_name localhost;
-
-    # SSL Certificate
-    ssl_certificate /etc/nginx/certs/nginx.crt;
-    ssl_certificate_key /etc/nginx/certs/nginx.key;
-
-    # SSL Configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
 
     root /usr/share/nginx/html;
     index index.html;
@@ -29,66 +15,85 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 
-    # Static data folder access (use ^~ to prevent regex matching)
+    # Cloudflare Real IP 복원
+    set_real_ip_from 173.245.48.0/20;
+    set_real_ip_from 103.21.244.0/22;
+    set_real_ip_from 103.22.200.0/22;
+    set_real_ip_from 103.31.4.0/22;
+    set_real_ip_from 141.101.64.0/18;
+    set_real_ip_from 108.162.192.0/18;
+    set_real_ip_from 190.93.240.0/20;
+    set_real_ip_from 188.114.96.0/20;
+    set_real_ip_from 197.234.240.0/22;
+    set_real_ip_from 198.41.128.0/17;
+    set_real_ip_from 162.158.0.0/15;
+    set_real_ip_from 104.16.0.0/13;
+    set_real_ip_from 104.24.0.0/14;
+    set_real_ip_from 172.64.0.0/13;
+    set_real_ip_from 131.0.72.0/22;
+    real_ip_header CF-Connecting-IP;
+
+    # Static data folder access
     location ^~ /data/ {
         alias /data/;
-        autoindex on;  # Enable directory listing
+        autoindex on;
         autoindex_exact_size off;
         autoindex_localtime on;
         add_header Cache-Control "no-cache";
     }
 
-    # TTS API Documentation (FastAPI provides these paths directly)
+    # TTS API Documentation (FastAPI)
     location /tts-docs {
-        proxy_pass http://tts-api:${TTS_API_PORT};
+        proxy_pass http://tts-api:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
     location /tts-redoc {
-        proxy_pass http://tts-api:${TTS_API_PORT};
+        proxy_pass http://tts-api:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
-    # Storybook API Documentation (FastAPI provides these paths directly)
+    # Storybook API Documentation (FastAPI)
     location /storybook-docs {
-        proxy_pass http://storybook-api:${STORYBOOK_API_PORT};
+        proxy_pass http://storybook-api:8001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
     location /storybook-redoc {
-        proxy_pass http://storybook-api:${STORYBOOK_API_PORT};
+        proxy_pass http://storybook-api:8001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
-    # TTS API Proxy (internal network with dynamic port)
+    # TTS API Proxy (internal network)
     location /tts/ {
-        proxy_pass http://tts-api:${TTS_API_PORT};
+        proxy_pass http://tts-api:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
-    # Storybook API Proxy (internal network with dynamic port)
+    # Storybook API Proxy (internal network)
     location /storybook/ {
-        proxy_pass http://storybook-api:${STORYBOOK_API_PORT};
+        proxy_pass http://storybook-api:8001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
+
     # Cache static assets for app files
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         root /usr/share/nginx/html;
