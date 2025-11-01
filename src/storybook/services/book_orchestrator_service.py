@@ -29,6 +29,7 @@ class BookOrchestratorService:
         stories: List[str],
         images: List[dict],
         book_id: Optional[str] = None,
+        voice_id: Optional[str] = None,
     ) -> Book:
         # 입력 검증
         if not stories or not images:

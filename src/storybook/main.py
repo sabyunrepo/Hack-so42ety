@@ -46,6 +46,7 @@ async def background_create_full_book(
     book_id: str,
     stories: List[str],
     images_data: List[dict],
+    voice_id: Optional[str],
     book_service: BookOrchestratorService,
     book_repository: InMemoryBookRepository,
 ):
@@ -53,7 +54,7 @@ async def background_create_full_book(
 
         # 기존 create_book_with_tts 활용 (이미지 생성 + TTS 생성 + 기타 작업)
         book = await book_service.create_book_with_tts(
-            stories=stories, images=images_data, book_id=book_id
+            stories=stories, images=images_data, book_id=book_id, voice_id=voice_id
         )
 
         # Repository 업데이트 (status="success" 또는 "error")
@@ -107,6 +108,7 @@ async def create_book(
     images: List[UploadFile] = File(
         ..., description="각 페이지의 이미지 파일 배열 (같은 키 'images'를 반복 전송)"
     ),
+    voice_id: Optional[str] = Form(default=None, description="TTS 음성 ID"),
     book_repository: InMemoryBookRepository = Depends(get_book_repository),
     book_service: BookOrchestratorService = Depends(get_book_service),
 ):
@@ -115,6 +117,7 @@ async def create_book(
         title="",  # 기본 제목
         cover_image="",  # 나중에 설정
         status="process",
+        voice_id=voice_id,
         pages=[],  # 빈 페이지
     )
 
@@ -140,6 +143,7 @@ async def create_book(
         background_create_full_book,
         book_id=saved_book.id,
         stories=stories,
+        voice_id=voice_id,
         images_data=images_data,  # bytes 전달
         book_service=book_service,  # DI
         book_repository=book_repository,  # DI
