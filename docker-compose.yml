@@ -1,0 +1,133 @@
+services:
+  tts-api:
+    build:
+      context: .
+      dockerfile: ./docker/tts/Dockerfile
+    image: tts-api
+    container_name: tts-api
+    init: true
+    expose:
+      - "${TTS_API_PORT:-8000}"
+    volumes:
+      # 개발 모드: 소스 코드 실시간 반영 (주석 해제)
+      # - ./src/tts:/app/tts
+      # 프로덕션 모드: 데이터 볼륨만 마운트
+      - data-volume:/app/data
+    environment:
+      - TTS_API_PORT=${TTS_API_PORT:-8000}
+      - DEBUG=${DEBUG:-false}
+      - UVICORN_RELOAD=${UVICORN_RELOAD:-false}
+    env_file:
+      - .env
+    networks:
+      - moriai-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:${TTS_API_PORT:-8000}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  storybook-api:
+    build:
+      context: .
+      dockerfile: ./docker/storybook/Dockerfile
+    image: storybook-api
+    container_name: storybook-api
+    init: true
+    expose:
+      - "${STORYBOOK_API_PORT:-8001}"
+    volumes:
+      - storybook-data:/app/storybook
+      - data-volume:/app/data
+    environment:
+      - STORYBOOK_API_PORT=${STORYBOOK_API_PORT:-8001}
+      - TTS_API_PORT=${TTS_API_PORT:-8000}
+      - DEBUG=${DEBUG:-false}
+      - UVICORN_RELOAD=${UVICORN_RELOAD:-false}
+      - BOOK_DATA_DIR=${BOOK_DATA_DIR}
+      - IMAGE_DATA_DIR=${IMAGE_DATA_DIR}
+      - VIDEO_DATA_DIR=${VIDEO_DATA_DIR}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - KLING_ACCESS_KEY=${KLING_ACCESS_KEY}
+      - KLING_SECRET_KEY=${KLING_SECRET_KEY}
+      - USE_TEMPLATE_MODE=${USE_TEMPLATE_MODE}
+      - TTS_DEFAULT_VOICE_ID=${TTS_DEFAULT_VOICE_ID}
+    env_file:
+      - .env
+    networks:
+      - moriai-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:${STORYBOOK_API_PORT:-8001}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend-builder:
+    build:
+      context: ./src/front
+      dockerfile: ../../docker/front/Dockerfile
+    image: frontend-builder
+    container_name: frontend-builder
+    volumes:
+      - ./src/front:/app
+      - /app/node_modules
+    networks:
+      - moriai-network
+    restart: "no"
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./docker/nginx/Dockerfile
+    image: nginx
+    container_name: nginx
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./src/front/dist:/usr/share/nginx/html:ro
+      - ./data:/data:ro
+      - ./docker/nginx/certs:/etc/nginx/certs
+    environment:
+      - TTS_API_PORT=${TTS_API_PORT:-8000}
+      - STORYBOOK_API_PORT=${STORYBOOK_API_PORT:-8001}
+    env_file:
+      - .env
+    networks:
+      - moriai-network
+    depends_on:
+      frontend-builder:
+        condition: service_completed_successfully
+      tts-api:
+        condition: service_healthy
+      storybook-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  moriai-network:
+    driver: bridge
+
+volumes:
+  tts-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./src/tts
+  storybook-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./src/storybook
+  data-volume:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
