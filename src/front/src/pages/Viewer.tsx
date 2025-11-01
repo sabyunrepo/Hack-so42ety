@@ -115,7 +115,7 @@ const Viewer: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div className="p-8">스토리북을 불러오는 중...</div>;
+    return <div className="p-8"></div>;
   }
 
   if (isError) {
@@ -124,11 +124,11 @@ const Viewer: React.FC = () => {
 
   // 10. book 객체가 null이 아님을 TypeScript에 확인
   if (!book) {
-    return <div className="p-8">스토리북 데이터를 찾을 수 없습니다.</div>;
+    return <div className="p-8"></div>;
   }
 
   return (
-    <div className="p-7 bg-orange-50 flex flex-col justify-center items-center ">
+    <div className="p-7 flex flex-col justify-center items-center ">
       <div className="relative flex items-center justify-center w-full mb-3">
         <h1 className="text-3xl font-bold mb-4">{book.title || "제목 없음"}</h1>
         <button

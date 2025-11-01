@@ -25,10 +25,11 @@ export default function BookCard({
   onClick,
 }: BookCardProps) {
   const isProcessing = book.status === "process";
+  const isError = book.status === "error";
 
   const handleClick = () => {
-    // process 상태일 때는 클릭 불가
-    if (isProcessing) {
+    // process 또는 error 상태일 때는 클릭 불가
+    if (isProcessing || isError) {
       return;
     }
     if (!isEditing && onClick) {
@@ -58,7 +59,7 @@ export default function BookCard({
   return (
     <div
       className={`relative h-[228px] w-[171px] transition-transform ${
-        isProcessing
+        isProcessing || isError
           ? "cursor-not-allowed opacity-75"
           : "cursor-pointer hover:scale-105 hover:z-10"
       }`}
@@ -94,6 +95,15 @@ export default function BookCard({
         <div className="absolute inset-0 bg-black opacity-90 rounded-[13px] flex flex-col items-center justify-center z-20 pointer-events-none">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mb-3 "></div>
           <p className="text-white font-bold text-lg">생성중...</p>
+        </div>
+      )}
+
+      {/* 에러 오버레이 */}
+      {isError && (
+        <div className="absolute inset-0 bg-red-600 opacity-90 rounded-[13px] flex flex-col items-center justify-center z-20 pointer-events-none">
+          <div className="text-white text-5xl mb-2">⚠️</div>
+          <p className="text-white font-bold text-lg">생성 실패</p>
+          <p className="text-white text-xs mt-1">삭제 후 재시도</p>
         </div>
       )}
 

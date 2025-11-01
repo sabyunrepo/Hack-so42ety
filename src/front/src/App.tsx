@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 import Header from "./components/Header";
+import Footer from "./components/Footer";
 import Bookshelf from "./pages/Bookshelf";
 import Settings from "./pages/Settings";
 import Creator from "./pages/Creator";
@@ -19,6 +20,7 @@ function App() {
             <Route path="*" element={<div>404</div>} />
           </Routes>
         </div>
+        <Footer />
       </div>
     </>
   );
