@@ -17,9 +17,8 @@ from fastapi import (
 
 from .core.logging import setup_logging, get_logger
 from .core.lifespan import lifespan
-from .core.dependencies import (
-    get_book_repository,
-)
+from .core.dependencies import get_book_repository, get_book_service
+from .services import BookOrchestratorService
 from .api.schemas import (
     BooksListResponse,
     BookDetailResponse,
@@ -74,8 +73,10 @@ async def create_book(
     images: List[UploadFile] = File(
         ..., description="각 페이지의 이미지 파일 배열 (같은 키 'images'를 반복 전송)"
     ),
+    book_service: BookOrchestratorService = Depends(get_book_service),
 ):
-    return {"message": "This endpoint is create book"}
+    book = await book_service.create_book_with_tts(stories=stories, images=images)
+    return {"message": "Ok"}
 
 
 @app.get(
