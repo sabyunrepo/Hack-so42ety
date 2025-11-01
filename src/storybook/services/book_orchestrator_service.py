@@ -40,6 +40,10 @@ class BookOrchestratorService:
                 f"Stories and images count mismatch: {len(stories)} vs {len(images)}"
             )
 
+        result = await self.story_generator.generate_story_with_ai(stories)
+        stories = result["stories"]
+        book.title = result.get("title", "Untitled Story")
+
         # Book 객체 초기화 (status='process')
         if book_id:
             # 기존 Book ID 사용 (BackgroundTasks에서 호출 시)
