@@ -75,7 +75,7 @@ export default function Settings() {
     } catch (err: unknown) {
       // Axios 에러 처리
       let errorMessage = "알 수 없는 오류가 발생했습니다.";
-      
+
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosError = err as { response?: { data?: { detail?: string } } };
         errorMessage = axiosError.response?.data?.detail || errorMessage;
@@ -83,7 +83,7 @@ export default function Settings() {
         const error = err as { message: string };
         errorMessage = error.message;
       }
-      
+
       setError(`❌ ${errorMessage}`);
     } finally {
       setLoading(false);
@@ -106,7 +106,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-5 font-sans">
+    <div className="min-h-screen py-10 px-5 font-sans">
       {/* 헤더 - 뒤로가기 버튼 */}
       <div className="relative flex items-center justify-center w-full mb-3">
         <button
@@ -171,7 +171,7 @@ export default function Settings() {
                 📎 {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
               </div>
             )}
-            
+
             {/* 파일 안내 */}
             <div className="text-xs text-gray-600 leading-relaxed">
               • 허용 형식: mp3, wav, m4a, flac, ogg<br />

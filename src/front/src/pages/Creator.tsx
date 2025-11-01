@@ -122,7 +122,7 @@ export default function Creator() {
   };
 
   return (
-    <div className=" min-h-screen p-8 font-sans relative">
+    <div className="p-8 font-sans relative">
       <div className="max-w-3xl mx-auto ">
         <BackButton />
         {/* 상단 컨트롤 */}

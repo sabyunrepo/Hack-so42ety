@@ -46,11 +46,13 @@ export default function Bookshelf() {
     setShowConfirmModal(true); // 모달 표시
   };
 
-  const confirmDeleteBook = () => {
+  const confirmDeleteBook = async () => {
+    if (!bookToDelete)
+      return
     const previous = books;
     setBooks((prev) => prev.filter((book) => book.id !== bookToDelete));
     try {
-      // await deleteBook(bookId);
+      await deleteBook(bookToDelete);
     } catch (err) {
       console.error("Failed to delete book:", err);
       setBooks(previous);
@@ -76,7 +78,7 @@ export default function Bookshelf() {
 
   if (isLoading) {
     return (
-      <div className="p-8 bg-orange-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-orange-50 h-full flex items-center justify-center">
         <div className="text-xl font-medium">책장을 불러오는 중...</div>
       </div>
     );
@@ -84,14 +86,14 @@ export default function Bookshelf() {
 
   if (error) {
     return (
-      <div className="p-8 bg-orange-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-orange-50 h-full flex items-center justify-center">
         <div className="text-xl font-medium text-red-600">{error}</div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 bg-orange-50 min-h-screen">
+    <div className="p-8 bg-orange-50 h-full">
       <div className="flex justify-end mb-6">
         <button
           onClick={toggleEditMode}
