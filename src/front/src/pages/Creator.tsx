@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { createStorybook, getVoices } from "../api/index";
 import StoryInput from "../components/StoryInput";
 import BackButton from "../components/BackButton";
+import Modal from "../components/Modal";
 
 interface Page {
   id: number;
@@ -29,6 +30,12 @@ export default function Creator() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<string>("");
+  const [showVoiceWarningModal, setShowVoiceWarningModal] = useState(false);
+  const [showMaxPageModal, setShowMaxPageModal] = useState(false);
+  const [showMinPageModal, setShowMinPageModal] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   // 음성 목록 가져오기
   useEffect(() => {
@@ -40,8 +47,7 @@ export default function Creator() {
         if (voiceList.length > 0) {
           setSelectedVoice(voiceList[0].voice_id);
         } else {
-          alert("목소리부터 넣고오세요");
-          navigate("/settings");
+          setShowVoiceWarningModal(true);
         }
       } catch (error) {
         console.error("음성 목록 불러오기 실패:", error);
@@ -52,15 +58,22 @@ export default function Creator() {
   }, []);
 
   const addPage = () => {
-    if (pages.length >= 10) {
+        console.log("현재 페이지 수:", pages.length);
+
+    if (pages.length > 9) {
+      console.log("페이지 추가 제한: 최대 페이지 수 도달");
       alert("동화는 최대 10페이지까지 만들 수 있어요.");
       return;
     }
     const newPage: Page = { id: Date.now(), image: null, story: "" };
     setPages([...pages, newPage]);
+        console.log("현재 페이지 수:", pages.length);
+    console.log("pages:", pages);
   };
 
   const removePage = (id: number) => {
+        console.log("현재 페이지 수:", pages.length);
+
     if (pages.length > 1) {
       setPages(pages.filter((page) => page.id !== id));
     } else {
@@ -79,6 +92,8 @@ export default function Creator() {
   };
 
   const handleSubmit = async () => {
+        console.log("현재 페이지 수:", pages.length);
+
     setIsSubmitting(true);
 
     const stories = pages.map((page) => page.story);
@@ -224,7 +239,6 @@ export default function Creator() {
         <div className="mt-6 flex justify-center">
           <button
             onClick={addPage}
-            disabled={pages.length >= 10}
             className="w-[680px] border-2 border-dashed border-gray-400 rounded-2xl py-6 flex justify-center items-center cursor-pointer hover:bg-amber-100/50 transition-colors disabled:opacity-50"
           >
             <svg
@@ -244,6 +258,16 @@ export default function Creator() {
           </button>
         </div>
       </div>
+
+      {/* 목소리 경고 모달 */}
+      <Modal
+        isOpen={showVoiceWarningModal}
+        onClose={() => setShowVoiceWarningModal(false)}
+        title="목소리 설정 필요"
+        message="목소리부터 넣고오세요"
+        buttonText="목소리 설정하러 가기"
+        redirectTo="/settings"
+      />
     </div>
   );
 }

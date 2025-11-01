@@ -1,20 +1,43 @@
-interface SuccessModalProps {
+import { useNavigate } from "react-router-dom";
+
+interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
   message?: string;
   submessage?: string;
   buttonText?: string;
+  redirectTo?: string; // 리다이렉트할 경로
+  onConfirm?: () => void; // 확인 버튼 클릭 시 추가 동작
 }
 
-export default function SuccessModal({
+export default function Modal({
   isOpen,
   onClose,
   title = "요청 완료!",
   message = "요청이 성공적으로 처리되었습니다.",
   submessage,
   buttonText = "확인",
-}: SuccessModalProps) {
+  redirectTo,
+  onConfirm
+}: ModalProps) {
+  const navigate = useNavigate();
+
+  const handleConfirm = () => {
+    // 추가 동작이 있으면 실행
+    if (onConfirm) {
+      onConfirm();
+    }
+    
+    // 모달 닫기
+    onClose();
+    
+    // 리다이렉트가 설정되어 있으면 페이지 이동
+    if (redirectTo) {
+      navigate(redirectTo);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -40,7 +63,7 @@ export default function SuccessModal({
         
         {/* 확인 버튼 */}
         <button
-          onClick={onClose}
+          onClick={handleConfirm}
           className="w-full py-3 bg-yellow-400 text-white font-semibold rounded-lg hover:bg-yellow-500 transition-colors"
         >
           {buttonText}
