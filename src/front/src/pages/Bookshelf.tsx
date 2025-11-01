@@ -39,15 +39,17 @@ export default function Bookshelf() {
 
   //책 삭제 핸들러
   const handleDeleteBook = async (bookId: string) => {
-    const previous = books;
-    setBooks((prev) => prev.filter((book) => book.id !== bookId));
-    try {
-      await deleteBook(bookId);
-      alert("책 삭제에 성공했습니다.");
-    } catch (err) {
-      console.error("Failed to delete book:", err);
-      setBooks(previous);
-      alert("책 삭제에 실패했습니다.");
+    if (window.confirm("정말로 이 책을 삭제하시겠습니까?")) {
+      const previous = books;
+      setBooks((prev) => prev.filter((book) => book.id !== bookId));
+      try {
+        // await deleteBook(bookId);
+        alert("책 삭제에 성공했습니다.");
+      } catch (err) {
+        console.error("Failed to delete book:", err);
+        setBooks(previous);
+        alert("책 삭제에 실패했습니다.");
+      }
     }
   };
 

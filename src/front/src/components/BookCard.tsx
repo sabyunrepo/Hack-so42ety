@@ -8,11 +8,6 @@ interface Book {
   status?: "success" | "process" | "error";
 }
 
-// DeleteButton props 타입
-interface DeleteButtonProps {
-  onClick: () => void;
-}
-
 // BookCard props 타입
 interface BookCardProps {
   book: Book;
@@ -21,29 +16,13 @@ interface BookCardProps {
   onClick?: () => void;
 }
 
-// 삭제 버튼 컴포넌트
-function DeleteButton({ onClick }: DeleteButtonProps) {
-  const handleDelete = () => {
-    if (window.confirm('정말로 이 책을 삭제하시겠습니까?')) {
-      onClick();
-    }
-  };
 
-  return (
-    <button
-      onClick={handleDelete}
-      className="absolute -top-2 -right-2 border-[2px] bg-white text-black rounded-full p-1 hover:bg-red-600 transition-colors z-10"
-    >
-      <X className="w-4 h-4" />
-    </button>
-  );
-}
 
 export default function BookCard({
   book,
   isEditing = false,
   onDelete,
-  onClick
+  onClick,
 }: BookCardProps) {
   const isProcessing = book.status === "process";
 
@@ -60,22 +39,28 @@ export default function BookCard({
   // 책 상태에 따른 이미지 처리
   const getBookImage = (): string => {
     if (book.status === "process") {
-      return book.cover_image || "https://placehold.co/400x600/f3f4f6/9ca3af?text=생성+중...";
+      return (
+        book.cover_image ||
+        "https://placehold.co/400x600/f3f4f6/9ca3af?text=생성+중..."
+      );
     }
     if (book.status === "error") {
       return "https://placehold.co/400x600/fef2f2/ef4444?text=생성+실패";
     }
     console.log(book.cover_image);
 
-    return book.cover_image || "https://placehold.co/400x600/22c55e/ffffff?text=No+Image";
+    return (
+      book.cover_image ||
+      "https://placehold.co/400x600/22c55e/ffffff?text=No+Image"
+    );
   };
 
   return (
     <div
       className={`relative h-[228px] w-[171px] transition-transform ${
         isProcessing
-          ? 'cursor-not-allowed opacity-75'
-          : 'cursor-pointer hover:scale-105 hover:z-10'
+          ? "cursor-not-allowed opacity-75"
+          : "cursor-pointer hover:scale-105 hover:z-10"
       }`}
       data-name="책장 컴포넌트"
       onClick={handleClick}
@@ -99,7 +84,9 @@ export default function BookCard({
 
       {/* 책 제목 */}
       <div className="absolute flex flex-col font-normal inset-[82.89%_8.77%_5.26%_8.77%] justify-center items-center text-[12px] text-black text-center leading-tight px-1">
-        <p className="line-clamp-2 text-center wrap-break-word overflow-hidden">{book.title}</p>
+        <p className="line-clamp-2 text-center wrap-break-word overflow-hidden">
+          {book.title}
+        </p>
       </div>
 
       {/* 생성중 오버레이 */}
@@ -111,7 +98,14 @@ export default function BookCard({
       )}
 
       {/* 편집 모드일 때 삭제 버튼 (생성중이 아닐 때만) */}
-      {isEditing && !isProcessing && onDelete && <DeleteButton onClick={onDelete} />}
+      {isEditing && !isProcessing && onDelete && (
+        <button
+          onClick={onDelete}
+          className="absolute -top-2 -right-2 border-[2px] bg-white text-black rounded-full p-1 hover:bg-red-600 transition-colors z-10"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 }
