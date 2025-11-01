@@ -205,7 +205,10 @@ class StoriesListResponse(BaseModel):
 
 
 def create_stories_response_schema(
-    max_pages: int, max_dialogues_per_page: int = None, max_title_length: int = 20
+    max_pages: int,
+    max_dialogues_per_page: int = None,
+    max_chars_per_dialogue: int = None,
+    max_title_length: int = 20,
 ) -> Type[BaseModel]:
     """
     동적으로 StoriesListResponse 스키마 생성
@@ -213,6 +216,7 @@ def create_stories_response_schema(
     Args:
         max_pages: 최대 페이지 수
         max_dialogues_per_page: 페이지당 최대 대사 수 (선택 사항)
+        max_chars_per_dialogue: 대사당 최대 글자 수 (선택 사항)
         max_title_length: 제목 최대 길이 (기본값: 20)
 
     Returns:
@@ -226,12 +230,32 @@ def create_stories_response_schema(
         ...     config={"response_schema": schema}
         ... )
     """
-    if max_dialogues_per_page:
-        # 페이지당 대사 수도 제한
-        stories_type = List[Annotated[List[str], Field(max_length=max_dialogues_per_page)]]
+    if max_dialogues_per_page and max_chars_per_dialogue:
+        # 페이지당 대사 수 + 대사당 글자 수 제한
+        stories_type = List[
+            Annotated[
+                List[Annotated[str, Field(max_length=max_chars_per_dialogue)]],
+                Field(max_length=max_dialogues_per_page),
+            ]
+        ]
+        description = (
+            f"최대 {max_pages}페이지, 페이지당 최대 {max_dialogues_per_page}개 대사, "
+            f"대사당 최대 {max_chars_per_dialogue}자"
+        )
+    elif max_dialogues_per_page:
+        # 페이지당 대사 수만 제한
+        stories_type = List[
+            Annotated[List[str], Field(max_length=max_dialogues_per_page)]
+        ]
         description = (
             f"최대 {max_pages}페이지, 페이지당 최대 {max_dialogues_per_page}개 대사"
         )
+    elif max_chars_per_dialogue:
+        # 대사당 글자 수만 제한
+        stories_type = List[
+            List[Annotated[str, Field(max_length=max_chars_per_dialogue)]]
+        ]
+        description = f"최대 {max_pages}페이지, 대사당 최대 {max_chars_per_dialogue}자"
     else:
         # 페이지 수만 제한
         stories_type = List[List[str]]
@@ -286,6 +310,6 @@ class TTSExpressionResponse(BaseModel):
                         "[happy] Make a lunchbox. Yum, yum food inside.",
                         "[excited] Crunch, crunch!",
                     ],
-                ]
+                ],
             }
         }
