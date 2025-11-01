@@ -14,7 +14,7 @@ from core.registry import RouterRegistry
 # Feature 라우터 자동 등록을 위한 import (Registry에 등록됨)
 import features.health.api  # noqa: F401
 import features.tts_generation.api  # noqa: F401
-# import features.word_tts.api  # noqa: F401
+import features.word_tts.api  # noqa: F401
 import features.voice_management.api  # noqa: F401
 import features.voice_clone.api  # noqa: F401
 
