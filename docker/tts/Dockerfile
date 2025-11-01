@@ -15,7 +15,7 @@ COPY src/tts/core /app/tts/core
 COPY src/tts/shared /app/tts/shared
 COPY src/tts/features /app/tts/features
 COPY src/tts/src /app/tts/src
-COPY src/tts/utils /app/tts/utils
+COPY src/tts/utills /app/tts/utills
 
 # 작업 디렉토리 설정
 WORKDIR /app/tts
