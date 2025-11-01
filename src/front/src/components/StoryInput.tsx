@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import Img_Icon from "../assets/img.svg";
 
-
 interface Page {
   id: number;
   image: File | null;
