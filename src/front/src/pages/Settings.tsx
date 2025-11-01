@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Mic, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createVoiceClone } from "../api/index";
-import Modal from "../components/Modal";
+import {AlertModal} from "../components/Modal";
 
 // 허용되는 오디오 파일 확장자
 const ALLOWED_AUDIO_TYPES = [".mp3", ".wav", ".m4a", ".flac", ".ogg"];
@@ -230,7 +230,7 @@ export default function Settings() {
       </div>
 
       {/* 성공 모달 */}
-      <Modal
+      <AlertModal
         isOpen={showModal}
         onClose={closeModal}
         title="안내"

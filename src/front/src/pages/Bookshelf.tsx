@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import BookCard, { type Book } from "../components/BookCard";
 import { useEffect, useState } from "react";
 import { deleteBook, getAllStorybooks } from "../api/index";
+import { ConfirmModal } from "../components/Modal";
 
 export default function Bookshelf() {
   const navigate = useNavigate();
@@ -9,6 +10,8 @@ export default function Bookshelf() {
   const [books, setBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [bookToDelete, setBookToDelete] = useState<string | null>(null);
 
   // 책 목록 불러오기
   useEffect(() => {
@@ -38,18 +41,19 @@ export default function Bookshelf() {
   };
 
   //책 삭제 핸들러
-  const handleDeleteBook = async (bookId: string) => {
-    if (window.confirm("정말로 이 책을 삭제하시겠습니까?")) {
-      const previous = books;
-      setBooks((prev) => prev.filter((book) => book.id !== bookId));
-      try {
-        await deleteBook(bookId);
-        alert("책 삭제에 성공했습니다.");
-      } catch (err) {
-        console.error("Failed to delete book:", err);
-        setBooks(previous);
-        alert("책 삭제에 실패했습니다.");
-      }
+  const handleDeleteBook = (bookId: string) => {
+    setBookToDelete(bookId); // 삭제할 책 ID 저장
+    setShowConfirmModal(true); // 모달 표시
+  };
+
+  const confirmDeleteBook = () => {
+    const previous = books;
+    setBooks((prev) => prev.filter((book) => book.id !== bookToDelete));
+    try {
+      // await deleteBook(bookId);
+    } catch (err) {
+      console.error("Failed to delete book:", err);
+      setBooks(previous);
     }
   };
 
@@ -133,6 +137,13 @@ export default function Bookshelf() {
           </div>
         ))}
       </div>
+
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        title="삭제 하시겠습니끼?"
+        onConfirm={() => confirmDeleteBook()}
+      />
     </div>
   );
 }
