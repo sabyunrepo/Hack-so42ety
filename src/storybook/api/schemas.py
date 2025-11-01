@@ -228,9 +228,7 @@ def create_stories_response_schema(
     """
     if max_dialogues_per_page:
         # 페이지당 대사 수도 제한
-        stories_type = List[
-            Annotated[List[str], Field(max_length=max_dialogues_per_page)]
-        ]
+        stories_type = List[Annotated[List[str], Field(max_length=max_dialogues_per_page)]]
         description = (
             f"최대 {max_pages}페이지, 페이지당 최대 {max_dialogues_per_page}개 대사"
         )
@@ -288,6 +286,6 @@ class TTSExpressionResponse(BaseModel):
                         "[happy] Make a lunchbox. Yum, yum food inside.",
                         "[excited] Crunch, crunch!",
                     ],
-                ],
+                ]
             }
         }

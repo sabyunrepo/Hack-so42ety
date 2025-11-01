@@ -3,6 +3,7 @@ anyio==4.11.0
 click==8.3.0
 fastapi==0.119.0
 h11==0.16.0
+httpx==0.28.1
 idna==3.11
 pydantic==2.12.2
 pydantic_core
@@ -16,4 +17,5 @@ aiofiles==24.1.0
 google-genai
 pillow
 pydantic-settings>=2.0.0
+PyJWT>=2.8.0  # JWT token generation for Kling API
 # python-dotenv>=1.0.0
