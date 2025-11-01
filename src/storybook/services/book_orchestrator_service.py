@@ -10,6 +10,8 @@ from typing import List, Optional
 from ..core.logging import get_logger
 from ..domain.models import Book
 from ..storage import AbstractStorageService
+from .story_generator_service import StoryGeneratorService
+from .tts_service import TtsService
 
 logger = get_logger(__name__)
 
@@ -19,8 +21,12 @@ class BookOrchestratorService:
     def __init__(
         self,
         storage_service: AbstractStorageService,
+        story_generator: StoryGeneratorService,
+        tts_service: TtsService,
     ):
         self.storage = storage_service
+        self.story_generator = story_generator
+        self.tts_service = tts_service
 
         logger.info("BookOrchestratorService initialized (DI mode)")
 
@@ -41,6 +47,11 @@ class BookOrchestratorService:
             )
 
         result = await self.story_generator.generate_story_with_ai(stories)
+        result2 = await self.tts_service.generate_tts_audio(
+            dialogs=result["stories"],
+            voice_id=voice_id or "default_voice",
+        )
+        logger.info(f"TTS generation result: {result2}")
         stories = result["stories"]
         book.title = result.get("title", "Untitled Story")
 
