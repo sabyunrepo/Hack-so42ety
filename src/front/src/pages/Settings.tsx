@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { Mic } from "lucide-react";
+import { Mic, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { createVoiceClone } from "../api/index";
 
 // 허용되는 오디오 파일 확장자
 const ALLOWED_AUDIO_TYPES = [".mp3", ".wav", ".m4a", ".flac", ".ogg"];
@@ -12,6 +14,7 @@ export default function Settings() {
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const navigate = useNavigate();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -38,6 +41,53 @@ export default function Settings() {
     setError("");
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!name.trim()) {
+      setError("목소리 이름을 입력하세요.");
+      return;
+    }
+
+    if (!file) {
+      setError("오디오 파일을 선택하세요.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+    setError("");
+
+    try {
+      await createVoiceClone({
+        name,
+        file,
+        description: description.trim() || undefined, // 빈 문자열이면 undefined로
+      });
+
+      setMessage(
+        "✅ 목소리 생성 요청이 접수되었습니다! 백그라운드에서 처리 중입니다."
+      );
+      // 폼 초기화
+      handleReset();
+    } catch (err: unknown) {
+      // Axios 에러 처리
+      let errorMessage = "알 수 없는 오류가 발생했습니다.";
+      
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { detail?: string } } };
+        errorMessage = axiosError.response?.data?.detail || errorMessage;
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        const error = err as { message: string };
+        errorMessage = error.message;
+      }
+      
+      setError(`❌ ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReset = () => {
     setName("");
     setDescription("");
@@ -51,6 +101,16 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-5 font-sans">
+      {/* 헤더 - 뒤로가기 버튼 */}
+      <div className="relative flex items-center justify-center w-full mb-3">
+        <button
+          onClick={() => navigate("/")}
+          className="absolute left-8 bg-white rounded-full p-3.5 shadow-xl hover:scale-110 hover:bg-yellow-400 hover:text-white transition-all"
+        >
+          <ArrowLeft className="w-8 h-8" />
+        </button>
+      </div>
+
       {/* 메인 카드 */}
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-10">
         {/* 아이콘 */}
@@ -69,7 +129,7 @@ export default function Settings() {
         </p>
 
         {/* 설정 폼 */}
-        <form className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* 이름 입력 */}
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">
