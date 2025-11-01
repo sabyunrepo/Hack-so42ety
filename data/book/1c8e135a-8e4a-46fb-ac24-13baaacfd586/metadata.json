@@ -1,0 +1,85 @@
+{
+  "id": "1c8e135a-8e4a-46fb-ac24-13baaacfd586",
+  "title": "My Playground Day",
+  "cover_image": "/data/image/1c8e135a-8e4a-46fb-ac24-13baaacfd586/0_page_1.png",
+  "voice_id": "uzyfnLLlKo55AbgBU5uH",
+  "status": "success",
+  "pages": [
+    {
+      "id": "f4fe37c1-876b-4628-a3a4-f92112c96b26",
+      "index": 1,
+      "type": "video",
+      "content": "/data/video/1c8e135a-8e4a-46fb-ac24-13baaacfd586/page_1.mp4",
+      "dialogues": [
+        {
+          "id": "0fd5f91b-324b-4490-b99b-1cb1c60e07b9",
+          "index": 1,
+          "text": "I am at the playground. With my friends. It is hot. I drink water. Gulp, gulp!",
+          "part_audio_url": "/data/sound/bd4bfd1a-00e0-49fe-abfd-a3b55c29a79e/1693e263-6b2a-4f2b-a55a-2a14c6c2f4bf.mp3"
+        }
+      ],
+      "fallback_image": "/data/image/1c8e135a-8e4a-46fb-ac24-13baaacfd586/0_page_1.png"
+    },
+    {
+      "id": "d2fc4c22-762f-44f9-904a-9d887718b5b0",
+      "index": 2,
+      "type": "video",
+      "content": "/data/video/1c8e135a-8e4a-46fb-ac24-13baaacfd586/page_2.mp4",
+      "dialogues": [
+        {
+          "id": "bff6d8f3-21d3-4ea5-bfb5-8e2da80bcdb8",
+          "index": 1,
+          "text": "We play hanging. I hang strong! Wow, I am strong!",
+          "part_audio_url": "/data/sound/bd4bfd1a-00e0-49fe-abfd-a3b55c29a79e/9b8fd901-243f-4054-874f-1cfd056976e0.mp3"
+        }
+      ],
+      "fallback_image": "/data/image/1c8e135a-8e4a-46fb-ac24-13baaacfd586/1_page_2.png"
+    },
+    {
+      "id": "e4e92c8b-2654-4da5-8116-60325b599785",
+      "index": 3,
+      "type": "video",
+      "content": "/data/video/1c8e135a-8e4a-46fb-ac24-13baaacfd586/page_3.mp4",
+      "dialogues": [
+        {
+          "id": "89eca997-b44f-4c7f-a8f4-41d422a81314",
+          "index": 1,
+          "text": "We play with bubbles. Pop, pop, pop! So many bubbles. Fun, fun, fun!",
+          "part_audio_url": "/data/sound/bd4bfd1a-00e0-49fe-abfd-a3b55c29a79e/930f320e-15f7-4827-9c15-9bc95e713713.mp3"
+        }
+      ],
+      "fallback_image": "/data/image/1c8e135a-8e4a-46fb-ac24-13baaacfd586/2_page_3.png"
+    },
+    {
+      "id": "418dcd35-92b8-4399-a109-f3e37d536f2c",
+      "index": 4,
+      "type": "video",
+      "content": "/data/video/1c8e135a-8e4a-46fb-ac24-13baaacfd586/page_4.mp4",
+      "dialogues": [
+        {
+          "id": "748c9d28-ec0b-41f6-9839-de52848d5157",
+          "index": 1,
+          "text": "I ride the swing. Up and down. I try to swing alone. Whee! So fun!",
+          "part_audio_url": "/data/sound/bd4bfd1a-00e0-49fe-abfd-a3b55c29a79e/cc38bc70-91e1-414e-818c-ad856884a6c2.mp3"
+        }
+      ],
+      "fallback_image": "/data/image/1c8e135a-8e4a-46fb-ac24-13baaacfd586/3_page_4.png"
+    },
+    {
+      "id": "1b486846-cfe8-4b17-aeeb-23b01fd82c07",
+      "index": 5,
+      "type": "video",
+      "content": "/data/video/1c8e135a-8e4a-46fb-ac24-13baaacfd586/page_5.mp4",
+      "dialogues": [
+        {
+          "id": "9f332b2a-9193-45a2-98fb-791da0e60a2d",
+          "index": 1,
+          "text": "I look at bugs. With a magnifying glass. Wow! A bug. So cool!",
+          "part_audio_url": "/data/sound/bd4bfd1a-00e0-49fe-abfd-a3b55c29a79e/e97b769b-9d9c-4140-bebf-4e1a7b610511.mp3"
+        }
+      ],
+      "fallback_image": "/data/image/1c8e135a-8e4a-46fb-ac24-13baaacfd586/4_page_5.png"
+    }
+  ],
+  "created_at": "2025-11-01T14:19:40.486916"
+}
