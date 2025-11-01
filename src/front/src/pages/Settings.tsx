@@ -99,7 +99,6 @@ export default function Settings() {
               disabled={loading}
             />
 
-            
             {/* 선택된 파일 정보 */}
             {file && (
               <div className="p-2 bg-gray-100 border border-gray-200 rounded-lg text-xs text-gray-700">
@@ -139,7 +138,21 @@ export default function Settings() {
           </div>
         </form>
 
-          {/* 안내 사항 */}
+        {/* 성공 메시지 */}
+        {message && (
+          <div className="mt-5 p-4 bg-green-100 border border-green-300 rounded-lg text-green-800 text-sm leading-relaxed">
+            {message}
+          </div>
+        )}
+
+        {/* 에러 메시지 */}
+        {error && (
+          <div className="mt-5 p-4 bg-red-100 border border-red-300 rounded-lg text-red-800 text-sm leading-relaxed">
+            {error}
+          </div>
+        )}
+        
+        {/* 안내 사항 */}
       </div>
     </div>
   )
