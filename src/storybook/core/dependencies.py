@@ -6,7 +6,12 @@ Shared Dependencies Module
 from functools import lru_cache
 from ..repositories import FileBookRepository, InMemoryBookRepository
 from ..storage import LocalStorageService
-from ..services import BookOrchestratorService, StoryGeneratorService, TtsService
+from ..services import (
+    BookOrchestratorService,
+    StoryGeneratorService,
+    TtsService,
+    ImageGeneratorService,
+)
 from .config import settings
 from .logging import get_logger
 import httpx
@@ -91,6 +96,16 @@ def get_story_generator_service() -> StoryGeneratorService:
 
 
 @lru_cache()
+def get_image_generator_service() -> ImageGeneratorService:
+    """ImageGeneratorService 싱글톤 인스턴스 반환"""
+    return ImageGeneratorService(
+        storage_service=get_storage_service(),
+        image_data_dir=settings.image_data_dir,
+        genai_client=get_genai_client(),  # 공유 GenAI 클라이언트
+    )
+
+
+@lru_cache()
 def get_book_service() -> BookOrchestratorService:
     """
     BookOrchestratorService 싱글톤 인스턴스 반환
@@ -101,4 +116,5 @@ def get_book_service() -> BookOrchestratorService:
         storage_service=get_storage_service(),
         tts_service=get_tts_service(),
         story_generator=get_story_generator_service(),
+        image_generator=get_image_generator_service(),
     )
