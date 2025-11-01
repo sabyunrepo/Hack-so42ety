@@ -1,0 +1,34 @@
+.env
+.env.local
+.venv
+.claude
+**/**/.venv
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Frontend
+node_modules/
+src/front/dist/
+src/front/.vite/
+
+# SSL Certificates
+docker/nginx/certs/
+
+# Test & Coverage
+.pytest_cache/
+htmlcov/
+.coverage
+*.cover
+.hypothesis/
+
+# Data directories (local development)
+src/storybook/data/
+src/tts/data/

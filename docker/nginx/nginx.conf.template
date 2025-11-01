@@ -1,0 +1,103 @@
+# HTTP Server - Redirect to HTTPS
+server {
+    listen 80;
+    server_name localhost;
+    return 301 https://$server_name$request_uri;
+}
+
+# HTTPS Server
+server {
+    listen 443 ssl;
+    server_name localhost;
+
+    # SSL Certificate
+    ssl_certificate /etc/nginx/certs/nginx.crt;
+    ssl_certificate_key /etc/nginx/certs/nginx.key;
+
+    # SSL Configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Upload size limit (for voice clone files)
+    client_max_body_size 35M;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+    # Static data folder access (use ^~ to prevent regex matching)
+    location ^~ /data/ {
+        alias /data/;
+        autoindex on;  # Enable directory listing
+        autoindex_exact_size off;
+        autoindex_localtime on;
+        add_header Cache-Control "no-cache";
+    }
+
+    # TTS API Documentation (FastAPI provides these paths directly)
+    location /tts-docs {
+        proxy_pass http://tts-api:${TTS_API_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /tts-redoc {
+        proxy_pass http://tts-api:${TTS_API_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Storybook API Documentation (FastAPI provides these paths directly)
+    location /storybook-docs {
+        proxy_pass http://storybook-api:${STORYBOOK_API_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /storybook-redoc {
+        proxy_pass http://storybook-api:${STORYBOOK_API_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # TTS API Proxy (internal network with dynamic port)
+    location /tts/ {
+        proxy_pass http://tts-api:${TTS_API_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Storybook API Proxy (internal network with dynamic port)
+    location /storybook/ {
+        proxy_pass http://storybook-api:${STORYBOOK_API_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    # Cache static assets for app files
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        root /usr/share/nginx/html;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # React SPA routing - always serve index.html for non-file requests
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
