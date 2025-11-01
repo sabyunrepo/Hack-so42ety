@@ -184,9 +184,6 @@ async def create_book(
     """
     try:
         # 입력 검증
-        # stories가 쉼표로 구분된 단일 문자열로 들어올 경우 split 처리
-        if len(stories) == 1 and "," in stories[0]:
-            stories = [s.strip() for s in stories[0].split(",")]
         if len(stories) != len(images):
             raise HTTPException(
                 status_code=400,
