@@ -101,6 +101,14 @@ export default function BookCard({
       <div className="absolute flex flex-col font-normal inset-[82.89%_8.77%_5.26%_8.77%] justify-center items-center text-[12px] text-black text-center leading-tight px-1">
         <p className="line-clamp-2 text-center wrap-break-word overflow-hidden">{book.title}</p>
       </div>
+
+      {/* 생성중 오버레이 */}
+      {isProcessing && (
+        <div className="absolute inset-0 bg-black opacity-90 rounded-[13px] flex flex-col items-center justify-center z-20 pointer-events-none">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mb-3"></div>
+          <p className="text-white font-bold text-lg">생성중...</p>
+        </div>
+      )}
       
       {/* 편집 모드일 때 삭제 버튼 (생성중이 아닐 때만) */}
       {isEditing && !isProcessing && onDelete && <DeleteButton onClick={onDelete} />}

@@ -1,3 +1,4 @@
+import { Link, useNavigate } from "react-router-dom";
 import BookCard from "../components/BookCard";
 import { useEffect, useState } from 'react';
 import { deleteBook, getAllStorybooks } from '../api/index';
@@ -18,27 +19,37 @@ interface ApiResponse {
 }
 
 export default function Bookshelf() {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // 책 목록 불러오기
   useEffect(() => {
     const fetchBooks = async () => {
       try {
+        setIsLoading(true);
         const data = await getAllStorybooks() as ApiResponse;
-        setBooks(data.books || []);
+        setBooks(data.books);
         console.log(data);
-      } catch (error) {
-        console.error('Failed to fetch books:', error);
-        setBooks([]);
+        setError(null);
+      } catch (err) {
+        console.error("Failed to fetch books:", err);
+        setError("책 목록을 불러오는데 실패했습니다.");
+      } finally {
+        setIsLoading(false);
       }
     };
+
     fetchBooks();
   }, []);
 
   //책 클릭 핸들러
   const handleBookClick = (bookId: string) => {
-    // 뷰어 페이지로 이동
+      if (!isEditing) {
+        navigate(`/book/${bookId}`);
+    }
   }
 
   //책 삭제 핸들러
@@ -72,6 +83,22 @@ export default function Bookshelf() {
 
   const bookShelves = groupBooksIntoShelves(books);
 
+    if (isLoading) {
+    return (
+      <div className="p-8 bg-orange-50 min-h-screen flex items-center justify-center">
+        <div className="text-xl font-medium">책장을 불러오는 중...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 bg-orange-50 min-h-screen flex items-center justify-center">
+        <div className="text-xl font-medium text-red-600">{error}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8 bg-orange-50 min-h-screen">
       <div className="flex justify-end mb-6">
@@ -95,6 +122,27 @@ export default function Bookshelf() {
                   onClick={() => handleBookClick(book.id)}
                 />
               ))}
+              {shelfIndex === bookShelves.length - 1 && (
+                <Link to="/create">
+                  <div className="h-[228px] w-[171px] border-3 border-black border-dashed rounded-[13px] flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">+</div>
+                    </div>
+                  </div>
+                </Link>
+              )}
+              
+            </div>
+
+            {/* 선반 */}
+            <div
+              className="w-full h-6 rounded-lg shadow-lg relative overflow-hidden"
+              style={{ backgroundColor: "#C1A78E" }}
+            >
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-30"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-black to-transparent opacity-20"></div>
+              <div className="absolute top-0 bottom-0 left-0 w-1 bg-gradient-to-b from-transparent via-black to-transparent opacity-15"></div>
+              <div className="absolute top-0 bottom-0 right-0 w-1 bg-gradient-to-b from-transparent via-black to-transparent opacity-15"></div>
             </div>
           </div>
         ))}
