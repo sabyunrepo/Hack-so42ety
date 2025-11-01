@@ -9,13 +9,13 @@ interface Book {
   title?: string;
   cover_image?: string;
   status?: string;
-  // 나머지는 any로 허용
-  [key: string]: any;
+  // 나머지는 unknown으로 허용
+  [key: string]: unknown;
 }
 
 interface ApiResponse {
   books: Book[];
-  [key: string]: any; // 유연하게 시작
+  [key: string]: unknown; // 유연하게 시작
 }
 
 export default function Bookshelf() {
