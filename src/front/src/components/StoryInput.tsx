@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
-// import MyImage from "../assets/img.svg";
+import Img_Icon from "../assets/img.svg";
+
 
 interface Page {
   id: number;
@@ -60,8 +61,7 @@ export default function StoryInput({
             className="w-full h-full object-cover"
           />
         ) : (
-          // <img className="w-12 h-12" src={MyImage} alt="Upload" />
-          <div>test</div>
+          <img className="w-12 h-12" src={Img_Icon} alt="Upload" />
         )}
       </div>
 
