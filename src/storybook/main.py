@@ -28,6 +28,7 @@ from .api.schemas import (
     ErrorResponse,
 )
 from .repositories import InMemoryBookRepository
+from .core.middleware import setup_middleware
 
 # 로깅 설정
 setup_logging()
@@ -37,6 +38,8 @@ logger = get_logger(__name__)
 app = FastAPI(
     lifespan=lifespan,
 )
+
+setup_middleware(app)
 
 
 @app.get("/health")
