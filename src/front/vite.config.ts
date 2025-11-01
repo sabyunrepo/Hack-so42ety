@@ -11,6 +11,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import fs from "fs";
 import path from "path";
+import type { ServerOptions } from "https";
 
 export default defineConfig(() => {
   const certPath = path.resolve(__dirname, "../../docker/nginx/certs");
@@ -18,7 +19,7 @@ export default defineConfig(() => {
   const certFile = path.join(certPath, "nginx.crt");
 
   // 인증서 파일 존재 여부 및 유효성 확인
-  let httpsConfig = false;
+  let httpsConfig: ServerOptions | undefined = undefined;
 
   // HTTPS 활성화 옵션 (true: HTTPS, false: HTTP)
   const enableHttps = true; // nginx 인증서 사용
@@ -31,7 +32,8 @@ export default defineConfig(() => {
       };
       console.log("✅ HTTPS enabled with nginx certificates");
     } catch (error) {
-      console.warn("⚠️  Certificate read error, falling back to HTTP:", error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn("⚠️  Certificate read error, falling back to HTTP:", errorMessage);
     }
   } else {
     console.log(enableHttps ? "ℹ️  No certificates found, using HTTP" : "ℹ️  HTTP mode (HTTPS disabled)");
@@ -52,8 +54,8 @@ export default defineConfig(() => {
           target: "https://localhost",
           changeOrigin: true,
           secure: false, // self-signed 인증서 허용
-          configure: (proxy, options) => {
-            proxy.on("proxyReq", (proxyReq, req, res) => {
+          configure: (proxy) => {
+            proxy.on("proxyReq", (_proxyReq, req) => {
               console.log("[Proxy] TTS API:", req.method, req.url);
             });
           },
@@ -64,8 +66,8 @@ export default defineConfig(() => {
           target: "https://localhost",
           changeOrigin: true,
           secure: false, // self-signed 인증서 허용
-          configure: (proxy, options) => {
-            proxy.on("proxyReq", (proxyReq, req, res) => {
+          configure: (proxy) => {
+            proxy.on("proxyReq", (_proxyReq, req) => {
               console.log("[Proxy] Storybook API:", req.method, req.url);
             });
           },
@@ -76,8 +78,8 @@ export default defineConfig(() => {
           target: "https://localhost",
           changeOrigin: true,
           secure: false, // self-signed 인증서 허용
-          configure: (proxy, options) => {
-            proxy.on("proxyReq", (proxyReq, req, res) => {
+          configure: (proxy) => {
+            proxy.on("proxyReq", (_proxyReq, req) => {
               console.log("[Proxy] Static File:", req.method, req.url);
             });
           },
