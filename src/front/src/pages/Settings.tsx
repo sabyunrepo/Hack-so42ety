@@ -1,6 +1,40 @@
+import React, { useState } from "react";
 import { Mic } from "lucide-react";
 
+// 허용되는 오디오 파일 확장자
+const ALLOWED_AUDIO_TYPES = [".mp3", ".wav", ".m4a", ".flac", ".ogg"];
+const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
+
 export default function Settings() {
+  const [description, setDescription] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    // 파일 크기 체크
+    if (selectedFile.size > MAX_FILE_SIZE) {
+      setError("파일 크기가 30MB를 초과합니다.");
+      setFile(null);
+      return;
+    }
+
+    // 파일 형식 체크
+    const fileExt = "." + selectedFile.name.split(".").pop()?.toLowerCase();
+    if (!ALLOWED_AUDIO_TYPES.includes(fileExt || "")) {
+      setError(
+        `지원하지 않는 파일 형식입니다. 허용: ${ALLOWED_AUDIO_TYPES.join(", ")}`
+      );
+      setFile(null);
+      return;
+    }
+
+    setFile(selectedFile);
+    setError("");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-5 font-sans">
@@ -24,13 +58,34 @@ export default function Settings() {
         {/* 설정 폼 */}
         <form className="space-y-5"></form>
           {/* 이름 입력 */}
-          <div className="space-y-2"></div>
-
-          {/* 설명 입력 (선택사항) */}
-          <div className="space-y-2"></div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">
+              목소리 이름 <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="예: 엄마 목소리, 아빠 목소리"
+              className="w-full p-3 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all disabled:opacity-60"
+              disabled={loading}
+            />
+          </div>
 
           {/* 오디오 파일 업로드 */}
-          <div className="space-y-2"></div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">
+              오디오 파일 <span className="text-red-600">*</span>
+            </label>
+            <input
+              id="fileInput"
+              type="file"
+              accept=".mp3,.wav,.m4a,.flac,.ogg"
+              onChange={handleFileChange}
+              className="w-full p-2 text-sm border border-gray-300 rounded-lg cursor-pointer focus:ring-2 focus:ring-yellow-400 focus:border-transparent disabled:opacity-60"
+              disabled={loading}
+            />
+          </div>
 
           {/* 버튼 그룹 */}
           <div className="flex gap-3 mt-6"></div>
