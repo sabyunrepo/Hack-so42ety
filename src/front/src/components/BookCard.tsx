@@ -80,13 +80,8 @@ export default function BookCard({
       </div>
 
       {/* 책 제목 배경 (하단 영역) - 글래스모픽 효과 */}
-      <div className="absolute bottom-0 left-0 right-0 top-[78.07%] rounded-b-[13px] overflow-hidden">
-        <div className="w-full h-full bg-white/95 backdrop-blur-sm border-t-[3px] border-gray-800/30 rounded-b-[13px]" />
-      </div>
-
-      {/* 책 제목 */}
-      <div className="absolute flex flex-col font-medium inset-[82.89%_8.77%_5.26%_8.77%] justify-center items-center text-[13px] text-gray-900 text-center leading-snug px-1">
-        <p className="line-clamp-2 text-center break-words overflow-hidden font-semibold">
+      <div className="absolute bottom-0 left-0 right-0 top-[78.07%] rounded-b-[13px] overflow-hidden bg-white/95 backdrop-blur-sm border-t-[3px] border-gray-800/30 flex items-center justify-center px-2">
+        <p className="text-[13px] text-gray-900 text-center font-semibold line-clamp-2 break-words leading-snug">
           {book.title}
         </p>
       </div>

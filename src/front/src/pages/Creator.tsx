@@ -56,7 +56,7 @@ export default function Creator() {
   }, []);
 
   const addPage = () => {
-    if (pages.length > 9) {
+    if (pages.length >= 6) {
       setShowMaxPageModal(true);
       return;
     }
@@ -85,7 +85,7 @@ export default function Creator() {
   };
 
   const handleSubmit = async () => {
-        console.log("현재 페이지 수:", pages.length);
+    console.log("현재 페이지 수:", pages.length);
 
     setIsSubmitting(true);
 
@@ -148,10 +148,10 @@ export default function Creator() {
                   <option
                     key={voice.voice_id}
                     value={voice.voice_id}
-                    disabled={voice.state !== "success"}
+                    // disabled={voice.state !== "success"}
                   >
                     {voice.voice_label}
-                    {voice.state !== "success" && " - 생성중"}
+                    {voice.state !== "success" && " - 프리뷰 없음"}
                   </option>
                 ))}
               </select>
@@ -165,8 +165,22 @@ export default function Creator() {
                         ?.preview_url
                     )
                   }
-                  className="bg-white border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
-                  title="음성 미리듣기"
+                  disabled={
+                    !voices.find((v) => v.voice_id === selectedVoice)
+                      ?.preview_url
+                  }
+                  className={`border rounded-lg px-3 py-2 transition-colors ${
+                    voices.find((v) => v.voice_id === selectedVoice)
+                      ?.preview_url
+                      ? "bg-white border-gray-300 hover:bg-gray-50 cursor-pointer"
+                      : "bg-gray-100 border-gray-200 cursor-not-allowed opacity-60"
+                  }`}
+                  title={
+                    voices.find((v) => v.voice_id === selectedVoice)
+                      ?.preview_url
+                      ? "음성 미리듣기"
+                      : "프리뷰 음성이 만들어지지 않아서 들을 수 없지만 해당 보이스로 동화는 만들 수 있습니다"
+                  }
                 >
                   🔊
                 </button>
@@ -266,7 +280,7 @@ export default function Creator() {
         isOpen={showMaxPageModal}
         onClose={() => setShowMaxPageModal(false)}
         title="페이지 제한"
-        message="동화는 최대 10페이지까지 만들 수 있어요."
+        message="동화는 최대 6페이지까지 만들 수 있어요."
         buttonText="확인"
       />
 
