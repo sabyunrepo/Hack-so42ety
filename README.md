@@ -246,15 +246,69 @@ make prod
 
 ---
 
-## 11. 팀 (so42ety)
+## 11. 👥 팀
 
-| 이름 | 역할 | 담당 |
-|------|------|------|
-| **이충헌** | Team Lead / PM | 프로젝트 기획·관리, 기술 총괄 |
-| **변상훈** | Backend & DevOps | 인프라 설계, TTS API, Docker/Nginx |
-| **이동학** | AI & Backend Lead | LLM/TTS/Video 파이프라인 설계 및 구현 |
-| **이소민** | Product Designer & Frontend | UX/UI 디자인(Figma), React 인터랙션 구현 |
-| **최지민** | Frontend Developer | 프론트 구조 설계, API 연동, 상태관리 |
+### Team so42ety
+
+<table>
+<tr>
+<td align="center">
+<a href="https://github.com/MatSalt">
+<img src="https://github.com/MatSalt.png" width="80px;" alt="chobae"/>
+<br />
+<sub><b>이충헌</b></sub>
+</a>
+<br />
+Team Lead / PM
+<br />
+프로젝트 기획·관리, 기술 총괄
+</td>
+<td align="center">
+<a href="https://github.com/alsksssass">
+<img src="https://github.com/alsksssass.png" width="80px;" alt="sanglee2"/>
+<br />
+<sub><b>변상훈</b></sub>
+</a>
+<br />
+Backend & DevOps
+<br />
+인프라 설계, TTS API, Docker/Nginx
+</td>
+<td align="center">
+<a href="https://github.com/stsr1284">
+<img src="https://github.com/stsr1284.png" width="80px;" alt="dhlee-b"/>
+<br />
+<sub><b>이동학</b></sub>
+</a>
+<br />
+AI & Backend Lead
+<br />
+LLM/TTS/Video 파이프라인 설계 및 구현
+</td>
+<td align="center">
+<a href="https://github.com/somilee0202">
+<img src="https://github.com/somilee0202.png" width="80px;" alt="lsm"/>
+<br />
+<sub><b>이소민</b></sub>
+</a>
+<br />
+Product Designer & Frontend
+<br />
+UX/UI 디자인(Figma), React 인터랙션 구현
+</td>
+<td align="center">
+<a href="https://github.com/jimchoi9">
+<img src="https://github.com/jimchoi9.png" width="80px;" alt="jmchoi"/>
+<br />
+<sub><b>최지민</b></sub>
+</a>
+<br />
+Frontend Developer
+<br />
+프론트 구조 설계, API 연동, 상태관리
+</td>
+</tr>
+</table>
 
 **협업 도구**: Notion, Figma, GitHub (git-flow)
 
