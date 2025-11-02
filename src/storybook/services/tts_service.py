@@ -93,10 +93,9 @@ class TtsService:
                                 f"[TtsService] Page {page_idx + 1}, Dialog {dialog_idx + 1}: {cleaned_url}"
                             )
                         else:
-                            page_urls.append(None)
-                            logger.warning(
-                                f"[TtsService] Page {page_idx + 1}, Dialog {dialog_idx + 1}: No audio URL"
-                            )
+                            error_msg = f"TTS audio generation failed for Page {page_idx + 1}, Dialog {dialog_idx + 1}: No audio URL returned"
+                            logger.error(f"[TtsService] {error_msg}")
+                            raise Exception(error_msg)
                 else:
                     # 예상치 못한 형식
                     logger.error(
