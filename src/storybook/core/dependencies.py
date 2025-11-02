@@ -39,8 +39,8 @@ def get_http_client() -> httpx.AsyncClient:
     - 타임아웃 및 연결 제한 설정
     """
     return httpx.AsyncClient(
-        timeout=httpx.Timeout(60.0, read=300.0),
-        limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        timeout=httpx.Timeout(180.0, read=300.0),
+        limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
     )
 
 
