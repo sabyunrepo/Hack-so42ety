@@ -6,6 +6,7 @@ export interface Book {
   title: string;
   cover_image: string;
   status: BookStatus;
+  is_default: boolean;
 }
 
 interface AllStorybooksResponse {
