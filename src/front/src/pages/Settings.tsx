@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Mic, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createVoiceClone } from "../api/index";
-import Modal from "../components/Modal";
+import {AlertModal} from "../components/Modal";
 
 // 허용되는 오디오 파일 확장자
 const ALLOWED_AUDIO_TYPES = [".mp3", ".wav", ".m4a", ".flac", ".ogg"];
@@ -75,7 +75,7 @@ export default function Settings() {
     } catch (err: unknown) {
       // Axios 에러 처리
       let errorMessage = "알 수 없는 오류가 발생했습니다.";
-      
+
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosError = err as { response?: { data?: { detail?: string } } };
         errorMessage = axiosError.response?.data?.detail || errorMessage;
@@ -83,7 +83,7 @@ export default function Settings() {
         const error = err as { message: string };
         errorMessage = error.message;
       }
-      
+
       setError(`❌ ${errorMessage}`);
     } finally {
       setLoading(false);
@@ -106,7 +106,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-5 font-sans">
+    <div className="min-h-screen py-10 px-5 font-sans">
       {/* 헤더 - 뒤로가기 버튼 */}
       <div className="relative flex items-center justify-center w-full mb-3">
         <button
@@ -171,7 +171,7 @@ export default function Settings() {
                 📎 {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
               </div>
             )}
-            
+
             {/* 파일 안내 */}
             <div className="text-xs text-gray-600 leading-relaxed">
               • 허용 형식: mp3, wav, m4a, flac, ogg<br />
@@ -225,12 +225,13 @@ export default function Settings() {
             <li>🟡 목소리 생성 완료까지 약 3분 소요됩니다.</li>
             <li>🟡 2분 30초 미만의 오디오는 거부됩니다.</li>
             <li>🟡 3분 이상의 오디오는 자동으로 2분 59초로 트리밍됩니다.</li>
+            <li>🟡 음성 학습 기능의 악용 사례를 방지하기 위해, 공인 또는 특정 유명인의 목소리는 생성이 제한될 수 있습니다.</li>
           </ul>
         </div>
       </div>
 
       {/* 성공 모달 */}
-      <Modal
+      <AlertModal
         isOpen={showModal}
         onClose={closeModal}
         title="안내"

@@ -27,7 +27,7 @@ class GenerateImagePrompt:
 
         return f"""
 Create a whimsical, storybook-style illustration in the style of {STYLE_PROMPTS[self.style_keyword]} based on the story: {diary_text}.
-Depict the main human characters as they are, and transform all other characters or background figures into animals appropriate for the scene.
+Depict the main human characters as they are, and transform some other characters or background figures into animals appropriate for the scene.
 Show characters and key elements in dynamic motion, illustrating their actions and interactions with lively expressions and gestures.
 Do not include any text, letters, numbers, captions, speech bubbles, or signs in the image.
 Use vivid, magical, and charming details to enhance the fairy tale atmosphere.
