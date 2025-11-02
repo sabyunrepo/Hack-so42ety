@@ -6,6 +6,7 @@ interface Book {
   title: string;
   cover_image?: string;
   status?: "success" | "process" | "error";
+  is_default : boolean;
 }
 
 // BookCard props 타입
@@ -125,7 +126,7 @@ export default function BookCard({
       )}
 
       {/* 편집 모드일 때 삭제 버튼 - 세련된 디자인 */}
-      {isEditing && !isProcessing && onDelete && (
+      {isEditing && !isProcessing && onDelete && !book.is_default && (
         <button
           onClick={onDelete}
           className="absolute -top-3 -right-3 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-full p-2 hover:from-red-600 hover:to-red-700 hover:scale-110 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl z-10 border-2 border-white"
