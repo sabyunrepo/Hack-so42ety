@@ -56,7 +56,7 @@ export default function Creator() {
   }, []);
 
   const addPage = () => {
-    if (pages.length > 9) {
+    if (pages.length >= 6) {
       setShowMaxPageModal(true);
       return;
     }
@@ -280,7 +280,7 @@ export default function Creator() {
         isOpen={showMaxPageModal}
         onClose={() => setShowMaxPageModal(false)}
         title="페이지 제한"
-        message="동화는 최대 10페이지까지 만들 수 있어요."
+        message="동화는 최대 6페이지까지 만들 수 있어요."
         buttonText="확인"
       />
 
