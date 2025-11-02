@@ -36,10 +36,6 @@ prod:
 	@echo "==================================================="
 	@echo "  프로덕션 환경 시작 (Cloudflare Tunnel)"
 	@echo "==================================================="
-	@if [ -z "$$CLOUDFLARE_TUNNEL_TOKEN" ]; then \
-		echo "❌ Error: CLOUDFLARE_TUNNEL_TOKEN이 .env에 설정되지 않았습니다."; \
-		exit 1; \
-	fi
 	@echo "🚀 Docker Compose 서비스 시작 중..."
 	$(COMPOSE) up -d --build
 	@echo ""

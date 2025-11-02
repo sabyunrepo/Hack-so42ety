@@ -1,13 +1,7 @@
 import { X } from "lucide-react";
+import type { Book } from "../api";
 
 // Book 타입 정의 (BookCard에서 사용하는 필드들)
-interface Book {
-  id: string;
-  title: string;
-  cover_image?: string;
-  status?: "success" | "process" | "error";
-  is_default : boolean;
-}
 
 // BookCard props 타입
 interface BookCardProps {

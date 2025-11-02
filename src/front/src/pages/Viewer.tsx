@@ -328,16 +328,6 @@ const Viewer: React.FC = () => {
           </svg>
         </button>
 
-        {/* Page number indicator */}
-        <div className="flex flex-col items-center">
-          {/* <div className="bg-white/90 backdrop-blur-sm px-6 py-3 rounded-full shadow-lg border-2 border-amber-200">
-            <span className="text-lg font-bold text-amber-900">
-              {currentPage + 1} / {totalPages}
-            </span>
-          </div> */}
-          {/* <p className="text-sm text-amber-700 mt-2 font-medium">페이지</p> */}
-        </div>
-
         {/* Next button */}
         <button
           onClick={handleNextPage}
