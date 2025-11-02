@@ -295,6 +295,7 @@ async def get_all_books(
                 title=book.title,
                 cover_image=book.cover_image,
                 status=book.status,
+                is_default=book.is_default,
             )
             for book in books
         ]
@@ -345,6 +346,7 @@ async def get_book(
             title=book.title,
             cover_image=book.cover_image,
             status=book.status,
+            is_default=book.is_default,
             pages=book.pages,
             created_at=book.created_at,
         )
