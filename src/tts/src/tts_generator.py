@@ -7,7 +7,6 @@ import os
 import uuid
 import asyncio
 import logging
-import pprint
 from pathlib import Path
 from typing import List, Optional, Tuple
 from dotenv import load_dotenv
@@ -411,6 +410,7 @@ class TtsGenerator:
         for x in response.voices:
             if x.category == "premade":
                 continue
+
             temp_data = {
                 "voice_label": x.name,
                 "voice_id": x.voice_id,
@@ -421,12 +421,28 @@ class TtsGenerator:
                 ),
                 "labels": (x.labels if hasattr(x, "labels") and x.labels else {}),
             }
-            # state value 가 fine_tuned 면 success , processing
-            state_value = x.fine_tuning.state.values()
-            if "fine_tuned" not in state_value:
-                temp_data["state"] = "processing"
+
+            # 카테고리별 생성 완료 판단 로직
+            if x.category == "professional":
+                # PVC (Professional Voice Clone): fine_tuning.state 확인 필요
+                if x.fine_tuning.state:  # 딕셔너리에 값이 있으면
+                    state_values = list(x.fine_tuning.state.values())
+                    if "fine_tuned" in state_values:
+                        temp_data["state"] = "success"  # 완료
+                    elif any(s in ["queued", "fine_tuning"] for s in state_values):
+                        temp_data["state"] = "processing"  # 처리 중
+                    elif "failed" in state_values:
+                        temp_data["state"] = "failed"  # 실패
+                    else:
+                        temp_data["state"] = "pending"  # 대기
+                else:
+                    # PVC인데 state가 비었으면 아직 시작 안 됨
+                    temp_data["state"] = "pending"
             else:
+                # IVC (cloned), Generated: fine_tuning 불필요
+                # state가 {} (빈 딕셔너리)면 생성 완료
                 temp_data["state"] = "success"
+
             voices.append(temp_data)
 
         return voices
