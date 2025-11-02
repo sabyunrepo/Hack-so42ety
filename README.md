@@ -194,10 +194,7 @@ ElevenLabs API를 래핑한 싱글톤 클래스로, TTS 생성 및 클론 보이
 1. **싱글톤 패턴**: 애플리케이션 전체에서 단일 인스턴스 사용
 2. **세마포어 제어**: 최대 동시 요청 수 제한 (기본 5개)
 3. **비동기 배치 처리**: 중첩 리스트 구조 유지하며 병렬 처리
-4. **클론 보이스 상태 판별**:
-    - IVC (Instant Voice Clone): `fine_tuning.state = {}` → 즉시 사용 가능
-    - PVC (Professional Voice Clone): `fine_tuning.state` 값 확인 필요
-5. **오디오 전처리**: FFmpeg 기반 길이 검증 및 자동 트리밍
+4. **오디오 전처리**: FFmpeg 기반 길이 검증 및 자동 트리밍
 
 ---
 
