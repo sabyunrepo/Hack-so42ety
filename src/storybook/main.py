@@ -210,8 +210,11 @@ async def create_book(
             content = await image.read()
             image_size = len(content)
             total_image_size += image_size
-            logger.info("*" * 20)
-            logger.info(f"Read Image: {image.filename}, type={image.content_type}")
+            if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"지원하지 않는 이미지 형식입니다: {image.content_type}",
+                )
             images_data.append(
                 {
                     "filename": image.filename,
@@ -256,6 +259,7 @@ async def create_book(
             id=saved_book.id,
             title=saved_book.title,
             cover_image=saved_book.cover_image,
+            is_default=saved_book.is_default,
             status="process",  # 진행 중
             pages=[],  # 빈 페이지
             created_at=saved_book.created_at,
@@ -396,6 +400,10 @@ async def delete_book(
         if not book:
             raise HTTPException(status_code=404, detail=f"Book not found: {book_id}")
 
+        if book.is_default:
+            raise HTTPException(
+                status_code=400, detail="기본 동화책은 삭제할 수 없습니다"
+            )
         # 2. 파일 리소스 삭제 (이미지 등) - StorageService
         await book_service.delete_book_assets(book)
 
