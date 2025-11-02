@@ -72,6 +72,7 @@ const Viewer: React.FC = () => {
   const [book, setBook] = useState<BookData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(0);
 
   // 8. useRef에 타입 적용
   const bookRef = useRef<HTMLFlipBookRef | null>(null);
@@ -105,41 +106,86 @@ const Viewer: React.FC = () => {
   const handleNextPage = () => {
     if (bookRef.current) {
       bookRef.current.pageFlip().flipNext();
+      setCurrentPage((prev) => Math.min(prev + 1, totalPages - 1));
     }
   };
 
   const handlePrevPage = () => {
     if (bookRef.current) {
       bookRef.current.pageFlip().flipPrev();
+      setCurrentPage((prev) => Math.max(prev - 1, 0));
     }
   };
 
+  // Calculate total pages (cover + content pages + back cover)
+  const totalPages = book ? book.pages.length * 2 + 2 : 0;
+
   if (isLoading) {
-    return <div className="p-8"></div>;
+    return (
+      <div className="p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-amber-200 border-t-amber-500"></div>
+            <div className="absolute inset-0 animate-ping rounded-full h-20 w-20 border-2 border-amber-400/40"></div>
+          </div>
+          <div className="text-2xl font-bold text-amber-900 tracking-wide">책을 불러오는 중...</div>
+          <div className="flex gap-2">
+            <div className="w-3 h-3 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-3 h-3 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-3 h-3 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (isError) {
-    return <div className="p-8">오류가 발생했습니다.</div>;
+    return (
+      <div className="p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md text-center border-2 border-red-200">
+          <div className="text-6xl mb-4 animate-pulse">⚠️</div>
+          <div className="text-2xl font-bold text-red-600 mb-2">오류가 발생했습니다</div>
+          <p className="text-gray-600 mb-6">책을 불러올 수 없습니다. 다시 시도해주세요.</p>
+          <button
+            onClick={() => navigate("/")}
+            className="px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+          >
+            책장으로 돌아가기
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // 10. book 객체가 null이 아님을 TypeScript에 확인
   if (!book) {
-    return <div className="p-8"></div>;
+    return (
+      <div className="p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md text-center">
+          <div className="text-6xl mb-4">📚</div>
+          <div className="text-2xl font-bold text-amber-900 mb-2">책을 찾을 수 없습니다</div>
+          <button
+            onClick={() => navigate("/")}
+            className="mt-4 px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+          >
+            책장으로 돌아가기
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="p-7 flex flex-col justify-center items-center ">
-      <div className="relative flex items-center justify-center w-full mb-3">
-        <h1 className="text-3xl font-bold mb-4">{book.title || "제목 없음"}</h1>
+    <div className=" p-7 flex flex-col justify-center items-center bg-gradient-to-br from-orange-50 via-amber-50/50 to-orange-50 min-h-full">
+      {/* Header with title and close button */}
+      <div className="relative flex items-center justify-center w-full mb-6">
+        <h1 className="text-4xl font-bold text-amber-900 tracking-tight drop-shadow-sm">{book.title || "제목 없음"}</h1>
         <button
           onClick={() => navigate("/")}
-          className="absolute right-8 bg-white rounded-full p-3.5 shadow-xl hover:scale-110 hover:bg-yellow-400 hover:text-white transition-all"
+          className="absolute right-8 bg-white rounded-full p-3.5 shadow-xl hover:scale-110 hover:bg-gradient-to-br hover:from-amber-400 hover:to-amber-500 hover:text-white transition-all duration-300 border-2 border-amber-200/50"
         >
           <X className="w-8 h-8" />
         </button>
-      </div>
-      <div className="w-full flex justify-center">
-        <div className="w-full max-w-[420px] md:max-w-[520px]"></div>
       </div>
       <HTMLFlipBook
         width={400}
@@ -155,6 +201,10 @@ const Viewer: React.FC = () => {
         disableFlipByClick={true}
         clickEventForward={false}
         size="fixed"
+        onFlip={(e: number | { data: number }) => {
+          const pageNum = typeof e === 'object' ? e.data : e;
+          setCurrentPage(pageNum);
+        }}
       >
         {/* 첫 번째 페이지: 커버 이미지 */}
         {/* A_FIX: <div>를 <Page>로 변경 */}
@@ -254,40 +304,56 @@ const Viewer: React.FC = () => {
           />
         </Page>
       </HTMLFlipBook>
-      <div className=" w-full flex justify-around items-center">
-        {/* ... 버튼들 ... */}
+
+      {/* Navigation controls */}
+      <div className="w-full flex justify-center items-center gap-8 mt-6">
+        {/* Previous button */}
         <button
           onClick={handlePrevPage}
-          className=" m-1 bg-white rounded-full p-3.5 shadow-xl hover:scale-110 hover:bg-yellow-400 hover:text-white transition-all"
+          disabled={currentPage === 0}
+          className="bg-gradient-to-br from-white to-amber-50 rounded-full p-4 shadow-xl hover:scale-110 hover:shadow-2xl hover:from-amber-400 hover:to-amber-500 hover:text-white transition-all duration-300 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:from-white disabled:hover:to-amber-50 disabled:hover:text-gray-800 border-2 border-amber-200/50"
         >
           <svg
             className="w-8 h-8"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            strokeWidth={3}
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={3}
               d="M15 19l-7-7 7-7"
             />
           </svg>
         </button>
+
+        {/* Page number indicator */}
+        <div className="flex flex-col items-center">
+          {/* <div className="bg-white/90 backdrop-blur-sm px-6 py-3 rounded-full shadow-lg border-2 border-amber-200">
+            <span className="text-lg font-bold text-amber-900">
+              {currentPage + 1} / {totalPages}
+            </span>
+          </div> */}
+          {/* <p className="text-sm text-amber-700 mt-2 font-medium">페이지</p> */}
+        </div>
+
+        {/* Next button */}
         <button
           onClick={handleNextPage}
-          className="  bg-white rounded-full p-3.5 shadow-xl hover:scale-110 hover:bg-yellow-400 hover:text-white transition-all"
+          disabled={currentPage === totalPages - 1}
+          className="bg-gradient-to-br from-white to-amber-50 rounded-full p-4 shadow-xl hover:scale-110 hover:shadow-2xl hover:from-amber-400 hover:to-amber-500 hover:text-white transition-all duration-300 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:from-white disabled:hover:to-amber-50 disabled:hover:text-gray-800 border-2 border-amber-200/50"
         >
           <svg
             className="w-8 h-8"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            strokeWidth={3}
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={3}
               d="M9 5l7 7-7 7"
             />
           </svg>
