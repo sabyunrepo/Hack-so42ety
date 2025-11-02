@@ -4,9 +4,15 @@
 > 해커톤 2025 IA x AI – 팀 so42ety
  
 
-### 시연 영상 : https://www.youtube.com/watch?v=zQO2ddCXmzg
+### 시연 영상 : [유튜브 시연영상](https://www.youtube.com/watch?v=zQO2ddCXmzg)
 
-### 서비스 데모: https://dev.crimecat.org/
+### 서비스 데모: [서비스 링크](https://dev.crimecat.org/)
+
+본 프로젝트는 해커톤 2025 IA x AI 출품작으로, 현재 심사위원 평가를 위해 배포 서버가 운영되고 있습니다.
+
+원활한 심사 진행을 위해, 심사위원이 아닌 분들께서는 서버로의 직접적인 API 요청이나 과도한 트래픽 유발을 자제해 주시기를 정중히 부탁드립니다.
+
+프로젝트에 대한 피드백이나 문의 사항은 본 저장소의 Issues 탭을 이용해 주시면 감사하겠습니다!
   
 (배포 환경이 내려가 있으면 아래 "로컬에서 실행하기"를 참고하세요.)
 
