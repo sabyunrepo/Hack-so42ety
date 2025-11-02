@@ -6,7 +6,7 @@
 
 ### 시연 영상 : https://www.youtube.com/watch?v=zQO2ddCXmzg
 
-### 서비스 데모: [https://moriai.kr/](https://moriai.kr/)
+### 서비스 데모: https://dev.crimecat.org/
   
 (배포 환경이 내려가 있으면 아래 "로컬에서 실행하기"를 참고하세요.)
 
