@@ -9,7 +9,7 @@ import Viewer from "./pages/Viewer";
 function App() {
   return (
     <>
-      <div className="flex flex-col w-full h-screen bg-orange-50 overflow-auto">
+      <div className="flex flex-col w-full h-screen bg-orange-50 overflow-auto min-w-[900px]">
         <Header />
         <div className="flex-1 max-w-7xl mx-auto w-full ">
           <Routes>
