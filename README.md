@@ -246,66 +246,85 @@ make prod
 
 ---
 
-## 11. 👥 팀
-
-### Team so42ety
+## 11. 👥 Team so42ety
 
 <table>
 <tr>
-<td align="center">
+<td align="center" width="20%">
 <a href="https://github.com/MatSalt">
-<img src="https://github.com/MatSalt.png" width="80px;" alt="chobae"/>
-<br />
-<sub><b>이충헌</b></sub>
+<img src="https://github.com/MatSalt.png" width="120px;" alt="이충헌"/>
 </a>
-<br />
-Team Lead / PM
-<br />
-프로젝트 기획·관리, 기술 총괄
 </td>
-<td align="center">
+<td align="center" width="20%">
 <a href="https://github.com/alsksssass">
-<img src="https://github.com/alsksssass.png" width="80px;" alt="sanglee2"/>
-<br />
-<sub><b>변상훈</b></sub>
+<img src="https://github.com/alsksssass.png" width="120px;" alt="변상훈"/>
 </a>
-<br />
-Backend & DevOps
-<br />
-인프라 설계, TTS API, Docker/Nginx
 </td>
-<td align="center">
+<td align="center" width="20%">
 <a href="https://github.com/stsr1284">
-<img src="https://github.com/stsr1284.png" width="80px;" alt="dhlee-b"/>
-<br />
-<sub><b>이동학</b></sub>
+<img src="https://github.com/stsr1284.png" width="120px;" alt="이동학"/>
 </a>
-<br />
-AI & Backend Lead
-<br />
-LLM/TTS/Video 파이프라인 설계 및 구현
 </td>
-<td align="center">
+<td align="center" width="20%">
 <a href="https://github.com/somilee0202">
-<img src="https://github.com/somilee0202.png" width="80px;" alt="lsm"/>
-<br />
-<sub><b>이소민</b></sub>
+<img src="https://github.com/somilee0202.png" width="120px;" alt="이소민"/>
 </a>
-<br />
-Product Designer & Frontend
-<br />
-UX/UI 디자인(Figma), React 인터랙션 구현
+</td>
+<td align="center" width="20%">
+<a href="https://github.com/jimchoi9">
+<img src="https://github.com/jimchoi9.png" width="120px;" alt="최지민"/>
+</a>
+</td>
+</tr>
+<tr>
+<td align="center">
+<b>이충헌</b>
 </td>
 <td align="center">
-<a href="https://github.com/jimchoi9">
-<img src="https://github.com/jimchoi9.png" width="80px;" alt="jmchoi"/>
-<br />
-<sub><b>최지민</b></sub>
-</a>
-<br />
+<b>변상훈</b>
+</td>
+<td align="center">
+<b>이동학</b>
+</td>
+<td align="center">
+<b>이소민</b>
+</td>
+<td align="center">
+<b>최지민</b>
+</td>
+</tr>
+<tr>
+<td align="center">
+Team Lead / PM
+</td>
+<td align="center">
+Backend & DevOps
+</td>
+<td align="center">
+AI & Backend Lead
+</td>
+<td align="center">
+Product Designer & Frontend
+</td>
+<td align="center">
 Frontend Developer
-<br />
-프론트 구조 설계, API 연동, 상태관리
+</td>
+</tr>
+<tr>
+<td align="center">
+프로젝트 기획·관리<br/>기술 총괄
+</td>
+<td align="center">
+인프라 설계<br/>TTS API, Docker/Nginx
+</td>
+<td align="center">
+LLM/TTS/Video<br/>파이프라인 설계 및 구현
+</td>
+<td align="center">
+UX/UI 디자인(Figma)<br/>React 인터랙션 구현
+</td>
+<td align="center">
+프론트 구조 설계<br/>API 연동, 상태관리
 </td>
 </tr>
 </table>
