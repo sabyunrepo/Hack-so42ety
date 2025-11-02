@@ -421,8 +421,9 @@ class TtsGenerator:
                 ),
                 "labels": (x.labels if hasattr(x, "labels") and x.labels else {}),
             }
-            # preview_url이 None이면 processing, 아니면 success
-            if x.preview_url is None:
+            # state value 가 fine_tuned 면 success , processing
+            state_value = x.fine_tuning.state.values()
+            if "fine_tuned" not in state_value:
                 temp_data["state"] = "processing"
             else:
                 temp_data["state"] = "success"
