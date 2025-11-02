@@ -4,6 +4,7 @@
   "cover_image": "/data/image/32e543c7-a845-4cfb-a93d-a0153dc9e063/0_page_1.png",
   "voice_id": "uzyfnLLlKo55AbgBU5uH",
   "status": "success",
+  "is_default": true,
   "pages": [
     {
       "id": "53fb6abc-1708-44d8-bf66-158f7ffb6b58",
