@@ -202,16 +202,6 @@ async def create_book(
         logger.info(f"Using voice_id: {voice_id}")
 
         # 1. 빈 Book 객체 생성 (status="process")
-        book = Book(
-            title="",  # 기본 제목
-            cover_image="",  # 나중에 설정
-            voice_id=voice_id,  # TTS 음성 ID (기본값 적용됨)
-            status="process",
-            pages=[],  # 빈 페이지
-        )
-
-        # 2. Repository에 저장 (빈 Book)
-        saved_book = await book_repository.create(book)
 
         # 3. UploadFile을 bytes로 변환 (메모리에 미리 읽기)
         images_data = []
@@ -220,6 +210,8 @@ async def create_book(
             content = await image.read()
             image_size = len(content)
             total_image_size += image_size
+            logger.info("*" * 20)
+            logger.info(f"Read Image: {image.filename}, type={image.content_type}")
             images_data.append(
                 {
                     "filename": image.filename,
@@ -234,6 +226,17 @@ async def create_book(
         logger.info(
             f"Total images size: {total_image_size / 1024 / 1024:.2f} MB ({len(images)} images)"
         )
+
+        book = Book(
+            title="",  # 기본 제목
+            cover_image="",  # 나중에 설정
+            voice_id=voice_id,  # TTS 음성 ID (기본값 적용됨)
+            status="process",
+            pages=[],  # 빈 페이지
+        )
+
+        # 2. Repository에 저장 (빈 Book)
+        saved_book = await book_repository.create(book)
 
         # 4. 백그라운드 작업 등록 (전체 생성 프로세스)
         background_tasks.add_task(
