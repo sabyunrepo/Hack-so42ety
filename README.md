@@ -121,7 +121,7 @@ projectMori/
 
 ---
 
-## 5. AI 파이프라인 개요
+## 5. 동확책 생성 AI 파이프라인 개요
 
 ```mermaid
 flowchart TD
@@ -129,9 +129,8 @@ flowchart TD
     B --> C["2. 감정 제어문 삽입: LLM 재호출로 감정 표현 주입"]
     C --> D["3A. TTS (ElevenLabs): 부모 목소리 음성 생성"]
     C --> E["3B. Image2Video (Kling-V2): 삽화 → 동영상 변환"]
-    D --> F["4. FFmpeg + pydub: 오디오/비디오 병합"]
+    D --> F["5. 패키징: 텍스트+음성+영상 JSON/URL로 프론트 전달"]
     E --> F
-    F --> G["5. 패키징: 텍스트+음성+영상 JSON/URL로 프론트 전달"]
 ```
 
 **세마포어 기반 동시성 제어**
