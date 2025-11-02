@@ -255,8 +255,8 @@ export default function Creator() {
       <AlertModal
         isOpen={showVoiceWarningModal}
         onClose={() => setShowVoiceWarningModal(false)}
-        title="목소리 설정 필요"
-        message="목소리부터 넣고오세요"
+        title="음성 없음"
+        message="준비된 음성이 없습니다. 목소리를 등록해주세요"
         buttonText="목소리 설정하러 가기"
         redirectTo="/settings"
       />
