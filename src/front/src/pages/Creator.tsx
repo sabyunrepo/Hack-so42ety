@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { createStorybook, getVoices } from "../api/index";
 import StoryInput from "../components/StoryInput";
 import BackButton from "../components/BackButton";
-import Modal from "../components/Modal";
+import { AlertModal } from "../components/Modal";
 
 interface Page {
   id: number;
@@ -122,7 +122,7 @@ export default function Creator() {
   };
 
   return (
-    <div className=" min-h-screen p-8 font-sans relative">
+    <div className="p-8 font-sans relative">
       <div className="max-w-3xl mx-auto ">
         <BackButton />
         {/* 상단 컨트롤 */}
@@ -252,17 +252,17 @@ export default function Creator() {
       </div>
 
       {/* 목소리 경고 모달 */}
-      <Modal
+      <AlertModal
         isOpen={showVoiceWarningModal}
         onClose={() => setShowVoiceWarningModal(false)}
-        title="목소리 설정 필요"
-        message="목소리부터 넣고오세요"
+        title="음성 없음"
+        message="준비된 음성이 없습니다. 목소리를 등록해주세요"
         buttonText="목소리 설정하러 가기"
         redirectTo="/settings"
       />
 
       {/* 최대 페이지 제한 모달 */}
-      <Modal
+      <AlertModal
         isOpen={showMaxPageModal}
         onClose={() => setShowMaxPageModal(false)}
         title="페이지 제한"
@@ -271,7 +271,7 @@ export default function Creator() {
       />
 
       {/* 최소 페이지 제한 모달 */}
-      <Modal
+      <AlertModal
         isOpen={showMinPageModal}
         onClose={() => setShowMinPageModal(false)}
         title="페이지 제한"
@@ -280,7 +280,7 @@ export default function Creator() {
       />
 
       {/* 검증 실패 모달 */}
-      <Modal
+      <AlertModal
         isOpen={showValidationModal}
         onClose={() => setShowValidationModal(false)}
         title="입력 확인"
@@ -289,7 +289,7 @@ export default function Creator() {
       />
 
       {/* 성공 모달 */}
-      <Modal
+      <AlertModal
         isOpen={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
         title="동화책 생성"
@@ -299,7 +299,7 @@ export default function Creator() {
       />
 
       {/* 에러 모달 */}
-      <Modal
+      <AlertModal
         isOpen={showErrorModal}
         onClose={() => setShowErrorModal(false)}
         title="오류 발생"

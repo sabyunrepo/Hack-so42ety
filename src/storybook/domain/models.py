@@ -99,6 +99,7 @@ class Book(BaseModel):
         default="process", description="동화책 상태"
     )
     pages: List[Page] = Field(default_factory=list, description="동화책 페이지 리스트")
+    is_default: bool = Field(default=False, description="기본 동화책 여부")
     created_at: datetime = Field(default_factory=datetime.now, description="생성 시간")
 
     class Config:

@@ -150,7 +150,7 @@ class BookOrchestratorService:
                     zip(story_dialogues, tts_urls if tts_urls else [])
                 ):
                     # 감정 태그 제거 (예: "[excited] Hello!" -> "Hello!")
-                    clean_text = re.sub(r'\[[\w\s]+\]\s*', '', text).strip()
+                    clean_text = re.sub(r"\[[\w\s]+\]\s*", "", text).strip()
 
                     dialogue = Dialogue(
                         index=dialogue_idx + 1,
@@ -216,6 +216,9 @@ class BookOrchestratorService:
 
         Returns:
             Page: 생성된 페이지 객체
+
+        Raises:
+            Exception: 이미지 생성 실패 시 (필수 리소스)
         """
         page_id = f"page_{index + 1}"
 
@@ -230,7 +233,14 @@ class BookOrchestratorService:
                 index, story, image, book_id, page_id
             )
 
+        # 이미지 생성 실패 체크 (필수 리소스)
+        if not image_url:
+            error_msg = f"Image generation failed for page {index + 1}"
+            logger.error(f"[BookOrchestratorService] {error_msg}")
+            raise Exception(error_msg)
+
         # 2. 비디오 생성 (템플릿 또는 Kling API)
+        # 비디오는 선택적 리소스 - 실패해도 이미지로 대체 가능
         if settings.use_template_mode:
             video_url = await self.video_generator.generate_video_from_template(
                 index, story, image_url, book_id, page_id

@@ -31,8 +31,17 @@ declare module "react-pageflip" {
     children: React.ReactNode;
   }
 
+  export interface PageFlipApi {
+    flipNext: () => void;
+    flipPrev: () => void;
+  }
+
+  export interface HTMLFlipBookRef {
+    pageFlip: () => PageFlipApi;
+  }
+
   const HTMLFlipBook: React.ForwardRefExoticComponent<
-    IProps & React.RefAttributes<any>
+    IProps & React.RefAttributes<HTMLFlipBookRef>
   >;
 
   export default HTMLFlipBook;

@@ -56,6 +56,7 @@ class BookSummary(BaseModel):
     status: Literal["process", "success", "error"] = Field(
         ..., description="동화책 상태"
     )
+    is_default: bool = Field(..., description="기본 동화책 여부")
 
     class Config:
         json_schema_extra = {
@@ -118,6 +119,7 @@ class BookDetailResponse(BaseModel):
     status: Literal["process", "success", "error"] = Field(
         ..., description="동화책 상태"
     )
+    is_default: bool = Field(..., description="기본 동화책 여부")
     pages: List[Page] = Field(default_factory=list, description="동화책 페이지 리스트")
     created_at: datetime = Field(..., description="생성 시간")
 
