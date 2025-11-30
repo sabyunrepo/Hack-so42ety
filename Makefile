@@ -1,164 +1,208 @@
-.PHONY: up down logs build rebuild clean help dev prod tunnel-logs
+.PHONY: help setup dev prod test clean migrate backup
 
-# Docker Compose 설정
-COMPOSE_FILE = docker-compose.yml
-COMPOSE = docker compose -f $(COMPOSE_FILE)
+# ==================== Colors ====================
+BLUE := \033[0;34m
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+RED := \033[0;31m
+NC := \033[0m  # No Color
 
-# 기본 타겟
+# ==================== Variables ====================
+PROJECT_NAME := MoriAI Storybook Service
+DOCKER_COMPOSE := docker-compose
+DOCKER_COMPOSE_DEV := docker-compose -f docker-compose.yml -f docker-compose.dev.yml
+
+# ==================== Help ====================
+help: ## 사용 가능한 명령어 목록 표시
+	@echo "$(BLUE)$(PROJECT_NAME) - Makefile Commands$(NC)"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo ""
+
+# ==================== Setup ====================
+setup: ## 초기 설정 (환경 변수 복사, 디렉토리 생성)
+	@echo "$(BLUE)Setting up project...$(NC)"
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "$(GREEN)✓ .env file created$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠ .env file already exists$(NC)"; \
+	fi
+	@mkdir -p data/{book,image,video,sound}
+	@echo "$(GREEN)✓ Data directories created$(NC)"
+	@echo "$(BLUE)Please edit .env file with your credentials$(NC)"
+
+# ==================== Development ====================
+dev: ## 개발 모드 실행 (Hot Reload)
+	@echo "$(BLUE)Starting development environment...$(NC)"
+	$(DOCKER_COMPOSE) up -d postgres
+	@echo "$(YELLOW)Waiting for PostgreSQL...$(NC)"
+	@sleep 5
+	$(DOCKER_COMPOSE) up -d backend
+	@echo "$(GREEN)✓ Backend started$(NC)"
+	@echo "$(BLUE)Backend: http://localhost:8000$(NC)"
+	@echo "$(BLUE)API Docs: http://localhost:8000/docs$(NC)"
+
+dev-logs: ## 개발 모드 로그 확인
+	$(DOCKER_COMPOSE) logs -f backend
+
+dev-stop: ## 개발 모드 중지
+	$(DOCKER_COMPOSE) stop
+
+# ==================== Production ====================
+build: ## Docker 이미지 빌드
+	@echo "$(BLUE)Building Docker images...$(NC)"
+	$(DOCKER_COMPOSE) build
+
+prod: build ## 프로덕션 모드 실행
+	@echo "$(BLUE)Starting production environment...$(NC)"
+	$(DOCKER_COMPOSE) --profile production up -d
+	@echo "$(GREEN)✓ All services started$(NC)"
+	@echo "$(BLUE)Application: http://localhost$(NC)"
+
+prod-logs: ## 프로덕션 모드 로그 확인
+	$(DOCKER_COMPOSE) logs -f
+
+prod-stop: ## 프로덕션 모드 중지
+	$(DOCKER_COMPOSE) --profile production down
+
+# ==================== Database ====================
+db-shell: ## PostgreSQL 셸 접속
+	@echo "$(BLUE)Connecting to PostgreSQL...$(NC)"
+	$(DOCKER_COMPOSE) exec postgres psql -U moriai_user -d moriai_db
+
+db-migrate: ## 데이터베이스 마이그레이션 실행
+	@echo "$(BLUE)Running database migrations...$(NC)"
+	$(DOCKER_COMPOSE) exec backend alembic upgrade head
+	@echo "$(GREEN)✓ Migrations completed$(NC)"
+
+db-rollback: ## 마이그레이션 롤백 (1단계)
+	@echo "$(YELLOW)Rolling back last migration...$(NC)"
+	$(DOCKER_COMPOSE) exec backend alembic downgrade -1
+
+db-reset: ## 데이터베이스 초기화 (⚠️ 주의: 모든 데이터 삭제)
+	@echo "$(RED)⚠️  This will delete all data!$(NC)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		$(DOCKER_COMPOSE) exec postgres psql -U moriai_user -d moriai_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"; \
+		$(MAKE) db-migrate; \
+		echo "$(GREEN)✓ Database reset completed$(NC)"; \
+	else \
+		echo "$(YELLOW)Cancelled$(NC)"; \
+	fi
+
+db-backup: ## 데이터베이스 백업
+	@echo "$(BLUE)Backing up database...$(NC)"
+	@mkdir -p backups
+	$(DOCKER_COMPOSE) exec -T postgres pg_dump -U moriai_user moriai_db > backups/backup_$(shell date +%Y%m%d_%H%M%S).sql
+	@echo "$(GREEN)✓ Backup completed$(NC)"
+
+# ==================== Testing ====================
+test: ## 전체 테스트 실행
+	@echo "$(BLUE)Running all tests...$(NC)"
+	$(DOCKER_COMPOSE) exec backend pytest tests/ -v
+
+test-unit: ## 단위 테스트만 실행
+	@echo "$(BLUE)Running unit tests...$(NC)"
+	$(DOCKER_COMPOSE) exec backend pytest tests/unit/ -v
+
+test-integration: ## 통합 테스트만 실행
+	@echo "$(BLUE)Running integration tests...$(NC)"
+	$(DOCKER_COMPOSE) exec backend pytest tests/integration/ -v
+
+test-e2e: ## E2E 테스트 실행
+	@echo "$(BLUE)Running E2E tests...$(NC)"
+	$(DOCKER_COMPOSE) exec backend pytest tests/e2e/ -v
+
+test-coverage: ## 테스트 커버리지 리포트
+	@echo "$(BLUE)Generating test coverage report...$(NC)"
+	$(DOCKER_COMPOSE) exec backend pytest tests/ --cov=backend --cov-report=html --cov-report=term
+	@echo "$(GREEN)✓ Coverage report generated: htmlcov/index.html$(NC)"
+
+# ==================== Code Quality ====================
+lint: ## 코드 린트 (Ruff)
+	@echo "$(BLUE)Running linter...$(NC)"
+	$(DOCKER_COMPOSE) exec backend ruff check backend/
+
+format: ## 코드 포맷 (Black + isort)
+	@echo "$(BLUE)Formatting code...$(NC)"
+	$(DOCKER_COMPOSE) exec backend black backend/
+	$(DOCKER_COMPOSE) exec backend isort backend/
+
+format-check: ## 포맷 검사 (CI용)
+	@echo "$(BLUE)Checking code format...$(NC)"
+	$(DOCKER_COMPOSE) exec backend black --check backend/
+	$(DOCKER_COMPOSE) exec backend isort --check backend/
+
+# ==================== Frontend ====================
+frontend-dev: ## 프론트엔드 개발 모드 실행
+	@echo "$(BLUE)Starting frontend development server...$(NC)"
+	cd frontend && npm run dev
+
+frontend-build: ## 프론트엔드 빌드
+	@echo "$(BLUE)Building frontend...$(NC)"
+	cd frontend && npm run build
+
+frontend-test: ## 프론트엔드 테스트
+	@echo "$(BLUE)Running frontend tests...$(NC)"
+	cd frontend && npm run test
+
+# ==================== Cleanup ====================
+clean: ## 임시 파일 및 캐시 정리
+	@echo "$(BLUE)Cleaning up...$(NC)"
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@echo "$(GREEN)✓ Cleanup completed$(NC)"
+
+clean-all: clean ## 모든 데이터 삭제 (Docker volumes 포함)
+	@echo "$(RED)⚠️  This will delete all Docker volumes and data!$(NC)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		$(DOCKER_COMPOSE) down -v; \
+		rm -rf data/*; \
+		echo "$(GREEN)✓ All data deleted$(NC)"; \
+	else \
+		echo "$(YELLOW)Cancelled$(NC)"; \
+	fi
+
+# ==================== Logs ====================
+logs: ## 모든 서비스 로그 확인
+	$(DOCKER_COMPOSE) logs -f
+
+logs-backend: ## 백엔드 로그 확인
+	$(DOCKER_COMPOSE) logs -f backend
+
+logs-postgres: ## PostgreSQL 로그 확인
+	$(DOCKER_COMPOSE) logs -f postgres
+
+logs-nginx: ## Nginx 로그 확인
+	$(DOCKER_COMPOSE) logs -f nginx
+
+# ==================== Utilities ====================
+shell-backend: ## 백엔드 컨테이너 셸 접속
+	$(DOCKER_COMPOSE) exec backend /bin/bash
+
+shell-postgres: ## PostgreSQL 컨테이너 셸 접속
+	$(DOCKER_COMPOSE) exec postgres /bin/sh
+
+ps: ## 실행 중인 컨테이너 목록
+	$(DOCKER_COMPOSE) ps
+
+restart: ## 모든 서비스 재시작
+	$(DOCKER_COMPOSE) restart
+
+# ==================== CI/CD ====================
+ci-test: ## CI 환경에서 테스트 실행
+	@echo "$(BLUE)Running CI tests...$(NC)"
+	$(DOCKER_COMPOSE) up -d postgres
+	@sleep 10
+	$(DOCKER_COMPOSE) run --rm backend pytest tests/ -v --cov=backend --cov-report=xml
+
+# ==================== Default ====================
 .DEFAULT_GOAL := help
-
-## dev: 로컬 개발 환경 시작 (백엔드 + 프론트엔드)
-dev:
-	@echo "==================================================="
-	@echo "  로컬 개발 환경 시작"
-	@echo "==================================================="
-	@echo ""
-	@echo "🚀 백엔드 API 시작 중 (Docker)..."
-	@docker compose -f docker-compose.dev.yml up -d
-	@echo ""
-	@echo "✅ 백엔드 API 시작 완료!"
-	@echo "   - TTS API: http://localhost:8000"
-	@echo "   - Storybook API: http://localhost:8001"
-	@echo ""
-	@echo "==================================================="
-
-## dev-down: 로컬 개발 환경 중지
-dev-down:
-	@echo "==================================================="
-	@echo "  로컬 개발 환경 중지"
-	@echo "==================================================="
-	@docker compose -f docker-compose.dev.yml down
-	@echo "✅ 백엔드 API 중지 완료"
-	@echo "==================================================="
-
-## prod: 프로덕션 환경 시작 (Cloudflare Tunnel)
-prod:
-	@echo "==================================================="
-	@echo "  프로덕션 환경 시작 (Cloudflare Tunnel)"
-	@echo "==================================================="
-	@echo "🚀 Docker Compose 서비스 시작 중..."
-	$(COMPOSE) up -d --build
-	@echo ""
-	@echo "✅ 프로덕션 환경 시작 완료!"
-	@echo ""
-	@echo "📋 서비스 상태:"
-	@$(COMPOSE) ps
-	@echo ""
-	@echo "📋 Cloudflare Tunnel 로그:"
-	@echo "   make tunnel-logs"
-	@echo ""
-	@echo "🌍 접속 URL:"
-	@echo "   https://moriai.kr"
-	@echo "==================================================="
-
-## tunnel-logs: Cloudflare Tunnel 로그 확인
-tunnel-logs:
-	@docker logs -f cloudflared
-
-up:
-	@echo "==================================================="
-	@echo "  Docker 이미지 빌드 및 서비스 시작 중..."
-	@echo "==================================================="
-	$(COMPOSE) up -d --build
-	@echo "==================================================="
-	@echo "  완료! 서비스가 시작되었습니다."
-	@echo "==================================================="
-
-## down: 모든 서비스 중지 및 볼륨 삭제
-down:
-	$(COMPOSE) down -v
-
-## logs: 모든 서비스 로그 출력 (실시간)
-logs:
-	$(COMPOSE) logs -f
-
-## build: 특정 서비스 빌드 (사용법: make build <서비스명>)
-build:
-	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
-		echo "Error: 서비스명이 필요합니다."; \
-		echo "사용법: make build <서비스명>"; \
-		echo "예시: make build nginx"; \
-		exit 1; \
-	fi
-	$(COMPOSE) build $(filter-out $@,$(MAKECMDGOALS))
-
-## rebuild: 특정 서비스 재빌드 및 재시작 (사용법: make rebuild <서비스명>)
-rebuild:
-	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
-		echo "Error: 서비스명이 필요합니다."; \
-		echo "사용법: make rebuild <서비스명>"; \
-		echo "예시: make rebuild nginx"; \
-		exit 1; \
-	fi
-	$(COMPOSE) up -d --build $(filter-out $@,$(MAKECMDGOALS))
-
-## rebuild-nocache: 특정 서비스 캐시 없이 재빌드 및 재시작 (사용법: make rebuild-nocache <서비스명>)
-rebuild-no:
-	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
-		echo "Error: 서비스명이 필요합니다."; \
-		echo "사용법: make rebuild-nocache <서비스명>"; \
-		echo "예시: make rebuild-nocache nginx"; \
-		exit 1; \
-	fi
-	@echo "==================================================="
-	@echo "  [$(filter-out $@,$(MAKECMDGOALS))] 캐시 없이 빌드 시작..."
-	@echo "==================================================="
-	$(COMPOSE) build --no-cache $(filter-out $@,$(MAKECMDGOALS))
-	@echo "==================================================="
-	@echo "  [$(filter-out $@,$(MAKECMDGOALS))] 재시작 중..."
-	@echo "==================================================="
-	$(COMPOSE) up -d $(filter-out $@,$(MAKECMDGOALS))
-	@echo "==================================================="
-	@echo "  완료!"
-	@echo "==================================================="
-
-# 서비스명을 타겟으로 받기 위한 패턴
-%:
-	@:
-
-## build-all: 모든 서비스 빌드
-build-all:
-	$(COMPOSE) build
-
-## restart: 모든 서비스 재시작
-restart:
-	$(COMPOSE) restart
-
-## stop: 모든 서비스 중지 (볼륨 유지)
-stop:
-	$(COMPOSE) stop
-
-## ps: 실행 중인 컨테이너 확인
-ps:
-	$(COMPOSE) ps
-
-## clean: 모든 컨테이너, 네트워크, 볼륨, 이미지, 빌드 캐시 완전 정리
-clean:
-	@echo "==================================================="
-	@echo "  전체 정리 시작 (컨테이너, 볼륨, 이미지, 빌드 캐시)"
-	@echo "==================================================="
-	$(COMPOSE) down -v --rmi all --remove-orphans
-	@echo ""
-	@echo "빌드 캐시 정리 중..."
-	docker builder prune -f
-	@echo ""
-	@echo "사용하지 않는 볼륨 정리 중..."
-	docker volume prune -f
-	@echo ""
-	@echo "==================================================="
-	@echo "  정리 완료!"
-	@echo "==================================================="
-
-## help: Makefile 명령어 도움말
-help:
-	@echo "==================================================="
-	@echo "  MoriAI Docker Compose Makefile"
-	@echo "==================================================="
-	@echo ""
-	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## /  /'
-	@echo ""
-	@echo "서비스 목록:"
-	@echo "  - tts-api"
-	@echo "  - frontend-builder"
-	@echo "  - nginx"
-	@echo ""
