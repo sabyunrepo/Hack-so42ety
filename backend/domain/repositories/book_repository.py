@@ -60,7 +60,7 @@ class BookRepository(AbstractRepository[Book]):
             .options(
                 selectinload(Book.pages).selectinload(Page.dialogues)
             )
-            .where(Book.user_id == user_id)
+            .where(or_(Book.user_id == user_id, Book.is_default == True))
             .order_by(Book.created_at.desc())
             .offset(skip)
             .limit(limit)
