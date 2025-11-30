@@ -51,6 +51,9 @@ class Book(Base):
     # 상태 (draft, published)
     status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False)
     
+    # 기본 제공 책 여부 (공통 라이브러리)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
