@@ -119,7 +119,7 @@ async def get_book(
         raise HTTPException(status_code=404, detail="Book not found")
     
     # RLS가 있지만, 서비스 레벨에서도 한 번 더 체크하는 것이 안전 (또는 RLS가 처리)
-    if book.user_id != current_user.id:
+    if book.user_id != current_user.id and not book.is_default:
         raise HTTPException(status_code=403, detail="Not authorized to view this book")
         
     return book
