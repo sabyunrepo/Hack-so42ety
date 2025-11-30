@@ -70,11 +70,10 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.debug else None,
 )
 
+
 # 미들웨어 설정
 app.add_middleware(UserContextMiddleware)
 setup_cors(app)
-
-
 
 
 # ==================== Health Check ====================

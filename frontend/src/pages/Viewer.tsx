@@ -13,27 +13,26 @@ import AudioPlayer from "../components/AudioPlayer";
 // 2. 책 내부의 'dialogue' 데이터 타입
 interface Dialogue {
   id: string | number;
-  text: string;
-  part_audio_url: string;
+  text_en: string;
+  text_ko?: string;
+  audio_url?: string;
 }
 
 // 3. 책의 'page' 데이터 타입
 interface PageData {
   id: string | number;
-  type: "video" | "image" | string; // 'video' 외 다른 타입이 있다면 추가
-  content: string; // 이미지 또는 비디오 URL
+  image_url: string;
   dialogues: Dialogue[];
 }
 
 // 4. API로부터 받는 'book' 데이터의 전체 구조
 interface BookData {
   title: string;
-  cover_image: string;
+  cover_image_url: string;
   pages: PageData[];
 }
 
 // 5. react-pageflip 라이브러리의 ref가 노출하는 API 타입
-// (실제 라이브러리에 타입이 있다면 @types/react-pageflip 임포트로 대체 가능)
 interface PageFlipApi {
   flipNext: () => void;
   flipPrev: () => void;
@@ -62,19 +61,17 @@ const Page = React.forwardRef<HTMLDivElement, PageProps>(
     );
   }
 );
+
 // --- 컴포넌트 ---
 
 const Viewer: React.FC = () => {
-  // 6. useParams에 제네릭을 사용하여 bookId의 타입을 string으로 지정
   const { bookId } = useParams<{ bookId: string }>();
 
-  // 7. useState에 타입 적용
   const [book, setBook] = useState<BookData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(0);
 
-  // 8. useRef에 타입 적용
   const bookRef = useRef<HTMLFlipBookRef | null>(null);
   const navigate = useNavigate();
 
@@ -88,8 +85,7 @@ const Viewer: React.FC = () => {
       try {
         setIsLoading(true);
         setIsError(false);
-        // getStorybookById가 BookData 타입을 반환한다고 가정
-        const data: BookData = await getStorybookById(bookId);
+        const data: any = await getStorybookById(bookId);
         setBook(data);
       } catch (error) {
         setIsError(true);
@@ -102,7 +98,6 @@ const Viewer: React.FC = () => {
     fetchBook();
   }, [bookId]);
 
-  // 9. ref 사용 시 null 체크 추가 (TypeScript가 강제)
   const handleNextPage = () => {
     if (bookRef.current) {
       bookRef.current.pageFlip().flipNext();
@@ -117,6 +112,11 @@ const Viewer: React.FC = () => {
     }
   };
 
+  // Helper to check if url is video
+  const isVideo = (url: string) => {
+    return url?.toLowerCase().endsWith('.mp4');
+  };
+
   // Calculate total pages (cover + content pages + back cover)
   const totalPages = book ? book.pages.length * 2 + 2 : 0;
 
@@ -129,11 +129,6 @@ const Viewer: React.FC = () => {
             <div className="absolute inset-0 animate-ping rounded-full h-20 w-20 border-2 border-amber-400/40"></div>
           </div>
           <div className="text-2xl font-bold text-amber-900 tracking-wide">책을 불러오는 중...</div>
-          <div className="flex gap-2">
-            <div className="w-3 h-3 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-3 h-3 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-3 h-3 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-          </div>
         </div>
       </div>
     );
@@ -157,7 +152,6 @@ const Viewer: React.FC = () => {
     );
   }
 
-  // 10. book 객체가 null이 아님을 TypeScript에 확인
   if (!book) {
     return (
       <div className="p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
@@ -207,13 +201,12 @@ const Viewer: React.FC = () => {
         }}
       >
         {/* 첫 번째 페이지: 커버 이미지 */}
-        {/* A_FIX: <div>를 <Page>로 변경 */}
         <Page
           className="demoPage border bg-white shadow-2xl/30"
           data-density="hard"
         >
           <img
-            src={`${book.cover_image}`}
+            src={`${book.cover_image_url}`}
             alt="커버"
             className="w-full h-full object-cover"
           />
@@ -222,22 +215,20 @@ const Viewer: React.FC = () => {
         {/* 책 내용 */}
         {book.pages.map((pageData: PageData) => [
           // 이미지 (오른쪽 접힌 부분 효과)
-          // A_FIX: <div>를 <Page>로 변경
           <Page
             key={`image-${pageData.id}`}
             className="relative bg-white flex flex-col justify-center items-center p-5 shadow-2xl/30 "
           >
-            {pageData.type === "video" ? (
+            {isVideo(pageData.image_url) ? (
               <video muted autoPlay loop className="h-full w-full object-cover">
-                <source src={`${pageData.content}`} type="video/mp4" />
+                <source src={`${pageData.image_url}`} type="video/mp4" />
               </video>
             ) : (
               <img
-                src={`${pageData.content}`}
+                src={`${pageData.image_url}`}
                 className="h-full w-full object-cover"
               />
             )}
-            {/* ... (그라데이션 효과) ... */}
             <div
               className="pointer-events-none absolute inset-y-0 right-0 w-[10%]"
               style={{
@@ -255,12 +246,10 @@ const Viewer: React.FC = () => {
           </Page>,
 
           // 글자 (왼쪽 접힌 부분 효과)
-          // A_FIX: <div>를 <Page>로 변경
           <Page
             key={`text-${pageData.id}`}
             className="relative w-full h-full bg-white flex flex-col justify-center items-center p-10 shadow-2xl/30 "
           >
-            {/* ... (그라데이션 효과) ... */}
             <div
               className="pointer-events-none absolute inset-y-0 left-0 w-[15%]"
               style={{
@@ -284,15 +273,14 @@ const Viewer: React.FC = () => {
                 onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                 onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
               >
-                <ClickableText text={dialogue.text} book_id={bookId!} />
-                <AudioPlayer src={`${dialogue.part_audio_url}`} />
+                <ClickableText text={dialogue.text_en} book_id={bookId!} />
+                <AudioPlayer src={`${dialogue.audio_url}`} />
               </div>
             ))}
           </Page>,
         ])}
 
         {/* 마지막 페이지: 뒷면 커버 */}
-        {/* A_FIX: <div>를 <Page>로 변경 */}
         <Page
           className="demoPage border bg-[#f2bf27] relative w-full min-h-[200px] shadow-2xl/30"
           data-density="hard"
@@ -307,7 +295,6 @@ const Viewer: React.FC = () => {
 
       {/* Navigation controls */}
       <div className="w-full flex justify-center items-center gap-8 mt-6">
-        {/* Previous button */}
         <button
           onClick={handlePrevPage}
           disabled={currentPage === 0}
@@ -328,7 +315,6 @@ const Viewer: React.FC = () => {
           </svg>
         </button>
 
-        {/* Next button */}
         <button
           onClick={handleNextPage}
           disabled={currentPage === totalPages - 1}

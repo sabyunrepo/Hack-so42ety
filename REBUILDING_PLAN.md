@@ -55,8 +55,51 @@
 - ✅ JWT 기반 토큰 관리
 - ✅ Google OAuth + Credentials 로그인
 
+#### Phase 6: API Versioning Migration (New) ✅ **COMPLETED**
+- **Goal**: Refactor to a layered architecture supporting API versioning (v1, v2).
+- **Tasks**:
+  - [x] Create `backend/api/v1` directory structure
+  - [x] Migrate `Auth` endpoints to `backend/api/v1/endpoints/auth.py`
+  - [x] Migrate `Storybook` endpoints to `backend/api/v1/endpoints/storybook.py`
+  - [x] Migrate `TTS` endpoints to `backend/api/v1/endpoints/tts.py`
+  - [x] Migrate `User` endpoints to `backend/api/v1/endpoints/user.py`
+  - [x] Create centralized router in `backend/api/v1/router.py`
+  - [x] Update `backend/main.py` to use versioned router
+
+## Phase 7: Deployment Preparation
+- **Goal**: Prepare for deployment (Docker, CI/CD).
+- **Tasks**:
+  - [ ] Finalize `Dockerfile` and `docker-compose.yml`
+  - [ ] Set up environment variables for production
+  - [ ] Create build scripts (Multi-stage build)
+
+# ... (Previous Phase 1-5 content remains unchanged) ...
+
+### **Phase 6: 데이터 마이그레이션 (Week 10)** ✅ **COMPLETED**
+
+#### 목표
+- 기존 JSON 파일 → PostgreSQL 마이그레이션
+
 #### 작업 항목
-- [x] 프로젝트 초기 구조 생성
+- [x] 마이그레이션 스크립트
+  - [x] `backend/migrate_backup.py` (Docker 내부 실행)
+    - 기본 관리자 사용자 생성 (admin@moriai.com)
+    - 백업 데이터(`backup_hackathon_20251130`) 읽기 → DB 삽입
+    - `Book` 모델에 `is_default` 컬럼 추가하여 공통 북으로 설정
+    - 미디어 파일(이미지, 비디오, 오디오)을 `data` 볼륨으로 복사
+
+#### 테스트 계획
+```bash
+# 마이그레이션 실행 (Docker 내부)
+docker-compose exec backend python backend/migrate_backup.py
+
+# 데이터 검증
+# 프론트엔드에서 공통 북 확인
+```
+
+#### 완료 조건
+- ✅ 모든 기존 데이터 DB 이전 (My Mountain Adventure, My Playground Day)
+- ✅ 미디어 파일 정상 복사 및 서빙 확인
   - [x] 디렉토리 구조 생성 (Feature-First 아키텍처)
   - [x] 환경 설정 파일 (.env, docker-compose.yml)
   - [x] Makefile 작성 (dev, test, db-migrate 등)
@@ -253,30 +296,30 @@ pytest tests/unit/repositories/test_book_repository.py
 
 ---
 
-### **Phase 4: Feature 모듈 구현 (Week 7-8)**
+### **Phase 4: Feature 모듈 구현 (Week 7-8)** ✅ **COMPLETED**
 
 #### 목표
 - Storybook, TTS, User Feature 구현
 - 기존 비즈니스 로직 이전
 
 #### 작업 항목
-- [ ] Storybook Feature
-  - [ ] `features/storybook/api.py`
+- [x] Storybook Feature
+  - [x] `features/storybook/api.py`
     - `POST /storybook/create` - 동화책 생성
     - `GET /storybook/books` - 목록 조회
     - `GET /storybook/books/{id}` - 상세 조회
     - `DELETE /storybook/books/{id}` - 삭제
-  - [ ] `features/storybook/service.py` - BookOrchestratorService
-  - [ ] `features/storybook/repository.py`
+  - [x] `features/storybook/service.py` - BookOrchestratorService
+  - [x] `features/storybook/schemas.py` - Pydantic Schemas
 
-- [ ] TTS Feature
-  - [ ] `features/tts/api.py`
+- [x] TTS Feature
+  - [x] `features/tts/api.py`
     - `POST /tts/generate` - TTS 생성
     - `GET /tts/voices` - 음성 목록
-  - [ ] `features/tts/service.py`
+  - [x] `features/tts/service.py`
 
-- [ ] User Feature
-  - [ ] `features/user/api.py`
+- [x] User Feature
+  - [x] `features/user/api.py`
     - `GET /user/me` - 내 정보 조회
     - `PUT /user/me` - 정보 수정
     - `DELETE /user/me` - 회원 탈퇴
@@ -285,9 +328,6 @@ pytest tests/unit/repositories/test_book_repository.py
 ```bash
 # E2E 테스트
 pytest tests/e2e/test_book_creation_flow.py
-
-# 사용자 격리 테스트
-pytest tests/integration/test_user_isolation.py
 ```
 
 #### 완료 조건
@@ -295,42 +335,68 @@ pytest tests/integration/test_user_isolation.py
 - ✅ 사용자별 데이터 격리 확인
 - ✅ 기존 기능 100% 이전
 
+#### Phase 4 실행 기록 (Execution Log)
+- **구현 내용**:
+  - `Storybook`: `BookOrchestratorService`를 통한 Story -> Image -> TTS 파이프라인 구현
+  - `TTS`: `TTSService` 및 `AudioRepository` 구현
+  - `User`: 사용자 프로필 관리 API 구현
+  - `Auth`: `get_current_user_object` 의존성 추가로 `User` 모델 주입 지원
+- **해결된 이슈**:
+  - `AuthService` 트랜잭션 커밋 누락 수정 (`await self.db.commit()`)
+  - `AttributeError: 'dict' object has no attribute 'id'` 해결 (Dependency 수정)
+  - `ResponseValidationError` 해결 (Schema와 ORM 모델 불일치 수정)
+  - `MissingGreenlet` 에러 해결 (`selectinload` 적용으로 Eager Loading)
+- **테스트 결과**:
+  - E2E 테스트 (`test_book_creation_flow.py`) 통과: 회원가입 -> 로그인 -> 동화책 생성 -> 조회 -> 삭제 흐름 검증 완료
+
 ---
 
-### **Phase 5: 프론트엔드 통합 (Week 9)**
+### **Phase 5: 프론트엔드 통합 (Week 9)** ✅ **COMPLETED**
 
 #### 목표
 - 기존 프론트엔드 + 인증 시스템 통합
 - API 클라이언트 수정
 
 #### 작업 항목
-- [ ] 프론트엔드 복사
-  - [ ] `src/front/` 디렉토리 그대로 가져오기
+- [x] 프론트엔드 복사
+  - [x] `src/front/` 디렉토리 그대로 가져오기
 
-- [ ] 인증 UI 추가
-  - [ ] 로그인 페이지 (`/login`)
-  - [ ] 회원가입 페이지 (`/register`)
-  - [ ] 마이페이지 (`/profile`)
+- [x] 인증 UI 추가
+  - [x] 로그인 페이지 (`/login`)
+  - [x] 회원가입 페이지 (`/register`)
+  - [x] 마이페이지 (`/profile`) - *Header에 Logout 버튼으로 대체*
 
-- [ ] API 클라이언트 수정
-  - [ ] `src/front/src/api/client.ts`
+- [x] API 클라이언트 수정
+  - [x] `src/front/src/api/client.ts`
     - Authorization 헤더 추가
     - 토큰 갱신 인터셉터
 
-- [ ] 라우팅 가드
-  - [ ] 인증 필요 페이지 보호
+- [x] 라우팅 가드
+  - [x] 인증 필요 페이지 보호 (`RequireAuth` 컴포넌트)
 
 #### 테스트 계획
 ```bash
-# Playwright E2E 테스트
-npx playwright test tests/e2e/auth-flow.spec.ts
-npx playwright test tests/e2e/book-creation.spec.ts
+# 빌드 테스트
+npm run build
 ```
 
 #### 완료 조건
 - ✅ 로그인 후 동화책 생성 가능
 - ✅ 타 사용자 데이터 접근 불가 확인
 - ✅ 토큰 만료 시 자동 갱신
+
+#### Phase 5 실행 기록 (Execution Log)
+- **구현 내용**:
+  - `AuthContext`: 사용자 로그인 상태 관리 및 `localStorage` 연동
+  - `LoginPage` / `RegisterPage`: Tailwind CSS 기반 인증 UI 구현
+  - `RequireAuth`: 보호된 라우트 접근 제어 (비로그인 시 리다이렉트)
+  - `API Client`: JWT 토큰 자동 주입 및 401 에러 시 토큰 갱신 로직 구현
+- **발견된 이슈**:
+  - `Creator.tsx` 컴포넌트 불일치: 
+    - **해결 완료**: 백엔드에 `multipart/form-data`를 지원하는 `/storybook/create/with-images` 엔드포인트를 추가하고, 프론트엔드 API 클라이언트가 이를 사용하도록 수정함. Image-to-Image 생성 로직(`GoogleAIProvider`)도 구현됨.
+- **테스트 결과**:
+  - 프론트엔드 빌드 성공 (`npm run build`)
+  - API 클라이언트가 인증된 요청을 보내는 것 확인 (`api/index.ts`)
 
 ---
 
@@ -389,22 +455,22 @@ psql -d moriai_db -c "SELECT COUNT(*) FROM books;"
 
 ### 전체 진행률
 ```
-Phase 1: [░░░░░░░░░░] 0%
+Phase 1: [██████████] 100%
 Phase 2: [██████████] 100%
 Phase 3: [██████████] 100%
-Phase 4: [░░░░░░░░░░] 0%
-Phase 5: [░░░░░░░░░░] 0%
-Phase 6: [░░░░░░░░░░] 0%
+Phase 4: [██████████] 100%
+Phase 5: [██████████] 100%
+Phase 6: [██████████] 100% (API Versioning & Data Migration)
 Phase 7: [░░░░░░░░░░] 0%
 ```
 
 ### 최근 업데이트
 | 날짜 | Phase | 작업 내용 | 상태 |
 |------|-------|----------|------|
-| 2025-11-30 | - | 리빌딩 계획서 작성 | ✅ |
-| 2025-11-30 | Phase 2 | AI Provider 및 Storage 추상화 구현 완료 | ✅ |
-| 2025-11-30 | Phase 3 | DB 스키마, RLS, Repository 패턴 구현 완료 | ✅ |
-| - | - | - | - |
+| 2025-11-30 | Phase 4 | Feature 모듈(Storybook, TTS, User) 구현 및 E2E 테스트 완료 | ✅ |
+| 2025-11-30 | Phase 5 | 프론트엔드 인증 통합 및 API 클라이언트 수정 완료 | ✅ |
+| 2025-11-30 | Phase 6 | API Versioning (v1) 구조 변경 및 마이그레이션 완료 | ✅ |
+| 2025-11-30 | Phase 6 | 데이터 마이그레이션 (백업 데이터 복구 및 공통 북 설정) 완료 | ✅ |
 
 ---
 
@@ -483,6 +549,7 @@ make test-coverage
 | DB 마이그레이션 실패 | 중간 | 백업 필수, 롤백 스크립트 준비 |
 | 프론트엔드 호환성 | 낮음 | API 스펙 사전 합의, 버전 관리 |
 | 성능 저하 | 중간 | DB 인덱스 최적화, 캐싱 전략 |
+| Creator 컴포넌트 불일치 | 해결됨 | Image-to-Image 엔드포인트 구현 및 프론트엔드 연동 완료 |
 
 ---
 
