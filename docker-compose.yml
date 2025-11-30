@@ -1,141 +1,143 @@
+version: '3.8'
+
 services:
-  tts-api:
-    build:
-      context: .
-      dockerfile: ./docker/tts/Dockerfile
-    image: tts-api
-    container_name: tts-api
-    init: true
-    expose:
-      - "${TTS_API_PORT:-8000}"
-    volumes:
-      # 개발 모드: 소스 코드 실시간 반영 (주석 해제)
-      # - ./src/tts:/app/tts
-      # 프로덕션 모드: 데이터 볼륨만 마운트
-      - data-volume:/app/data
+  # ==================== PostgreSQL Database ====================
+  postgres:
+    image: postgres:16-alpine
+    container_name: moriai-postgres
+    restart: unless-stopped
     environment:
-      - TTS_API_PORT=${TTS_API_PORT:-8000}
-      - DEBUG=${DEBUG:-false}
-      - UVICORN_RELOAD=${UVICORN_RELOAD:-false}
-    env_file:
-      - .env
+      POSTGRES_USER: ${POSTGRES_USER:-moriai_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-moriai_password}
+      POSTGRES_DB: ${POSTGRES_DB:-moriai_db}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
     networks:
       - moriai-network
     healthcheck:
-      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:${TTS_API_PORT:-8000}/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-moriai_user} -d ${POSTGRES_DB:-moriai_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  storybook-api:
+  # ==================== Backend API ====================
+  backend:
     build:
       context: .
-      dockerfile: ./docker/storybook/Dockerfile
-    image: storybook-api
-    container_name: storybook-api
+      dockerfile: ./docker/backend/Dockerfile
+    image: moriai-backend:latest
+    container_name: moriai-backend
+    restart: unless-stopped
     init: true
-    expose:
-      - "${STORYBOOK_API_PORT:-8001}"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - storybook-data:/app/storybook
-      - data-volume:/app/data
+      # Development mode: 소스 코드 실시간 반영
+      - ./backend:/app/backend:ro
+      # Data volume
+      - app-data:/app/data
     environment:
-      - STORYBOOK_API_PORT=${STORYBOOK_API_PORT:-8001}
-      - TTS_API_PORT=${TTS_API_PORT:-8000}
-      - DEBUG=${DEBUG:-false}
-      - UVICORN_RELOAD=${UVICORN_RELOAD:-false}
-      - BOOK_DATA_DIR=${BOOK_DATA_DIR}
-      - IMAGE_DATA_DIR=${IMAGE_DATA_DIR}
-      - VIDEO_DATA_DIR=${VIDEO_DATA_DIR}
+      - APP_ENV=${APP_ENV:-development}
+      - DEBUG=${DEBUG:-true}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-moriai_user}:${POSTGRES_PASSWORD:-moriai_password}@postgres:5432/${POSTGRES_DB:-moriai_db}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
       - KLING_ACCESS_KEY=${KLING_ACCESS_KEY}
       - KLING_SECRET_KEY=${KLING_SECRET_KEY}
-      - USE_TEMPLATE_MODE=${USE_TEMPLATE_MODE}
-      - TTS_DEFAULT_VOICE_ID=${TTS_DEFAULT_VOICE_ID}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
     env_file:
       - .env
     networks:
       - moriai-network
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:${STORYBOOK_API_PORT:-8001}/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    restart: unless-stopped
 
+  # ==================== Frontend Builder ====================
   frontend-builder:
     build:
-      context: ./src/front
-      dockerfile: ../../docker/front/Dockerfile
-    image: frontend-builder
-    container_name: frontend-builder
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+    image: moriai-frontend:latest
+    container_name: moriai-frontend-builder
     volumes:
-      - ./src/front:/app
+      - ./frontend:/app
       - /app/node_modules
+      - frontend-dist:/app/dist
     networks:
       - moriai-network
+    command: npm run build
     restart: "no"
 
+  # ==================== Nginx Reverse Proxy ====================
   nginx:
     build:
       context: .
       dockerfile: ./docker/nginx/Dockerfile
-    image: nginx
-    container_name: nginx
-    expose:
-      - "80"
+    image: moriai-nginx:latest
+    container_name: moriai-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./src/front/dist:/usr/share/nginx/html:ro
-      - ./data:/data:ro
+      - frontend-dist:/usr/share/nginx/html:ro
+      - app-data:/data:ro
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
     environment:
-      - TTS_API_PORT=${TTS_API_PORT:-8000}
-      - STORYBOOK_API_PORT=${STORYBOOK_API_PORT:-8001}
-    env_file:
-      - .env
+      - BACKEND_PORT=${BACKEND_PORT:-8000}
     networks:
       - moriai-network
     depends_on:
       frontend-builder:
         condition: service_completed_successfully
-      tts-api:
+      backend:
         condition: service_healthy
-      # storybook-api:
-      #   condition: service_healthy
-    restart: unless-stopped
 
+  # ==================== Cloudflare Tunnel ====================
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: cloudflared
+    container_name: moriai-cloudflared
+    restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     networks:
       - moriai-network
     depends_on:
       - nginx
-    restart: unless-stopped
+    profiles:
+      - production  # Only run in production
 
+# ==================== Networks ====================
 networks:
   moriai-network:
     driver: bridge
+    name: moriai-network
 
+# ==================== Volumes ====================
 volumes:
-  tts-data:
+  postgres-data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./src/tts
-  storybook-data:
+    name: moriai-postgres-data
+  app-data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./src/storybook
-  data-volume:
-    driver: local
+    name: moriai-app-data
     driver_opts:
       type: none
       o: bind
       device: ./data
+  frontend-dist:
+    driver: local
+    name: moriai-frontend-dist
