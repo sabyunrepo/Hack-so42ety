@@ -21,6 +21,8 @@ from core.database.base import Base
 
 # 모든 모델 임포트 (Alembic이 테이블을 인식하도록)
 from domain.models.user import User
+from domain.models.book import Book, Page, Dialogue
+from domain.models.audio import Audio
 
 # Alembic Config object
 config = context.config

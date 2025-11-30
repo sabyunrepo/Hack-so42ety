@@ -13,8 +13,13 @@ from backend.main import app
 from backend.core.database.base import Base
 from backend.core.config import settings
 
+import os
+
 # 테스트용 데이터베이스 URL
-TEST_DATABASE_URL = "postgresql+asyncpg://moriai_user:moriai_password@localhost:5432/test_db"
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://moriai_user:moriai_password@localhost:5432/test_db"
+)
 
 # 테스트용 엔진 생성
 test_engine = create_async_engine(
