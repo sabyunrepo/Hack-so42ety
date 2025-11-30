@@ -33,7 +33,7 @@ class PageResponse(BaseModel):
 class BookResponse(BaseModel):
     id: UUID
     title: str
-    cover_image_url: Optional[str] = None
+    cover_image: Optional[str] = None
     status: str
     created_at: datetime
     pages: List[PageResponse] = []

@@ -28,7 +28,7 @@ interface PageData {
 // 4. API로부터 받는 'book' 데이터의 전체 구조
 interface BookData {
   title: string;
-  cover_image_url: string;
+  cover_image: string;
   pages: PageData[];
 }
 
@@ -206,7 +206,7 @@ const Viewer: React.FC = () => {
           data-density="hard"
         >
           <img
-            src={`${book.cover_image_url}`}
+            src={book.cover_image}
             alt="커버"
             className="w-full h-full object-cover"
           />
