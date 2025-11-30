@@ -41,7 +41,7 @@ class Book(Base):
     )
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    cover_image_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    cover_image: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     
     # 메타데이터 (장르, 연령대 등)
     genre: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
