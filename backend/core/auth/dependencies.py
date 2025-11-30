@@ -96,7 +96,7 @@ async def get_current_user_object(
         user_id = uuid.UUID(current_user["user_id"])
         user = await user_repo.get(user_id)
         if user is None:
-             raise HTTPException(status_code=404, detail="User not found")
+             raise HTTPException(status_code=401, detail="User not found")
         return user
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid user ID format")
