@@ -61,11 +61,19 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 async def client() -> AsyncGenerator[AsyncClient, None]:
     """
     테스트용 HTTP 클라이언트 픽스처
-
-    FastAPI TestClient 대신 httpx.AsyncClient 사용
     """
+    from backend.core.database.session import get_db
+
+    async def override_get_db():
+        async with TestSessionLocal() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
+    
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="session")

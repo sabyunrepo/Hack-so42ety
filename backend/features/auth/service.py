@@ -60,7 +60,8 @@ class AuthService:
             oauth_id=None,
         )
 
-        user = await self.user_repo.create(user)
+        user = await self.user_repo.save(user)
+        await self.db.commit()
 
         # JWT 토큰 생성
         access_token = self.jwt_manager.create_access_token(
@@ -97,8 +98,13 @@ class AuthService:
             raise ValueError("Please login with Google")
 
         # 비밀번호 검증
-        if not self.credentials_provider.verify_password(password, user.password_hash):
-            raise ValueError("Invalid email or password")
+        if not user:
+            raise ValueError("Incorrect email or password")
+
+        verify_result = self.credentials_provider.verify_password(password, user.password_hash)
+
+        if not verify_result:
+            raise ValueError("Incorrect email or password")
 
         # JWT 토큰 생성
         access_token = self.jwt_manager.create_access_token(
@@ -143,6 +149,7 @@ class AuthService:
                 oauth_id=user_info["sub"],
             )
             user = await self.user_repo.create(user)
+            await self.db.commit()
 
         # JWT 토큰 생성
         access_token = self.jwt_manager.create_access_token(

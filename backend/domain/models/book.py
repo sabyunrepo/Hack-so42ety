@@ -13,6 +13,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.core.database.base import Base
 
 
+class BookStatus:
+    CREATING = "creating"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    DRAFT = "draft"
+
 class Book(Base):
     """
     동화책 모델

@@ -57,6 +57,9 @@ class BookRepository(AbstractRepository[Book]):
         """
         query = (
             select(Book)
+            .options(
+                selectinload(Book.pages).selectinload(Page.dialogues)
+            )
             .where(Book.user_id == user_id)
             .order_by(Book.created_at.desc())
             .offset(skip)
