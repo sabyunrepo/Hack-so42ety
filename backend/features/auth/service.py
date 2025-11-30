@@ -148,7 +148,7 @@ class AuthService:
                 oauth_provider="google",
                 oauth_id=user_info["sub"],
             )
-            user = await self.user_repo.create(user)
+            user = await self.user_repo.save(user)
             await self.db.commit()
 
         # JWT 토큰 생성
