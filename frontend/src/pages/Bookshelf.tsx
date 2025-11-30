@@ -19,7 +19,7 @@ export default function Bookshelf() {
       try {
         setIsLoading(true);
         const data = await getAllStorybooks();
-        setBooks(data.books as Book[]);
+        setBooks(data);
         console.log(data);
         setError(null);
       } catch (err) {

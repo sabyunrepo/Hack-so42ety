@@ -9,12 +9,8 @@ export interface Book {
   is_default: boolean;
 }
 
-interface AllStorybooksResponse {
-  books: Book[];
-}
-
 // 전체 책 조회
-export const getAllStorybooks = async (): Promise<AllStorybooksResponse> => {
+export const getAllStorybooks = async (): Promise<Book[]> => {
   try {
     const response = await apiClient.get("/storybook/books");
 
