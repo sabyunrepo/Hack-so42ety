@@ -1,0 +1,143 @@
+"""
+ElevenLabs TTS Provider
+ElevenLabs API를 사용한 고품질 음성 합성
+"""
+
+from typing import Optional, Dict, Any, List
+import httpx
+
+from ..base import TTSProvider
+from ....core.config import settings
+
+
+class ElevenLabsTTSProvider(TTSProvider):
+    """
+    ElevenLabs TTS Provider
+
+    고품질 음성 합성 서비스
+    """
+
+    def __init__(self, api_key: Optional[str] = None):
+        """
+        Args:
+            api_key: ElevenLabs API Key (None일 경우 settings에서 가져옴)
+        """
+        self.api_key = api_key or settings.elevenlabs_api_key
+        self.base_url = "https://api.elevenlabs.io/v1"
+        self.default_voice_id = settings.tts_default_voice_id
+        self.default_model_id = settings.tts_default_model_id
+        self.timeout = httpx.Timeout(settings.http_timeout, read=settings.http_read_timeout)
+
+    async def text_to_speech(
+        self,
+        text: str,
+        voice_id: Optional[str] = None,
+        model_id: Optional[str] = None,
+        language: str = "en",
+        speed: float = 1.0,
+    ) -> bytes:
+        """
+        텍스트를 음성으로 변환
+
+        Args:
+            text: 변환할 텍스트
+            voice_id: ElevenLabs 음성 ID
+            model_id: ElevenLabs 모델 ID
+            language: 언어 코드 (en, ko 등)
+            speed: 재생 속도
+
+        Returns:
+            bytes: MP3 오디오 데이터
+        """
+        voice_id = voice_id or self.default_voice_id
+        model_id = model_id or self.default_model_id
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
+                f"{self.base_url}/text-to-speech/{voice_id}",
+                headers={
+                    "Accept": "audio/mpeg",
+                    "xi-api-key": self.api_key,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "text": text,
+                    "model_id": model_id,
+                    "voice_settings": {
+                        "stability": 0.5,
+                        "similarity_boost": 0.75,
+                        "style": 0.0,
+                        "use_speaker_boost": True,
+                    },
+                },
+            )
+            response.raise_for_status()
+
+        return response.content
+
+    async def get_available_voices(self) -> List[Dict[str, Any]]:
+        """
+        사용 가능한 음성 목록 조회
+
+        Returns:
+            List[Dict[str, Any]]: 음성 정보 리스트
+        """
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(
+                f"{self.base_url}/voices",
+                headers={"xi-api-key": self.api_key},
+            )
+            response.raise_for_status()
+
+        data = response.json()
+
+        # ElevenLabs 응답 형식을 표준 형식으로 변환
+        voices = []
+        for voice in data.get("voices", []):
+            voices.append(
+                {
+                    "voice_id": voice["voice_id"],
+                    "name": voice["name"],
+                    "language": voice.get("labels", {}).get("language", "en"),
+                    "gender": voice.get("labels", {}).get("gender", "unknown"),
+                    "preview_url": voice.get("preview_url"),
+                    "category": voice.get("category", "generated"),
+                }
+            )
+
+        return voices
+
+    async def get_voice_settings(self, voice_id: str) -> Dict[str, Any]:
+        """
+        특정 음성의 설정 조회
+
+        Args:
+            voice_id: 음성 ID
+
+        Returns:
+            Dict[str, Any]: 음성 설정 정보
+        """
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(
+                f"{self.base_url}/voices/{voice_id}/settings",
+                headers={"xi-api-key": self.api_key},
+            )
+            response.raise_for_status()
+
+        return response.json()
+
+    async def get_user_info(self) -> Dict[str, Any]:
+        """
+        사용자 계정 정보 조회 (할당량 등)
+
+        Returns:
+            Dict[str, Any]: 사용자 정보
+        """
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(
+                f"{self.base_url}/user",
+                headers={"xi-api-key": self.api_key},
+            )
+            response.raise_for_status()
+
+        return response.json()

@@ -63,7 +63,7 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
         yield ac
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 async def setup_test_database():
     """
     테스트 데이터베이스 초기화 픽스처

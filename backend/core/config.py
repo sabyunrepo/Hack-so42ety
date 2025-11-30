@@ -104,6 +104,7 @@ class Settings(BaseSettings):
     kling_max_concurrent: int = Field(default=3, env="KLING_MAX_CONCURRENT")
     kling_polling_interval: int = Field(default=10, env="KLING_POLLING_INTERVAL")
     kling_max_polling_time: int = Field(default=600, env="KLING_MAX_POLLING_TIME")
+    kling_api_key: Optional[str] = Field(default=None, env="KLING_API_KEY")
 
     @property
     def kling_access_keys(self) -> List[str]:
@@ -124,6 +125,7 @@ class Settings(BaseSettings):
     # ==================== Storage ====================
     storage_provider: str = Field(default="local", env="STORAGE_PROVIDER")
     storage_base_path: str = Field(default="/app/data", env="STORAGE_BASE_PATH")
+    storage_base_url: str = Field(default="http://localhost:8000/static", env="STORAGE_BASE_URL")
 
     # AWS S3 (if STORAGE_PROVIDER=s3)
     aws_access_key_id: Optional[str] = Field(default=None, env="AWS_ACCESS_KEY_ID")
