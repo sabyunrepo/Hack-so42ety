@@ -71,6 +71,7 @@ services:
     build:
       context: ./frontend
       dockerfile: ../docker/frontend/Dockerfile
+      target: builder
     image: moriai-frontend:latest
     container_name: moriai-frontend-builder
     volumes:

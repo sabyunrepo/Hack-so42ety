@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+    volumes:
+      # Remove source code mount for production (rely on image)
+      # Only mount data and backup
+      - app-data:/app/data
+      - /Users/byeonsanghun/goinfre/Hack-so42ety/backup_hackathon_20251130/data:/app/backup_data
+
+  nginx:
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - app-data:/app/data:ro
+      # Mount frontend build output
+      - frontend-dist:/usr/share/nginx/html:ro
+
+  cloudflared:
+    profiles:
+      - production
