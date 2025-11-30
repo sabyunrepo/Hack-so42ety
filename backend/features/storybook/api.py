@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
@@ -47,6 +47,49 @@ async def create_book(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create book: {str(e)}"
+        )
+
+@router.post("/create/with-images", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
+async def create_book_with_images(
+    stories: List[str] = Form(...),
+    images: List[UploadFile] = File(...),
+    voice_id: str = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    이미지 기반 동화책 생성 (Multipart/Form-Data)
+    프론트엔드 Creator.tsx와 호환됨.
+    """
+    if len(stories) != len(images):
+        raise HTTPException(status_code=400, detail="Stories and images count mismatch")
+
+    storage_service = get_storage_service()
+    service = BookOrchestratorService(db, storage_service)
+    
+    try:
+        # 이미지 파일 읽기
+        image_data_list = []
+        content_types = []
+        for image in images:
+            content = await image.read()
+            image_data_list.append(content)
+            content_types.append(image.content_type)
+            
+        book = await service.create_storybook_with_images(
+            user_id=current_user.id,
+            stories=stories,
+            images=image_data_list,
+            image_content_types=content_types,
+            voice_id=voice_id
+        )
+        return book
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create book with images: {str(e)}"
         )
 
 @router.get("/books", response_model=List[BookResponse])

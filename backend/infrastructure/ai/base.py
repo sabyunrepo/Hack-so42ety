@@ -141,6 +141,30 @@ class ImageGenerationProvider(ABC):
         """
         pass
 
+    @abstractmethod
+    async def generate_image_from_image(
+        self,
+        image_data: bytes,
+        prompt: str,
+        width: int = 1024,
+        height: int = 1024,
+        style: Optional[str] = None,
+    ) -> bytes:
+        """
+        이미지-to-이미지 생성
+
+        Args:
+            image_data: 입력 이미지 바이너리
+            prompt: 이미지 생성 프롬프트
+            width: 너비
+            height: 높이
+            style: 스타일
+
+        Returns:
+            bytes: 생성된 이미지 바이너리 데이터
+        """
+        pass
+
 
 # ==================== TTS Provider ====================
 

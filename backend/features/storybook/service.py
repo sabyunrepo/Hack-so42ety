@@ -146,6 +146,91 @@ class BookOrchestratorService:
             await self.db_session.commit()
             raise e
 
+    async def create_storybook_with_images(
+        self,
+        user_id: uuid.UUID,
+        stories: List[str],
+        images: List[bytes],  # 이미지 바이너리 데이터
+        image_content_types: List[str],
+        voice_id: Optional[str] = None,
+    ) -> Book:
+        """
+        이미지 기반 동화책 생성 (Image-to-Image)
+        """
+        # 1. 책 엔티티 생성
+        book = await self.book_repo.create(
+            user_id=user_id,
+            title=stories[0][:20] if stories else "Untitled Story", # 첫 문장을 제목으로 임시 사용
+            target_age="5-7", # 기본값
+            theme="custom",
+            status=BookStatus.CREATING
+        )
+        
+        try:
+            image_provider = self.ai_factory.get_image_provider()
+            tts_provider = self.ai_factory.get_tts_provider()
+            
+            for i, (story, image_bytes, content_type) in enumerate(zip(stories, images, image_content_types)):
+                # 2. 이미지 생성 (Image-to-Image)
+                # 원본 이미지를 먼저 저장 (옵션)
+                # original_image_url = await self.storage_service.save(...)
+                
+                # AI 이미지 생성
+                generated_image_bytes = await image_provider.generate_image_from_image(
+                    image_data=image_bytes,
+                    prompt=story, # 스토리를 프롬프트로 사용
+                    style="cartoon"
+                )
+                
+                # 생성된 이미지 저장
+                file_name = f"books/{book.id}/pages/{i+1}.png"
+                image_url = await self.storage_service.save(
+                    generated_image_bytes, 
+                    file_name, 
+                    content_type="image/png"
+                )
+                
+                # 3. 페이지 저장
+                page = await self.book_repo.add_page(
+                    book_id=book.id,
+                    page_data={
+                        "sequence": i + 1,
+                        "image_url": image_url,
+                        "image_prompt": story # 프롬프트로 사용된 스토리 저장
+                    }
+                )
+                
+                # 4. TTS 생성
+                if story:
+                    audio_bytes = await tts_provider.text_to_speech(story, voice_id=voice_id)
+                    audio_file_name = f"books/{book.id}/pages/{i+1}.mp3"
+                    audio_url = await self.storage_service.save(
+                        audio_bytes,
+                        audio_file_name,
+                        content_type="audio/mpeg"
+                    )
+                    
+                    await self.book_repo.add_dialogue(
+                        page_id=page.id,
+                        dialogue_data={
+                            "speaker": "Narrator",
+                            "text_en": story,
+                            "audio_url": audio_url,
+                            "sequence": 1
+                        }
+                    )
+
+            # 상태 업데이트
+            book.status = BookStatus.COMPLETED
+            await self.db_session.commit()
+            
+            return await self.book_repo.get_with_pages(book.id)
+
+        except Exception as e:
+            book.status = BookStatus.FAILED
+            await self.db_session.commit()
+            raise e
+
     async def get_books(self, user_id: uuid.UUID) -> List[Book]:
         """사용자의 책 목록 조회"""
         return await self.book_repo.get_user_books(user_id)
