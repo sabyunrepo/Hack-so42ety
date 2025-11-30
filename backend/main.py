@@ -12,11 +12,7 @@ from .core.database import engine, Base
 from .core.middleware import setup_cors
 from .core.middleware.auth import UserContextMiddleware
 
-# Feature 라우터 imports
-from .features.auth.api import router as auth_router
-from .features.storybook.api import router as storybook_router
-from .features.tts.api import router as tts_router
-from .features.user.api import router as user_router
+
 
 
 @asynccontextmanager
@@ -75,18 +71,16 @@ app = FastAPI(
 )
 
 # 미들웨어 설정
-setup_cors(app)
 app.add_middleware(UserContextMiddleware)
+setup_cors(app)
 
-# 라우터 등록
-app.include_router(auth_router, prefix="/api/v1")
-app.include_router(storybook_router, prefix="/api/v1")
-app.include_router(tts_router, prefix="/api/v1")
-app.include_router(user_router, prefix="/api/v1")
+
 
 
 # ==================== Health Check ====================
-
+# 라우터 등록
+from backend.api.v1.router import api_router as api_v1_router
+app.include_router(api_v1_router, prefix="/api/v1")
 
 @app.get("/health", tags=["Health"])
 async def health_check():
