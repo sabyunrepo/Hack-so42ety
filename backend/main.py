@@ -6,6 +6,7 @@ FastAPI 통합 백엔드 서비스
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi
 
 from .core.config import settings
 from .core.database import engine, Base
@@ -59,21 +60,190 @@ async def lifespan(app: FastAPI):
     print("=" * 60)
 
 
+# 태그 메타데이터 정의
+tags_metadata = [
+    {
+        "name": "Authentication",
+        "description": """
+사용자 인증 및 권한 관리 API
+
+**주요 기능:**
+- 이메일/비밀번호 기반 회원가입 및 로그인
+- Google OAuth 2.0 소셜 로그인
+- JWT 토큰 기반 인증
+- Access Token 자동 갱신 (Refresh Token)
+
+**인증 방식:**
+- Bearer Token (JWT)
+- 헤더: `Authorization: Bearer <access_token>`
+        """,
+        "externalDocs": {
+            "description": "JWT 인증 표준 문서",
+            "url": "https://jwt.io/introduction",
+        },
+    },
+    {
+        "name": "Storybook",
+        "description": """
+AI 기반 동화책 생성, 조회, 관리 API
+
+**주요 기능:**
+- 프롬프트 기반 AI 동화책 자동 생성 (Google Gemini)
+- 고품질 이미지 자동 생성 (Kling AI)
+- 다국어 대화문 생성 (영어/한국어)
+- 이미지 업로드 기반 커스텀 동화책 생성
+- 동화책 목록 조회 및 상세 정보 확인
+
+**생성 프로세스:**
+1. 프롬프트 입력
+2. AI 스토리 생성
+3. 이미지 프롬프트 생성
+4. 이미지 생성 (Kling AI)
+5. TTS 음성 생성 (ElevenLabs)
+        """,
+    },
+    {
+        "name": "TTS",
+        "description": """
+텍스트 음성 변환 API (ElevenLabs 연동)
+
+**주요 기능:**
+- 다국어 TTS 지원 (한국어, 영어, 일본어, 중국어 등)
+- 다양한 음성 선택 가능
+- 자연스러운 음성 합성
+- 음성 미리듣기 지원
+
+**지원 언어:**
+- 한국어 (ko)
+- 영어 (en-US, en-GB)
+- 일본어 (ja)
+- 중국어 (zh-CN)
+
+**성능:**
+- 최대 텍스트 길이: 5000자
+- 평균 생성 시간: 2-5초
+        """,
+    },
+    {
+        "name": "User",
+        "description": "사용자 프로필 관리 API",
+    },
+    {
+        "name": "Health",
+        "description": """
+서비스 상태 확인 API
+
+**용도:**
+- 서버 헬스 체크
+- 로드 밸런서 모니터링
+- CI/CD 파이프라인 검증
+        """,
+    },
+    {
+        "name": "Root",
+        "description": "API 루트 정보 및 메타데이터",
+    },
+]
+
 # FastAPI 앱 생성
 app = FastAPI(
     title=settings.app_title,
-    description=settings.app_description,
+    description="""
+## 🎨 MoriAI Storybook Service
+
+AI 기반 맞춤형 동화책 생성 플랫폼 백엔드 API
+
+### ✨ 주요 기능
+
+**🎨 AI 동화책 생성**
+- **Google Gemini**: 연령대별 맞춤 스토리 자동 생성
+- **Kling AI**: 고품질 이미지 자동 생성
+- **자동 대화문 생성**: 영어/한국어 이중 언어 지원
+
+**🔊 TTS 음성 생성**
+- **ElevenLabs API**: 자연스러운 음성 합성
+- **다국어 지원**: 한국어, 영어, 일본어, 중국어 등
+- **다양한 음성**: 남성/여성/중성 음성 선택 가능
+
+**🔐 인증 시스템**
+- **JWT 기반**: 안전한 토큰 인증
+- **Google OAuth 2.0**: 간편한 소셜 로그인
+- **자동 토큰 갱신**: Refresh Token을 통한 seamless 인증
+
+### 🛠️ 기술 스택
+
+- **Framework**: FastAPI 0.104+
+- **Database**: PostgreSQL 16 + SQLAlchemy 2.0
+- **AI Services**:
+  - Google Gemini (스토리 생성)
+  - Kling AI (이미지 생성)
+  - ElevenLabs (음성 합성)
+- **Storage**: Local/S3 지원
+- **Auth**: JWT + OAuth 2.0
+
+### 📚 API 버전
+
+현재 버전: **v1** (2.0.0)
+
+### 🔗 참고 문서
+
+- API 문서는 `/docs`에서 확인 (개발 모드)
+- ReDoc 문서는 `/redoc`에서 확인 (개발 모드)
+    """,
     version=settings.app_version,
+    openapi_tags=tags_metadata,
     lifespan=lifespan,
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
     openapi_url="/openapi.json" if settings.debug else None,
+    contact={
+        "name": "MoriAI Team",
+        "email": "support@moriai.com",
+    },
+    license_info={
+        "name": "Private",
+    },
 )
 
 
 # 미들웨어 설정
 app.add_middleware(UserContextMiddleware)
 setup_cors(app)
+
+
+# ==================== OpenAPI 커스터마이징 ====================
+
+
+def custom_openapi():
+    """
+    OpenAPI 스키마 커스터마이징
+    JWT 인증 스키마 추가
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=settings.app_title,
+        version=settings.app_version,
+        description=settings.app_description,
+        routes=app.routes,
+    )
+
+    # JWT 보안 스키마 추가
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "JWT Access Token을 입력하세요 (Authorization: Bearer <token>)"
+        }
+    }
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 
 # ==================== Health Check ====================
