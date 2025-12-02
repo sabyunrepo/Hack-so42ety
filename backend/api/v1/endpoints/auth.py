@@ -3,11 +3,12 @@ Auth API Endpoints (v1)
 인증 관련 API 라우터
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database import get_db
 from backend.core.auth import get_current_user
+from backend.core.exceptions import NotFoundException, ErrorCode
 from backend.features.auth.schemas import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -29,7 +30,7 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     responses={
         201: {"description": "회원가입 성공"},
-        400: {"model": ErrorResponse, "description": "이메일 중복"},
+        409: {"model": ErrorResponse, "description": "이메일 중복"},
     },
 )
 async def register(
@@ -48,27 +49,23 @@ async def register(
     """
     auth_service = AuthService(db)
 
-    try:
-        user, access_token, refresh_token = await auth_service.register(
-            email=request.email,
-            password=request.password,
-        )
+    user, access_token, refresh_token = await auth_service.register(
+        email=request.email,
+        password=request.password,
+    )
 
-        return AuthResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer",
-            user=UserResponse(
-                id=str(user.id),
-                email=user.email,
-                oauth_provider=user.oauth_provider,
-                is_active=user.is_active,
-                created_at=user.created_at.isoformat(),
-            ),
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return AuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        user=UserResponse(
+            id=str(user.id),
+            email=user.email,
+            oauth_provider=user.oauth_provider,
+            is_active=user.is_active,
+            created_at=user.created_at.isoformat(),
+        ),
+    )
 
 
 @router.post(
@@ -95,27 +92,23 @@ async def login(
     """
     auth_service = AuthService(db)
 
-    try:
-        user, access_token, refresh_token = await auth_service.login(
-            email=request.email,
-            password=request.password,
-        )
+    user, access_token, refresh_token = await auth_service.login(
+        email=request.email,
+        password=request.password,
+    )
 
-        return AuthResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer",
-            user=UserResponse(
-                id=str(user.id),
-                email=user.email,
-                oauth_provider=user.oauth_provider,
-                is_active=user.is_active,
-                created_at=user.created_at.isoformat(),
-            ),
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    return AuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        user=UserResponse(
+            id=str(user.id),
+            email=user.email,
+            oauth_provider=user.oauth_provider,
+            is_active=user.is_active,
+            created_at=user.created_at.isoformat(),
+        ),
+    )
 
 
 @router.post(
@@ -142,26 +135,22 @@ async def google_oauth(
     """
     auth_service = AuthService(db)
 
-    try:
-        user, access_token, refresh_token = await auth_service.google_oauth_login(
-            google_token=request.token
-        )
+    user, access_token, refresh_token = await auth_service.google_oauth_login(
+        google_token=request.token
+    )
 
-        return AuthResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer",
-            user=UserResponse(
-                id=str(user.id),
-                email=user.email,
-                oauth_provider=user.oauth_provider,
-                is_active=user.is_active,
-                created_at=user.created_at.isoformat(),
-            ),
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    return AuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        user=UserResponse(
+            id=str(user.id),
+            email=user.email,
+            oauth_provider=user.oauth_provider,
+            is_active=user.is_active,
+            created_at=user.created_at.isoformat(),
+        ),
+    )
 
 
 @router.post(
@@ -188,19 +177,15 @@ async def refresh(
     """
     auth_service = AuthService(db)
 
-    try:
-        access_token = await auth_service.refresh_access_token(
-            refresh_token=request.refresh_token
-        )
+    access_token = await auth_service.refresh_access_token(
+        refresh_token=request.refresh_token
+    )
 
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=request.refresh_token,  # Refresh Token은 그대로 유지
-            token_type="bearer",
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=request.refresh_token,  # Refresh Token은 그대로 유지
+        token_type="bearer",
+    )
 
 
 @router.get(
@@ -209,6 +194,7 @@ async def refresh(
     responses={
         200: {"description": "현재 사용자 정보 조회 성공"},
         401: {"model": ErrorResponse, "description": "인증 실패"},
+        404: {"model": ErrorResponse, "description": "사용자를 찾을 수 없음"},
     },
 )
 async def get_current_user_info(
@@ -226,13 +212,15 @@ async def get_current_user_info(
         UserResponse: 사용자 정보
     """
     from backend.domain.repositories.user_repository import UserRepository
-    import uuid
 
     user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(uuid.UUID(current_user["user_id"]))
+    user = await user_repo.get_by_email(current_user["email"])
 
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise NotFoundException(
+            error_code=ErrorCode.BIZ_001,
+            message="사용자를 찾을 수 없습니다"
+        )
 
     return UserResponse(
         id=str(user.id),

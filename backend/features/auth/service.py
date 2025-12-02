@@ -11,6 +11,13 @@ from ...core.auth.providers.credentials import CredentialsAuthProvider
 from ...core.auth.providers.google_oauth import GoogleOAuthProvider
 from ...domain.models.user import User
 from ...domain.repositories.user_repository import UserRepository
+from .exceptions import (
+    InvalidCredentialsException,
+    OAuthUserOnlyException,
+    EmailAlreadyExistsException,
+    InvalidGoogleTokenException,
+    InvalidRefreshTokenException,
+)
 
 
 class AuthService:
@@ -43,11 +50,11 @@ class AuthService:
             Tuple[User, str, str]: (사용자, Access Token, Refresh Token)
 
         Raises:
-            ValueError: 이미 존재하는 이메일
+            EmailAlreadyExistsException: 이미 존재하는 이메일
         """
         # 이메일 중복 확인
         if await self.user_repo.exists_by_email(email):
-            raise ValueError("Email already registered")
+            raise EmailAlreadyExistsException(email)
 
         # 비밀번호 해싱
         password_hash = self.credentials_provider.hash_password(password)
@@ -85,27 +92,28 @@ class AuthService:
             Tuple[User, str, str]: (사용자, Access Token, Refresh Token)
 
         Raises:
-            ValueError: 인증 실패
+            InvalidCredentialsException: 인증 실패
+            OAuthUserOnlyException: OAuth 전용 사용자
         """
         # 사용자 조회
         user = await self.user_repo.get_by_email(email)
 
         if user is None:
-            raise ValueError("이메일 또는 비밀번호가 일치하지 않습니다")
+            raise InvalidCredentialsException()
 
         # OAuth 전용 사용자 체크 (Google, Kakao 등 소셜 로그인 사용자)
         if user.oauth_provider is not None:
-            raise ValueError(f"소셜 로그인 사용자입니다. {user.oauth_provider} 로그인을 이용해주세요")
+            raise OAuthUserOnlyException(user.oauth_provider)
 
         # 비밀번호 해시가 없는 경우 (OAuth 사용자)
         if user.password_hash is None:
-            raise ValueError("소셜 로그인 사용자입니다. 소셜 로그인을 이용해주세요")
+            raise OAuthUserOnlyException("social")
 
         # 비밀번호 검증
         verify_result = self.credentials_provider.verify_password(password, user.password_hash)
 
         if not verify_result:
-            raise ValueError("이메일 또는 비밀번호가 일치하지 않습니다")
+            raise InvalidCredentialsException()
 
         # JWT 토큰 생성
         access_token = self.jwt_manager.create_access_token(
@@ -128,13 +136,13 @@ class AuthService:
             Tuple[User, str, str]: (사용자, Access Token, Refresh Token)
 
         Raises:
-            ValueError: 토큰 검증 실패
+            InvalidGoogleTokenException: 토큰 검증 실패
         """
         # Google ID Token 검증
         user_info = await self.google_oauth_provider.verify_token(google_token)
 
         if user_info is None:
-            raise ValueError("Invalid Google token")
+            raise InvalidGoogleTokenException()
 
         # 기존 사용자 조회
         user = await self.user_repo.get_by_oauth(
@@ -173,13 +181,13 @@ class AuthService:
             str: 새로운 Access Token
 
         Raises:
-            ValueError: Refresh Token 검증 실패
+            InvalidRefreshTokenException: Refresh Token 검증 실패
         """
         # Refresh Token 검증
         payload = self.jwt_manager.verify_token(refresh_token, token_type="refresh")
 
         if payload is None:
-            raise ValueError("Invalid refresh token")
+            raise InvalidRefreshTokenException()
 
         # 새로운 Access Token 생성
         access_token = self.jwt_manager.create_access_token(
