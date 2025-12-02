@@ -91,20 +91,21 @@ class AuthService:
         user = await self.user_repo.get_by_email(email)
 
         if user is None:
-            raise ValueError("Invalid email or password")
+            raise ValueError("이메일 또는 비밀번호가 일치하지 않습니다")
 
-        # OAuth 전용 사용자 체크
+        # OAuth 전용 사용자 체크 (Google, Kakao 등 소셜 로그인 사용자)
+        if user.oauth_provider is not None:
+            raise ValueError(f"소셜 로그인 사용자입니다. {user.oauth_provider} 로그인을 이용해주세요")
+
+        # 비밀번호 해시가 없는 경우 (OAuth 사용자)
         if user.password_hash is None:
-            raise ValueError("Please login with Google")
+            raise ValueError("소셜 로그인 사용자입니다. 소셜 로그인을 이용해주세요")
 
         # 비밀번호 검증
-        if not user:
-            raise ValueError("Incorrect email or password")
-
         verify_result = self.credentials_provider.verify_password(password, user.password_hash)
 
         if not verify_result:
-            raise ValueError("Incorrect email or password")
+            raise ValueError("이메일 또는 비밀번호가 일치하지 않습니다")
 
         # JWT 토큰 생성
         access_token = self.jwt_manager.create_access_token(
