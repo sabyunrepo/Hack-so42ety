@@ -190,7 +190,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
     # 프로덕션에서는 상세 에러 정보를 숨김
     from backend.core.config import settings
 
-    details = {"error": str(exc), "type": type(exc).__name__} if settings.DEBUG else None
+    details = {"error": str(exc), "type": type(exc).__name__} if settings.debug else None
 
     error_response = ErrorResponse(
         error_code=ErrorCode.SYS_INTERNAL_ERROR,

@@ -289,22 +289,26 @@ async def root():
     }
 
 
-# ==================== Error Handlers ====================
+# ==================== Global Exception Handlers ====================
 
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from backend.core.exceptions import AppException
+from backend.core.exceptions.handlers import (
+    app_exception_handler,
+    validation_exception_handler,
+    http_exception_handler,
+    generic_exception_handler,
+)
 
-@app.exception_handler(404)
-async def not_found_handler(request, exc):
-    """404 Not Found 핸들러"""
-    return JSONResponse(
-        status_code=404,
-        content={"detail": "Resource not found"},
-    )
+# 커스텀 애플리케이션 예외
+app.add_exception_handler(AppException, app_exception_handler)
 
+# Pydantic 검증 에러
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
-@app.exception_handler(500)
-async def internal_error_handler(request, exc):
-    """500 Internal Server Error 핸들러"""
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"},
-    )
+# FastAPI/Starlette HTTP 예외
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+
+# 일반 예외 (catch-all)
+app.add_exception_handler(Exception, generic_exception_handler)
