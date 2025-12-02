@@ -70,6 +70,21 @@ class ErrorCode(str, Enum):
     BIZ_BOOK_CREATION_FAILED = "BIZ_102"
     """동화책 생성에 실패했습니다"""
 
+    BIZ_BOOK_UNAUTHORIZED = "BIZ_103"
+    """동화책 접근 권한이 없습니다"""
+
+    BIZ_BOOK_IMAGE_UPLOAD_FAILED = "BIZ_104"
+    """이미지 업로드에 실패했습니다"""
+
+    BIZ_BOOK_STORIES_IMAGES_MISMATCH = "BIZ_105"
+    """스토리와 이미지 개수가 일치하지 않습니다"""
+
+    BIZ_BOOK_AI_GENERATION_FAILED = "BIZ_106"
+    """AI 생성에 실패했습니다"""
+
+    BIZ_BOOK_INVALID_PAGE_COUNT = "BIZ_107"
+    """잘못된 페이지 수입니다"""
+
     # ==================== System (SYS_xxx) ====================
     SYS_INTERNAL_ERROR = "SYS_001"
     """서버 내부 오류가 발생했습니다"""
