@@ -7,30 +7,10 @@ import MoriAI_Icon from "../assets/MoriAI_Icon.svg";
 import { getStorybookById } from "../api/index";
 import ClickableText from "../components/ClickableText";
 import AudioPlayer from "../components/AudioPlayer";
+import type { BookData, PageData, Dialogue } from "../types/book";
+import { getDialogueText, getDialogueAudioUrl } from "../types/book";
 
 // --- 타입 정의 ---
-
-// 2. 책 내부의 'dialogue' 데이터 타입
-interface Dialogue {
-  id: string | number;
-  text_en: string;
-  text_ko?: string;
-  audio_url?: string;
-}
-
-// 3. 책의 'page' 데이터 타입
-interface PageData {
-  id: string | number;
-  image_url: string;
-  dialogues: Dialogue[];
-}
-
-// 4. API로부터 받는 'book' 데이터의 전체 구조
-interface BookData {
-  title: string;
-  cover_image: string;
-  pages: PageData[];
-}
 
 // 5. react-pageflip 라이브러리의 ref가 노출하는 API 타입
 interface PageFlipApi {
@@ -273,8 +253,8 @@ const Viewer: React.FC = () => {
                 onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                 onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
               >
-                <ClickableText text={dialogue.text_en} book_id={bookId!} />
-                <AudioPlayer src={`${dialogue.audio_url}`} />
+                <ClickableText text={getDialogueText(dialogue, "en")} book_id={bookId!} />
+                <AudioPlayer src={getDialogueAudioUrl(dialogue, "en") || ""} />
               </div>
             ))}
           </Page>,

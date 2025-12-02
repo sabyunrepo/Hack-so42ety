@@ -3,7 +3,9 @@ import asyncio
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.models.book import Book, Page, Dialogue, BookStatus
+from backend.domain.models.book import (
+    Book, Page, Dialogue, DialogueTranslation, DialogueAudio, BookStatus
+)
 from backend.domain.repositories.book_repository import BookRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
@@ -110,6 +112,21 @@ class BookOrchestratorService:
                 # TTS Provider
                 tts_provider = self.ai_factory.get_tts_provider()
                 if content:
+                    # Create dialogue with translations
+                    dialogue = await self.book_repo.add_dialogue_with_translation(
+                        page_id=page.id,
+                        speaker="Narrator",
+                        sequence=1,
+                        translations=[
+                            {
+                                "language_code": "en",
+                                "text": content,
+                                "is_primary": True
+                            }
+                        ]
+                    )
+
+                    # Generate and add audio
                     audio_bytes = await tts_provider.text_to_speech(content)
                     audio_file_name = f"books/{book.id}/pages/{i+1}.mp3"
                     audio_url = await self.storage_service.save(
@@ -117,21 +134,12 @@ class BookOrchestratorService:
                         audio_file_name,
                         content_type="audio/mpeg"
                     )
-                    # 페이지 업데이트 (audio_url 추가)
-                    # Page 모델에 audio_url 필드가 있다면 업데이트. 
-                    # 현재 Page 모델에는 audio_url이 없고 Dialogue가 있음.
-                    # 단순화를 위해 첫 번째 Dialogue로 추가하거나, Page 모델을 수정해야 함.
-                    # Phase 3 모델 정의에 따르면 Page에는 audio_url이 없음. Dialogue에 있음.
-                    # 따라서 content를 하나의 Dialogue로 취급하여 추가.
-                    
-                    await self.book_repo.add_dialogue(
-                        page_id=page.id,
-                        dialogue_data={
-                            "speaker": "Narrator",
-                            "text_en": content,
-                            "audio_url": audio_url,
-                            "sequence": 1
-                        }
+
+                    await self.book_repo.add_dialogue_audio(
+                        dialogue_id=dialogue.id,
+                        language_code="en",
+                        voice_id=settings.DEFAULT_VOICE_ID if hasattr(settings, 'DEFAULT_VOICE_ID') else "default",
+                        audio_url=audio_url
                     )
 
             # 상태 업데이트
@@ -202,6 +210,21 @@ class BookOrchestratorService:
                 
                 # 4. TTS 생성
                 if story:
+                    # Create dialogue with translations
+                    dialogue = await self.book_repo.add_dialogue_with_translation(
+                        page_id=page.id,
+                        speaker="Narrator",
+                        sequence=1,
+                        translations=[
+                            {
+                                "language_code": "en",
+                                "text": story,
+                                "is_primary": True
+                            }
+                        ]
+                    )
+
+                    # Generate and add audio
                     audio_bytes = await tts_provider.text_to_speech(story, voice_id=voice_id)
                     audio_file_name = f"books/{book.id}/pages/{i+1}.mp3"
                     audio_url = await self.storage_service.save(
@@ -209,15 +232,12 @@ class BookOrchestratorService:
                         audio_file_name,
                         content_type="audio/mpeg"
                     )
-                    
-                    await self.book_repo.add_dialogue(
-                        page_id=page.id,
-                        dialogue_data={
-                            "speaker": "Narrator",
-                            "text_en": story,
-                            "audio_url": audio_url,
-                            "sequence": 1
-                        }
+
+                    await self.book_repo.add_dialogue_audio(
+                        dialogue_id=dialogue.id,
+                        language_code="en",
+                        voice_id=voice_id or (settings.DEFAULT_VOICE_ID if hasattr(settings, 'DEFAULT_VOICE_ID') else "default"),
+                        audio_url=audio_url
                     )
 
             # 상태 업데이트

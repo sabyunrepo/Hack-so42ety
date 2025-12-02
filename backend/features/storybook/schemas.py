@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import UUID
 from datetime import datetime
 
@@ -39,13 +39,55 @@ class CreateBookRequest(BaseModel):
             }
         }
 
+# ==================== Multi-Language Support Schemas ====================
+
+class DialogueTranslationResponse(BaseModel):
+    """대화문 번역 응답"""
+    language_code: str = Field(..., description="언어 코드 (ISO 639-1)", example="en")
+    text: str = Field(..., description="번역된 텍스트", example="I'm ready for space adventure!")
+    is_primary: bool = Field(..., description="원본 언어 여부", example=True)
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "language_code": "en",
+                "text": "I'm ready for space adventure!",
+                "is_primary": True
+            }
+        }
+
+class DialogueAudioResponse(BaseModel):
+    """대화문 오디오 응답"""
+    language_code: str = Field(..., description="언어 코드 (ISO 639-1)", example="en")
+    voice_id: str = Field(..., description="음성 ID", example="21m00Tcm4TlvDq8ikWAM")
+    audio_url: str = Field(..., description="오디오 파일 URL", example="https://storage.example.com/audio/dialogue1.mp3")
+    duration: Optional[float] = Field(None, description="재생 시간 (초)", example=3.5)
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "language_code": "en",
+                "voice_id": "21m00Tcm4TlvDq8ikWAM",
+                "audio_url": "https://storage.example.com/audio/dialogue1.mp3",
+                "duration": 3.5
+            }
+        }
+
 class DialogueResponse(BaseModel):
+    """대화문 응답 (다국어 지원)"""
     id: UUID = Field(..., description="대화문 고유 ID")
     sequence: int = Field(..., description="페이지 내 순서", example=1)
     speaker: str = Field(..., description="화자", example="Cat")
-    text_en: str = Field(..., description="영어 대화문", example="I'm ready for space adventure!")
-    text_ko: Optional[str] = Field(None, description="한국어 대화문", example="우주 모험을 떠날 준비가 됐어!")
-    audio_url: Optional[str] = Field(None, description="음성 파일 URL", example="https://storage.example.com/audio/dialogue1.mp3")
+    translations: List[DialogueTranslationResponse] = Field(
+        default_factory=list,
+        description="다국어 번역 목록"
+    )
+    audios: List[DialogueAudioResponse] = Field(
+        default_factory=list,
+        description="다국어 오디오 목록"
+    )
 
     class Config:
         from_attributes = True
@@ -54,9 +96,26 @@ class DialogueResponse(BaseModel):
                 "id": "323e4567-e89b-12d3-a456-426614174002",
                 "sequence": 1,
                 "speaker": "Cat",
-                "text_en": "I'm ready for space adventure!",
-                "text_ko": "우주 모험을 떠날 준비가 됐어!",
-                "audio_url": "https://storage.example.com/audio/dialogue1.mp3"
+                "translations": [
+                    {
+                        "language_code": "en",
+                        "text": "I'm ready for space adventure!",
+                        "is_primary": True
+                    },
+                    {
+                        "language_code": "ko",
+                        "text": "우주 모험을 떠날 준비가 됐어!",
+                        "is_primary": False
+                    }
+                ],
+                "audios": [
+                    {
+                        "language_code": "en",
+                        "voice_id": "21m00Tcm4TlvDq8ikWAM",
+                        "audio_url": "https://storage.example.com/audio/dialogue1.mp3",
+                        "duration": 3.5
+                    }
+                ]
             }
         }
 

@@ -6,7 +6,7 @@ Book Domain Models
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Boolean
+from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Boolean, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -115,7 +115,10 @@ class Page(Base):
 
 class Dialogue(Base):
     """
-    페이지 내 대사/지문 모델
+    페이지 내 대사/지문 모델 (멀티언어 지원)
+
+    다국어 텍스트는 DialogueTranslation 테이블로 관리
+    TTS 오디오는 DialogueAudio 테이블로 관리
     """
     __tablename__ = "dialogues"
 
@@ -125,27 +128,21 @@ class Dialogue(Base):
         default=uuid.uuid4,
         index=True,
     )
-    
+
     page_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("pages.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    
+
     # 대사 순서
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
-    
+
     # 화자 (Narrator, Character Name)
+    # 멀티언어 지원: speaker_code 기반 (코드는 번역되지 않음)
     speaker: Mapped[str] = mapped_column(String(100), default="Narrator", nullable=False)
-    
-    # 내용 (영어/한국어)
-    text_en: Mapped[str] = mapped_column(Text, nullable=False)
-    text_ko: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
-    # TTS 오디오 연결
-    audio_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
-    
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
@@ -155,6 +152,119 @@ class Dialogue(Base):
 
     # Relationships
     page: Mapped["Page"] = relationship("Page", back_populates="dialogues")
+    translations: Mapped[List["DialogueTranslation"]] = relationship(
+        "DialogueTranslation", back_populates="dialogue", cascade="all, delete-orphan"
+    )
+    audios: Mapped[List["DialogueAudio"]] = relationship(
+        "DialogueAudio", back_populates="dialogue", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Dialogue(id={self.id}, page_id={self.page_id}, speaker={self.speaker})>"
+
+
+class DialogueTranslation(Base):
+    """
+    대사 번역 모델 (멀티언어 지원)
+
+    각 Dialogue는 여러 언어로 번역 가능
+    is_primary=True는 원본 언어를 나타냄
+    """
+    __tablename__ = "dialogue_translations"
+
+    __table_args__ = (
+        # 복합 유니크 제약: 하나의 대사는 언어당 하나의 번역만 가능
+        Index('idx_dialogue_language', 'dialogue_id', 'language_code', unique=True),
+        # 성능 최적화 인덱스: 언어별 검색
+        Index('idx_language_primary', 'language_code', 'is_primary'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True,
+    )
+
+    dialogue_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("dialogues.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # 언어 코드 (ISO 639-1: en, ko, ja, zh, es, fr, de, etc.)
+    language_code: Mapped[str] = mapped_column(String(10), nullable=False)
+
+    # 번역된 텍스트
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # 원본 언어 여부
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relationships
+    dialogue: Mapped["Dialogue"] = relationship("Dialogue", back_populates="translations")
+
+    def __repr__(self) -> str:
+        return f"<DialogueTranslation(id={self.id}, dialogue_id={self.dialogue_id}, language={self.language_code})>"
+
+
+class DialogueAudio(Base):
+    """
+    대사 TTS 오디오 모델 (멀티언어 + 멀티보이스 지원)
+
+    각 Dialogue는 언어별, 음성별로 여러 오디오 파일 보유 가능
+    예: 영어(남성), 영어(여성), 한국어(남성), 한국어(여성) 등
+    """
+    __tablename__ = "dialogue_audios"
+
+    __table_args__ = (
+        # 복합 유니크 제약: 하나의 대사는 언어+음성 조합당 하나의 오디오만 가능
+        Index('idx_dialogue_language_voice', 'dialogue_id', 'language_code', 'voice_id', unique=True),
+        # 성능 최적화 인덱스: 언어별 오디오 검색
+        Index('idx_audio_language', 'language_code'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True,
+    )
+
+    dialogue_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("dialogues.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # 언어 코드 (ISO 639-1: en, ko, ja, zh, es, fr, de, etc.)
+    language_code: Mapped[str] = mapped_column(String(10), nullable=False)
+
+    # ElevenLabs 음성 ID (다양한 음성 지원)
+    voice_id: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # 오디오 파일 URL
+    audio_url: Mapped[str] = mapped_column(String(1024), nullable=False)
+
+    # 오디오 재생 시간 (초)
+    duration: Mapped[Optional[float]] = mapped_column(nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relationships
+    dialogue: Mapped["Dialogue"] = relationship("Dialogue", back_populates="audios")
+
+    def __repr__(self) -> str:
+        return f"<DialogueAudio(id={self.id}, dialogue_id={self.dialogue_id}, language={self.language_code}, voice={self.voice_id})>"
