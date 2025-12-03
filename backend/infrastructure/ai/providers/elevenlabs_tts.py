@@ -8,6 +8,11 @@ import httpx
 
 from ..base import TTSProvider
 from ....core.config import settings
+from ....features.tts.exceptions import (
+    TTSAPIKeyNotConfiguredException,
+    TTSAPIAuthenticationFailedException,
+    TTSGenerationFailedException,
+)
 
 
 class ElevenLabsTTSProvider(TTSProvider):
@@ -21,8 +26,14 @@ class ElevenLabsTTSProvider(TTSProvider):
         """
         Args:
             api_key: ElevenLabs API Key (None일 경우 settings에서 가져옴)
+        
+        Raises:
+            TTSAPIKeyNotConfiguredException: API 키가 설정되지 않은 경우
         """
         self.api_key = api_key or settings.elevenlabs_api_key
+        if not self.api_key:
+            raise TTSAPIKeyNotConfiguredException(provider="elevenlabs")
+        
         self.base_url = "https://api.elevenlabs.io/v1"
         self.default_voice_id = settings.tts_default_voice_id
         self.default_model_id = settings.tts_default_model_id
@@ -52,26 +63,36 @@ class ElevenLabsTTSProvider(TTSProvider):
         voice_id = voice_id or self.default_voice_id
         model_id = model_id or self.default_model_id
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/text-to-speech/{voice_id}",
-                headers={
-                    "Accept": "audio/mpeg",
-                    "xi-api-key": self.api_key,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "text": text,
-                    "model_id": model_id,
-                    "voice_settings": {
-                        "stability": 0.5,
-                        "similarity_boost": 0.75,
-                        "style": 0.0,
-                        "use_speaker_boost": True,
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    f"{self.base_url}/text-to-speech/{voice_id}",
+                    headers={
+                        "Accept": "audio/mpeg",
+                        "xi-api-key": self.api_key,
+                        "Content-Type": "application/json",
                     },
-                },
-            )
-            response.raise_for_status()
+                    json={
+                        "text": text,
+                        "model_id": model_id,
+                        "voice_settings": {
+                            "stability": 0.5,
+                            "similarity_boost": 0.75,
+                            "style": 0.0,
+                            "use_speaker_boost": True,
+                        },
+                    },
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise TTSAPIAuthenticationFailedException(
+                    provider="elevenlabs",
+                    reason="API 키가 유효하지 않거나 만료되었습니다"
+                )
+            raise TTSGenerationFailedException(reason=f"ElevenLabs API 오류: {e.response.status_code} - {e.response.text}")
+        except httpx.RequestError as e:
+            raise TTSGenerationFailedException(reason=f"ElevenLabs API 요청 실패: {str(e)}")
 
         return response.content
 
@@ -81,13 +102,27 @@ class ElevenLabsTTSProvider(TTSProvider):
 
         Returns:
             List[Dict[str, Any]]: 음성 정보 리스트
+        
+        Raises:
+            TTSAPIAuthenticationFailedException: API 인증 실패 시
+            TTSGenerationFailedException: 기타 API 오류 시
         """
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(
-                f"{self.base_url}/voices",
-                headers={"xi-api-key": self.api_key},
-            )
-            response.raise_for_status()
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    f"{self.base_url}/voices",
+                    headers={"xi-api-key": self.api_key},
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise TTSAPIAuthenticationFailedException(
+                    provider="elevenlabs",
+                    reason="API 키가 유효하지 않거나 만료되었습니다"
+                )
+            raise TTSGenerationFailedException(reason=f"ElevenLabs API 오류: {e.response.status_code} - {e.response.text}")
+        except httpx.RequestError as e:
+            raise TTSGenerationFailedException(reason=f"ElevenLabs API 요청 실패: {str(e)}")
 
         data = response.json()
 
@@ -116,13 +151,27 @@ class ElevenLabsTTSProvider(TTSProvider):
 
         Returns:
             Dict[str, Any]: 음성 설정 정보
+        
+        Raises:
+            TTSAPIAuthenticationFailedException: API 인증 실패 시
+            TTSGenerationFailedException: 기타 API 오류 시
         """
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(
-                f"{self.base_url}/voices/{voice_id}/settings",
-                headers={"xi-api-key": self.api_key},
-            )
-            response.raise_for_status()
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    f"{self.base_url}/voices/{voice_id}/settings",
+                    headers={"xi-api-key": self.api_key},
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise TTSAPIAuthenticationFailedException(
+                    provider="elevenlabs",
+                    reason="API 키가 유효하지 않거나 만료되었습니다"
+                )
+            raise TTSGenerationFailedException(reason=f"ElevenLabs API 오류: {e.response.status_code} - {e.response.text}")
+        except httpx.RequestError as e:
+            raise TTSGenerationFailedException(reason=f"ElevenLabs API 요청 실패: {str(e)}")
 
         return response.json()
 
@@ -132,12 +181,26 @@ class ElevenLabsTTSProvider(TTSProvider):
 
         Returns:
             Dict[str, Any]: 사용자 정보
+        
+        Raises:
+            TTSAPIAuthenticationFailedException: API 인증 실패 시
+            TTSGenerationFailedException: 기타 API 오류 시
         """
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(
-                f"{self.base_url}/user",
-                headers={"xi-api-key": self.api_key},
-            )
-            response.raise_for_status()
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    f"{self.base_url}/user",
+                    headers={"xi-api-key": self.api_key},
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise TTSAPIAuthenticationFailedException(
+                    provider="elevenlabs",
+                    reason="API 키가 유효하지 않거나 만료되었습니다"
+                )
+            raise TTSGenerationFailedException(reason=f"ElevenLabs API 오류: {e.response.status_code} - {e.response.text}")
+        except httpx.RequestError as e:
+            raise TTSGenerationFailedException(reason=f"ElevenLabs API 요청 실패: {str(e)}")
 
         return response.json()

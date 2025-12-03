@@ -53,3 +53,25 @@ class TTSVoiceNotFoundException(NotFoundException):
             message="요청하신 음성을 찾을 수 없습니다",
             details={"voice_id": voice_id},
         )
+
+
+class TTSAPIKeyNotConfiguredException(BusinessLogicException):
+    """TTS API 키가 설정되지 않음"""
+
+    def __init__(self, provider: str = "elevenlabs"):
+        super().__init__(
+            error_code=ErrorCode.BIZ_TTS_API_KEY_NOT_CONFIGURED,
+            message=f"{provider} API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.",
+            details={"provider": provider, "env_var": "ELEVENLABS_API_KEY"},
+        )
+
+
+class TTSAPIAuthenticationFailedException(BusinessLogicException):
+    """TTS API 인증 실패"""
+
+    def __init__(self, provider: str = "elevenlabs", reason: str = None):
+        super().__init__(
+            error_code=ErrorCode.BIZ_TTS_API_AUTHENTICATION_FAILED,
+            message=f"{provider} API 인증에 실패했습니다. API 키를 확인해주세요.",
+            details={"provider": provider, "reason": reason} if reason else {"provider": provider},
+        )

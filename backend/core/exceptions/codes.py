@@ -97,6 +97,12 @@ class ErrorCode(str, Enum):
     BIZ_TTS_VOICE_NOT_FOUND = "BIZ_204"
     """요청하신 음성을 찾을 수 없습니다"""
 
+    BIZ_TTS_API_KEY_NOT_CONFIGURED = "BIZ_205"
+    """TTS API 키가 설정되지 않았습니다"""
+
+    BIZ_TTS_API_AUTHENTICATION_FAILED = "BIZ_206"
+    """TTS API 인증에 실패했습니다"""
+
     # ==================== System (SYS_xxx) ====================
     SYS_INTERNAL_ERROR = "SYS_001"
     """서버 내부 오류가 발생했습니다"""

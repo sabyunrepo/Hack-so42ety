@@ -10,6 +10,8 @@ from .exceptions import (
     TTSGenerationFailedException,
     TTSUploadFailedException,
     TTSTextTooLongException,
+    TTSAPIKeyNotConfiguredException,
+    TTSAPIAuthenticationFailedException,
 )
 
 class TTSService:
@@ -47,7 +49,15 @@ class TTSService:
         if len(text) > max_length:
             raise TTSTextTooLongException(text_length=len(text), max_length=max_length)
 
-        tts_provider = self.ai_factory.get_tts_provider()
+        # TTS Provider 가져오기
+        try:
+            tts_provider = self.ai_factory.get_tts_provider()
+        except TTSAPIKeyNotConfiguredException:
+            # API 키가 없을 때는 그대로 전파
+            raise
+        except Exception as e:
+            # Provider 생성 실패 시
+            raise TTSGenerationFailedException(reason=f"TTS Provider 초기화 실패: {str(e)}")
 
         # 1. TTS 생성
         try:
@@ -56,6 +66,9 @@ class TTSService:
                 voice_id=voice_id,
                 model_id=model_id
             )
+        except (TTSAPIKeyNotConfiguredException, TTSAPIAuthenticationFailedException):
+            # API 키 관련 예외는 그대로 전파
+            raise
         except Exception as e:
             raise TTSGenerationFailedException(reason=str(e))
 
@@ -85,6 +98,28 @@ class TTSService:
         return audio
 
     async def get_voices(self) -> List[Dict[str, Any]]:
-        """사용 가능한 음성 목록 조회"""
-        tts_provider = self.ai_factory.get_tts_provider()
-        return await tts_provider.get_available_voices()
+        """
+        사용 가능한 음성 목록 조회
+        
+        Raises:
+            TTSAPIKeyNotConfiguredException: API 키가 설정되지 않은 경우
+            TTSAPIAuthenticationFailedException: API 인증 실패 시
+            TTSGenerationFailedException: 기타 TTS 생성 실패 시
+        """
+        try:
+            tts_provider = self.ai_factory.get_tts_provider()
+        except TTSAPIKeyNotConfiguredException:
+            # API 키가 없을 때는 그대로 전파
+            raise
+        except Exception as e:
+            # Provider 생성 실패 시
+            raise TTSGenerationFailedException(reason=f"TTS Provider 초기화 실패: {str(e)}")
+        
+        try:
+            return await tts_provider.get_available_voices()
+        except (TTSAPIKeyNotConfiguredException, TTSAPIAuthenticationFailedException):
+            # API 키 관련 예외는 그대로 전파
+            raise
+        except Exception as e:
+            # 기타 예외는 TTSGenerationFailedException으로 변환
+            raise TTSGenerationFailedException(reason=f"음성 목록 조회 실패: {str(e)}")
