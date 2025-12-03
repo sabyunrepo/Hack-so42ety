@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.domain.models.audio import Audio
+from .models import Audio
 from backend.domain.repositories.base import AbstractRepository
 
 class AudioRepository(AbstractRepository[Audio]):

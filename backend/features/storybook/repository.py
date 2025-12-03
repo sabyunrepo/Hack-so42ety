@@ -9,7 +9,7 @@ from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.models.book import Book, Page, Dialogue, DialogueTranslation, DialogueAudio
+from .models import Book, Page, Dialogue, DialogueTranslation, DialogueAudio
 from backend.domain.repositories.base import AbstractRepository
 
 

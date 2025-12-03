@@ -4,7 +4,7 @@ from typing import List
 
 from backend.core.database.session import get_db
 from backend.core.auth.dependencies import get_current_user_object as get_current_user
-from backend.domain.models.user import User
+from backend.features.auth.models import User
 from backend.infrastructure.storage.local import LocalStorageService
 from backend.infrastructure.storage.s3 import S3StorageService
 from backend.core.config import settings

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database.session import get_db
 from backend.core.auth.dependencies import get_current_user_object as get_current_user
-from backend.domain.models.user import User
+from backend.features.auth.models import User
 from backend.features.auth.repository import UserRepository
 from backend.features.auth.schemas import UserResponse
 from backend.features.user.schemas import UserUpdateRequest

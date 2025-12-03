@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database import get_db
 from backend.core.auth import get_current_user
+from backend.core.auth.jwt_manager import JWTManager
+from backend.core.auth.providers.credentials import CredentialsAuthProvider
+from backend.core.auth.providers.google_oauth import GoogleOAuthProvider
 from backend.core.exceptions import NotFoundException, ErrorCode
 from backend.features.auth.schemas import (
     UserRegisterRequest,
@@ -20,8 +23,24 @@ from backend.features.auth.schemas import (
     ErrorResponse,
 )
 from backend.features.auth.service import AuthService
+from backend.features.auth.repository import UserRepository
 
 router = APIRouter()
+
+
+def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
+    """AuthService 의존성 주입"""
+    user_repo = UserRepository(db)
+    credentials_provider = CredentialsAuthProvider()
+    google_oauth_provider = GoogleOAuthProvider()
+    jwt_manager = JWTManager()
+    return AuthService(
+        user_repo=user_repo,
+        credentials_provider=credentials_provider,
+        google_oauth_provider=google_oauth_provider,
+        jwt_manager=jwt_manager,
+        db=db,
+    )
 
 
 @router.post(
@@ -35,20 +54,18 @@ router = APIRouter()
 )
 async def register(
     request: UserRegisterRequest,
-    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
     회원가입
 
     Args:
         request: 회원가입 요청 (email, password)
-        db: 데이터베이스 세션
+        auth_service: 인증 서비스
 
     Returns:
         AuthResponse: 토큰 + 사용자 정보
     """
-    auth_service = AuthService(db)
-
     user, access_token, refresh_token = await auth_service.register(
         email=request.email,
         password=request.password,
@@ -78,20 +95,18 @@ async def register(
 )
 async def login(
     request: UserLoginRequest,
-    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
     로그인
 
     Args:
         request: 로그인 요청 (email, password)
-        db: 데이터베이스 세션
+        auth_service: 인증 서비스
 
     Returns:
         AuthResponse: 토큰 + 사용자 정보
     """
-    auth_service = AuthService(db)
-
     user, access_token, refresh_token = await auth_service.login(
         email=request.email,
         password=request.password,
@@ -121,20 +136,18 @@ async def login(
 )
 async def google_oauth(
     request: GoogleOAuthRequest,
-    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
     Google OAuth 로그인
 
     Args:
         request: Google OAuth 요청 (Google ID Token)
-        db: 데이터베이스 세션
+        auth_service: 인증 서비스
 
     Returns:
         AuthResponse: 토큰 + 사용자 정보
     """
-    auth_service = AuthService(db)
-
     user, access_token, refresh_token = await auth_service.google_oauth_login(
         google_token=request.token
     )
@@ -163,20 +176,18 @@ async def google_oauth(
 )
 async def refresh(
     request: RefreshTokenRequest,
-    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
     Access Token 갱신
 
     Args:
         request: 토큰 갱신 요청 (Refresh Token)
-        db: 데이터베이스 세션
+        auth_service: 인증 서비스
 
     Returns:
         TokenResponse: 새로운 Access Token
     """
-    auth_service = AuthService(db)
-
     access_token = await auth_service.refresh_access_token(
         refresh_token=request.refresh_token
     )
@@ -211,8 +222,6 @@ async def get_current_user_info(
     Returns:
         UserResponse: 사용자 정보
     """
-    from backend.domain.repositories.user_repository import UserRepository
-
     user_repo = UserRepository(db)
     user = await user_repo.get_by_email(current_user["email"])
 

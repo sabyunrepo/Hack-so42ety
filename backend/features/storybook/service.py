@@ -3,7 +3,7 @@ import asyncio
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.models.book import (
+from .models import (
     Book, Page, Dialogue, DialogueTranslation, DialogueAudio, BookStatus
 )
 from .repository import BookRepository
@@ -24,17 +24,21 @@ class BookOrchestratorService:
     """
     동화책 생성 및 관리를 위한 오케스트레이터 서비스
     AI Provider와 Repository를 조율하여 동화책을 생성하고 저장합니다.
+
+    DI Pattern: 모든 의존성을 생성자를 통해 주입받습니다.
     """
 
     def __init__(
         self,
-        db_session: AsyncSession,
+        book_repo: BookRepository,
         storage_service: AbstractStorageService,
+        ai_factory: AIProviderFactory,
+        db_session: AsyncSession,
     ):
-        self.db_session = db_session
-        self.book_repo = BookRepository(db_session)
+        self.book_repo = book_repo
         self.storage_service = storage_service
-        self.ai_factory = AIProviderFactory()
+        self.ai_factory = ai_factory
+        self.db_session = db_session
 
     async def create_storybook(
         self,

@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.models.user import User
+from .models import User
 from backend.domain.repositories.base import AbstractRepository
 
 

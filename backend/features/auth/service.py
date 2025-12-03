@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...core.auth.jwt_manager import JWTManager
 from ...core.auth.providers.credentials import CredentialsAuthProvider
 from ...core.auth.providers.google_oauth import GoogleOAuthProvider
-from ...domain.models.user import User
+from .models import User
 from .repository import UserRepository
 from .exceptions import (
     InvalidCredentialsException,
@@ -25,18 +25,31 @@ class AuthService:
     인증 서비스
 
     회원가입, 로그인, OAuth 인증 처리
+
+    DI Pattern: 모든 의존성을 생성자를 통해 주입받습니다.
     """
 
-    def __init__(self, db: AsyncSession):
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        credentials_provider: CredentialsAuthProvider,
+        google_oauth_provider: GoogleOAuthProvider,
+        jwt_manager: JWTManager,
+        db: AsyncSession,
+    ):
         """
         Args:
+            user_repo: 사용자 레포지토리
+            credentials_provider: 비밀번호 인증 제공자
+            google_oauth_provider: Google OAuth 제공자
+            jwt_manager: JWT 토큰 관리자
             db: 비동기 데이터베이스 세션
         """
+        self.user_repo = user_repo
+        self.credentials_provider = credentials_provider
+        self.google_oauth_provider = google_oauth_provider
+        self.jwt_manager = jwt_manager
         self.db = db
-        self.user_repo = UserRepository(db)
-        self.credentials_provider = CredentialsAuthProvider()
-        self.google_oauth_provider = GoogleOAuthProvider()
-        self.jwt_manager = JWTManager()
 
     async def register(self, email: str, password: str) -> Tuple[User, str, str]:
         """

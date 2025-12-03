@@ -2,7 +2,7 @@ import uuid
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.models.audio import Audio
+from .models import Audio
 from .repository import AudioRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
@@ -16,17 +16,21 @@ class TTSService:
     """
     TTS 서비스
     텍스트를 음성으로 변환하고 저장합니다.
+
+    DI Pattern: 모든 의존성을 생성자를 통해 주입받습니다.
     """
 
     def __init__(
         self,
-        db_session: AsyncSession,
+        audio_repo: AudioRepository,
         storage_service: AbstractStorageService,
+        ai_factory: AIProviderFactory,
+        db_session: AsyncSession,
     ):
-        self.db_session = db_session
-        self.audio_repo = AudioRepository(db_session)
+        self.audio_repo = audio_repo
         self.storage_service = storage_service
-        self.ai_factory = AIProviderFactory()
+        self.ai_factory = ai_factory
+        self.db_session = db_session
 
     async def generate_speech(
         self,
