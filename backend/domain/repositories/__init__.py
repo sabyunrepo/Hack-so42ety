@@ -3,6 +3,6 @@ Repositories Module
 데이터 접근 계층
 """
 
-from .user_repository import UserRepository
+from .base import AbstractRepository
 
-__all__ = ["UserRepository"]
+__all__ = ["AbstractRepository"]
