@@ -88,7 +88,7 @@ async def get_current_user_object(
     """
     현재 인증된 사용자 객체(DB 모델) 반환
     """
-    from ...domain.repositories.user_repository import UserRepository
+    from backend.features.auth.repository import UserRepository
     import uuid
     
     user_repo = UserRepository(db)

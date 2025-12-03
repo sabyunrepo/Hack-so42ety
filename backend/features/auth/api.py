@@ -225,7 +225,7 @@ async def get_current_user_info(
     Returns:
         UserResponse: 사용자 정보
     """
-    from ...domain.repositories.user_repository import UserRepository
+    from backend.features.auth.repository import UserRepository
     import uuid
 
     user_repo = UserRepository(db)
