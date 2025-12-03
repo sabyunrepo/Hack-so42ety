@@ -49,7 +49,6 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
         setPlayingWord(null);
       };
     } catch (error) {
-      console.error("TTS 에러:", error);
       setPlayingWord(null);
     }
   };

@@ -3,6 +3,7 @@ import { createStorybook, getVoices } from "../api/index";
 import StoryInput from "../components/StoryInput";
 import BackButton from "../components/BackButton";
 import { AlertModal } from "../components/Modal";
+import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 
 interface Page {
   id: number;
@@ -34,6 +35,7 @@ export default function Creator() {
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   // 음성 목록 가져오기
   useEffect(() => {
@@ -48,7 +50,8 @@ export default function Creator() {
           setShowVoiceWarningModal(true);
         }
       } catch (error) {
-        console.error("음성 목록 불러오기 실패:", error);
+        setErrorMessage(getUserFriendlyErrorMessage(error));
+        setShowErrorModal(true);
       }
     };
 
@@ -107,7 +110,7 @@ export default function Creator() {
 
       setShowSuccessModal(true);
     } catch (error) {
-      console.error("전송 실패:", error);
+      setErrorMessage(getUserFriendlyErrorMessage(error));
       setShowErrorModal(true);
     } finally {
       setIsSubmitting(false);
@@ -317,7 +320,7 @@ export default function Creator() {
         isOpen={showErrorModal}
         onClose={() => setShowErrorModal(false)}
         title="오류 발생"
-        message="오류가 발생했어요. 다시 시도해주세요."
+        message={errorMessage || "오류가 발생했어요. 다시 시도해주세요."}
         buttonText="확인"
       />
     </div>

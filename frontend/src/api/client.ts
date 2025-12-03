@@ -1,4 +1,5 @@
 import axios from "axios";
+import { logError } from "../utils/errorHandler";
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api/v1",
@@ -25,6 +26,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // 개발 환경에서 백엔드 에러 로깅
+    logError(error, `API Request: ${originalRequest?.url}`);
 
     // If 401 and not already retrying
     if (error.response?.status === 401 && !originalRequest._retry) {

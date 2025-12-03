@@ -3,6 +3,7 @@ import BookCard, { type Book } from "../components/BookCard";
 import { useEffect, useState } from "react";
 import { deleteBook, getAllStorybooks } from "../api/index";
 import { ConfirmModal } from "../components/Modal";
+import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 
 export default function Bookshelf() {
   const navigate = useNavigate();
@@ -23,8 +24,7 @@ export default function Bookshelf() {
         console.log(data);
         setError(null);
       } catch (err) {
-        console.error("Failed to fetch books:", err);
-        setError("책 목록을 불러오는데 실패했습니다.");
+        setError(getUserFriendlyErrorMessage(err));
       } finally {
         setIsLoading(false);
       }
@@ -53,7 +53,7 @@ export default function Bookshelf() {
     try {
       await deleteBook(bookToDelete);
     } catch (err) {
-      console.error("Failed to delete book:", err);
+      setError(getUserFriendlyErrorMessage(err));
       setBooks(previous);
     }
   };
