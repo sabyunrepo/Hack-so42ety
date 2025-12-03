@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ==================== PostgreSQL Database ====================
   postgres:
@@ -37,11 +35,10 @@ services:
     volumes:
       # Development mode: 소스 코드 실시간 반영
       - ./backend:/app/backend
-      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
       - app-data:/app/data
       - /Users/byeonsanghun/goinfre/Hack-so42ety/backup_hackathon_20251130/data:/app/backup_data
     environment:
-      - APP_ENV=${APP_ENV:-development}
+      - APP_ENV=${APP_ENV:-dev}
       - DEBUG=${DEBUG:-true}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-moriai_user}:${POSTGRES_PASSWORD:-moriai_password}@postgres:5432/${POSTGRES_DB:-moriai_db}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
@@ -85,13 +82,17 @@ services:
 
   # ==================== Nginx Reverse Proxy ====================
   nginx:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+      args:
+        APP_ENV: dev
+    image: moriai-nginx:dev
     container_name: moriai-nginx
     restart: unless-stopped
     ports:
       - "80:80"
     volumes:
-      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
       - app-data:/app/data:ro
     environment:
       - BACKEND_PORT=${BACKEND_PORT:-8000}

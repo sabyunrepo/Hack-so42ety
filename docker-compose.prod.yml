@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   backend:
     environment:
-      - APP_ENV=production
+      - APP_ENV=prod
       - DEBUG=false
     volumes:
       # Remove source code mount for production (rely on image)
@@ -12,8 +10,13 @@ services:
       - /Users/byeonsanghun/goinfre/Hack-so42ety/backup_hackathon_20251130/data:/app/backup_data
 
   nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+      args:
+        APP_ENV: prod
+    image: moriai-nginx:prod
     volumes:
-      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - app-data:/app/data:ro
       # Mount frontend build output
       - frontend-dist:/usr/share/nginx/html:ro
