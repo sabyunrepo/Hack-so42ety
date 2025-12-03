@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     app_title: str = "MoriAI Storybook Service"
     app_description: str = "동화책 생성, 조회, 삭제 API (인증 및 AI 연동)"
     app_version: str = "2.0.0"
-    app_env: str = Field(default="development", env="APP_ENV")
+    app_env: str = Field(default="dev", env="APP_ENV")
     debug: bool = Field(default=False, env="DEBUG")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
 
@@ -182,7 +182,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_app_env(cls, v: str) -> str:
         """APP_ENV 값 검증"""
-        allowed_envs = ["development", "staging", "production"]
+        allowed_envs = ["dev", "prod"]
         if v not in allowed_envs:
             raise ValueError(f"APP_ENV must be one of {allowed_envs}")
         return v

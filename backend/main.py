@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             # 테이블 생성 (개발 모드에서만)
             # 프로덕션에서는 Alembic 사용
-            if settings.app_env == "development" and settings.debug:
+            if settings.app_env == "dev" and settings.debug:
                 await conn.run_sync(Base.metadata.create_all)
                 print("✓ Database tables created (development mode)")
     except Exception as e:
