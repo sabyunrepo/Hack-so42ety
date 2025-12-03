@@ -9,14 +9,35 @@ from backend.infrastructure.storage.local import LocalStorageService
 from backend.infrastructure.storage.s3 import S3StorageService
 from backend.core.config import settings
 from backend.features.tts.service import TTSService
+from backend.features.tts.repository import AudioRepository
 from backend.features.tts.schemas import GenerateSpeechRequest, AudioResponse, VoiceResponse
+from backend.infrastructure.ai.factory import AIProviderFactory
 
 router = APIRouter()
 
 def get_storage_service():
+    """스토리지 서비스 의존성"""
     if settings.storage_provider == "s3":
         return S3StorageService()
     return LocalStorageService()
+
+def get_ai_factory():
+    """AI Factory 의존성"""
+    return AIProviderFactory()
+
+def get_tts_service(
+    db: AsyncSession = Depends(get_db),
+    storage_service = Depends(get_storage_service),
+    ai_factory = Depends(get_ai_factory),
+) -> TTSService:
+    """TTSService 의존성 주입"""
+    audio_repo = AudioRepository(db)
+    return TTSService(
+        audio_repo=audio_repo,
+        storage_service=storage_service,
+        ai_factory=ai_factory,
+        db_session=db,
+    )
 
 @router.post(
     "/generate",
@@ -32,7 +53,7 @@ def get_storage_service():
 async def generate_speech(
     request: GenerateSpeechRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: TTSService = Depends(get_tts_service),
 ):
     """
     텍스트를 음성으로 변환 (ElevenLabs API)
@@ -45,7 +66,7 @@ async def generate_speech(
             - voice_id: 음성 ID (선택, 기본값: Rachel)
             - model_id: 모델 ID (선택, 기본값: eleven_multilingual_v2)
         current_user: 인증된 사용자 정보
-        db: 데이터베이스 세션
+        service: TTSService (의존성 주입)
 
     Returns:
         AudioResponse: 생성된 음성 파일 정보
@@ -75,9 +96,6 @@ async def generate_speech(
         }
         ```
     """
-    storage_service = get_storage_service()
-    service = TTSService(db, storage_service)
-    
     try:
         audio = await service.generate_speech(
             user_id=current_user.id,
@@ -101,7 +119,7 @@ async def generate_speech(
     },
 )
 async def list_voices(
-    db: AsyncSession = Depends(get_db),
+    service: TTSService = Depends(get_tts_service),
 ):
     """
     사용 가능한 음성 목록 조회
@@ -109,7 +127,7 @@ async def list_voices(
     ElevenLabs에서 사용 가능한 모든 음성 목록을 조회합니다.
 
     Args:
-        db: 데이터베이스 세션
+        service: TTSService (의존성 주입)
 
     Returns:
         List[VoiceResponse]: 음성 목록
@@ -140,10 +158,5 @@ async def list_voices(
         ]
         ```
     """
-    # Storage service is not needed for listing voices, but service init requires it.
-    # We can pass a dummy or just use LocalStorageService as it's lightweight.
-    storage_service = LocalStorageService() 
-    service = TTSService(db, storage_service)
-    
     voices = await service.get_voices()
     return voices

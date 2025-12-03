@@ -10,17 +10,35 @@ from backend.infrastructure.storage.local import LocalStorageService
 from backend.infrastructure.storage.s3 import S3StorageService
 from backend.core.config import settings
 from backend.features.storybook.service import BookOrchestratorService
+from backend.features.storybook.repository import BookRepository
 from backend.features.storybook.schemas import CreateBookRequest, BookResponse, BookListResponse
+from backend.infrastructure.ai.factory import AIProviderFactory
 
 router = APIRouter()
 
 def get_storage_service():
-    # 환경 설정에 따라 스토리지 서비스 반환
-    # 여기서는 간단히 LocalStorageService 사용 (또는 config에 따라 분기)
-    # 실제로는 DI 컨테이너나 Factory를 사용하는 것이 좋음
+    """스토리지 서비스 의존성"""
     if settings.storage_provider == "s3":
         return S3StorageService()
     return LocalStorageService()
+
+def get_ai_factory():
+    """AI Factory 의존성"""
+    return AIProviderFactory()
+
+def get_book_service(
+    db: AsyncSession = Depends(get_db),
+    storage_service = Depends(get_storage_service),
+    ai_factory = Depends(get_ai_factory),
+) -> BookOrchestratorService:
+    """BookOrchestratorService 의존성 주입"""
+    book_repo = BookRepository(db)
+    return BookOrchestratorService(
+        book_repo=book_repo,
+        storage_service=storage_service,
+        ai_factory=ai_factory,
+        db_session=db,
+    )
 
 @router.post(
     "/create",
@@ -36,7 +54,7 @@ def get_storage_service():
 async def create_book(
     request: CreateBookRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: BookOrchestratorService = Depends(get_book_service),
 ):
     """
     AI 기반 동화책 생성
@@ -54,7 +72,7 @@ async def create_book(
             - target_age: 대상 연령 (예: "5-7", "8-10")
             - theme: 테마 (예: "adventure", "education", "fantasy")
         current_user: 인증된 사용자 정보 (JWT에서 추출)
-        db: 데이터베이스 세션
+        service: BookOrchestratorService (의존성 주입)
 
     Returns:
         BookResponse: 생성된 동화책 정보
@@ -79,9 +97,6 @@ async def create_book(
         }
         ```
     """
-    storage_service = get_storage_service()
-    service = BookOrchestratorService(db, storage_service)
-
     book = await service.create_storybook(
         user_id=current_user.id,
         prompt=request.prompt,
@@ -108,7 +123,7 @@ async def create_book_with_images(
     images: List[UploadFile] = File(...),
     voice_id: str = Form(None),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: BookOrchestratorService = Depends(get_book_service),
 ):
     """
     이미지 기반 동화책 생성 (Multipart/Form-Data)
@@ -121,7 +136,7 @@ async def create_book_with_images(
         images (List[UploadFile]): 각 페이지의 이미지 파일 배열
         voice_id (str, optional): TTS 음성 ID (기본값: 시스템 기본 음성)
         current_user: 인증된 사용자 정보
-        db: 데이터베이스 세션
+        service: BookOrchestratorService (의존성 주입)
 
     Returns:
         BookResponse: 생성된 동화책 정보
@@ -139,9 +154,6 @@ async def create_book_with_images(
         - 이미지와 스토리 배열의 길이가 동일해야 함
         - 지원 이미지 형식: JPG, PNG, WEBP
     """
-    storage_service = get_storage_service()
-    service = BookOrchestratorService(db, storage_service)
-
     # 이미지 파일 읽기
     image_data_list = []
     content_types = []
@@ -170,7 +182,7 @@ async def create_book_with_images(
 )
 async def list_books(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: BookOrchestratorService = Depends(get_book_service),
 ):
     """
     내 동화책 목록 조회
@@ -179,7 +191,7 @@ async def list_books(
 
     Args:
         current_user: 인증된 사용자 정보 (JWT에서 추출)
-        db: 데이터베이스 세션
+        service: BookOrchestratorService (의존성 주입)
 
     Returns:
         List[BookResponse]: 동화책 목록
@@ -190,9 +202,6 @@ async def list_books(
     Raises:
         HTTPException 401: 인증 실패
     """
-    storage_service = get_storage_service()
-    service = BookOrchestratorService(db, storage_service)
-    
     books = await service.get_books(current_user.id)
     return books
 
@@ -210,7 +219,7 @@ async def list_books(
 async def get_book(
     book_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: BookOrchestratorService = Depends(get_book_service),
 ):
     """
     동화책 상세 조회
@@ -220,7 +229,7 @@ async def get_book(
     Args:
         book_id (UUID): 조회할 동화책의 고유 ID
         current_user: 인증된 사용자 정보
-        db: 데이터베이스 세션
+        service: BookOrchestratorService (의존성 주입)
 
     Returns:
         BookResponse: 동화책 상세 정보
@@ -237,9 +246,6 @@ async def get_book(
         - 본인이 생성한 동화책만 조회 가능
         - is_default=true인 샘플 동화책은 모두 조회 가능
     """
-    storage_service = get_storage_service()
-    service = BookOrchestratorService(db, storage_service)
-
     book = await service.get_book(book_id)
 
     # RLS가 있지만, 서비스 레벨에서도 한 번 더 체크하는 것이 안전 (또는 RLS가 처리)
@@ -266,7 +272,7 @@ async def get_book(
 async def delete_book(
     book_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: BookOrchestratorService = Depends(get_book_service),
 ):
     """
     동화책 삭제
@@ -276,7 +282,7 @@ async def delete_book(
     Args:
         book_id (UUID): 삭제할 동화책의 고유 ID
         current_user: 인증된 사용자 정보
-        db: 데이터베이스 세션
+        service: BookOrchestratorService (의존성 주입)
 
     Returns:
         None (HTTP 204 No Content)
@@ -290,7 +296,4 @@ async def delete_book(
         - 삭제 시 관련된 페이지, 대화문, 이미지 파일도 함께 삭제됨
         - 삭제된 데이터는 복구할 수 없음
     """
-    storage_service = get_storage_service()
-    service = BookOrchestratorService(db, storage_service)
-
     await service.delete_book(book_id, current_user.id)
