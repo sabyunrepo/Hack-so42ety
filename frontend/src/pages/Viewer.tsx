@@ -9,6 +9,7 @@ import ClickableText from "../components/ClickableText";
 import AudioPlayer from "../components/AudioPlayer";
 import type { BookData, PageData, Dialogue } from "../types/book";
 import { getDialogueText, getDialogueAudioUrl } from "../types/book";
+import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 
 // --- 타입 정의 ---
 
@@ -49,7 +50,7 @@ const Viewer: React.FC = () => {
 
   const [book, setBook] = useState<BookData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isError, setIsError] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(0);
 
   const bookRef = useRef<HTMLFlipBookRef | null>(null);
@@ -64,12 +65,11 @@ const Viewer: React.FC = () => {
     const fetchBook = async () => {
       try {
         setIsLoading(true);
-        setIsError(false);
+        setErrorMessage("");
         const data: any = await getStorybookById(bookId);
         setBook(data);
       } catch (error) {
-        setIsError(true);
-        console.error(error);
+        setErrorMessage(getUserFriendlyErrorMessage(error));
       } finally {
         setIsLoading(false);
       }
@@ -114,13 +114,13 @@ const Viewer: React.FC = () => {
     );
   }
 
-  if (isError) {
+  if (errorMessage) {
     return (
       <div className="p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md text-center border-2 border-red-200">
           <div className="text-6xl mb-4 animate-pulse">⚠️</div>
           <div className="text-2xl font-bold text-red-600 mb-2">오류가 발생했습니다</div>
-          <p className="text-gray-600 mb-6">책을 불러올 수 없습니다. 다시 시도해주세요.</p>
+          <p className="text-gray-600 mb-6">{errorMessage}</p>
           <button
             onClick={() => navigate("/")}
             className="px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"

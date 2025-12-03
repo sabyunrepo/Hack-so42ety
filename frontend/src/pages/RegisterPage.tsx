@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
+import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 
 const RegisterPage = () => {
   const [email, setEmail] = useState("");
@@ -15,14 +16,14 @@ const RegisterPage = () => {
     setError("");
 
     if (password !== confirmPassword) {
-      return setError("Passwords do not match");
+      return setError("비밀번호가 일치하지 않습니다");
     }
 
     try {
       await register({ email, password });
       navigate("/");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to register");
+    } catch (err) {
+      setError(getUserFriendlyErrorMessage(err));
     }
   };
 

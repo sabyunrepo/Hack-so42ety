@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
+import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -16,8 +17,8 @@ const LoginPage = () => {
     try {
       await login({ email, password });
       navigate("/");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to login");
+    } catch (err) {
+      setError(getUserFriendlyErrorMessage(err));
     }
   };
 
@@ -89,12 +90,12 @@ const LoginPage = () => {
                       await googleLogin(credentialResponse.credential);
                       navigate("/");
                     } catch (err) {
-                      setError("Google login failed");
+                      setError(getUserFriendlyErrorMessage(err));
                     }
                   }
                 }}
                 onError={() => {
-                  setError("Google Login Failed");
+                  setError("Google 로그인에 실패했습니다");
                 }}
               />
             </div>
