@@ -333,11 +333,19 @@ class BookOrchestratorService:
         """사용자의 책 목록 조회"""
         return await self.book_repo.get_user_books(user_id)
 
-    async def get_book(self, book_id: uuid.UUID) -> Book:
+    async def get_book(self, book_id: uuid.UUID, user_id: uuid.UUID = None) -> Book:
         """책 상세 조회"""
         book = await self.book_repo.get_with_pages(book_id)
         if not book:
             raise StorybookNotFoundException(storybook_id=str(book_id))
+
+        # 권한 체크 (user_id가 제공된 경우)
+        if user_id and book.user_id != user_id:
+            raise StorybookUnauthorizedException(
+                storybook_id=str(book_id),
+                user_id=str(user_id)
+            )
+
         return book
 
     async def delete_book(self, book_id: uuid.UUID, user_id: uuid.UUID) -> bool:
