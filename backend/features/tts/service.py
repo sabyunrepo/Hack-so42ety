@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.models.audio import Audio
-from backend.domain.repositories.audio_repository import AudioRepository
+from .repository import AudioRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
 from .exceptions import (

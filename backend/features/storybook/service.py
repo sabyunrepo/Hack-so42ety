@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.domain.models.book import (
     Book, Page, Dialogue, DialogueTranslation, DialogueAudio, BookStatus
 )
-from backend.domain.repositories.book_repository import BookRepository
+from .repository import BookRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.core.config import settings

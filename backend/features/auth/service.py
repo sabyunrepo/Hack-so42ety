@@ -10,7 +10,7 @@ from ...core.auth.jwt_manager import JWTManager
 from ...core.auth.providers.credentials import CredentialsAuthProvider
 from ...core.auth.providers.google_oauth import GoogleOAuthProvider
 from ...domain.models.user import User
-from ...domain.repositories.user_repository import UserRepository
+from .repository import UserRepository
 from .exceptions import (
     InvalidCredentialsException,
     OAuthUserOnlyException,
