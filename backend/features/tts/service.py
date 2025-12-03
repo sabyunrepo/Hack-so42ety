@@ -6,6 +6,11 @@ from backend.domain.models.audio import Audio
 from backend.domain.repositories.audio_repository import AudioRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
+from .exceptions import (
+    TTSGenerationFailedException,
+    TTSUploadFailedException,
+    TTSTextTooLongException,
+)
 
 class TTSService:
     """
@@ -33,23 +38,34 @@ class TTSService:
         """
         음성 생성 및 저장
         """
+        # 텍스트 길이 검증
+        max_length = 5000
+        if len(text) > max_length:
+            raise TTSTextTooLongException(text_length=len(text), max_length=max_length)
+
         tts_provider = self.ai_factory.get_tts_provider()
-        
+
         # 1. TTS 생성
-        audio_bytes = await tts_provider.text_to_speech(
-            text=text,
-            voice_id=voice_id,
-            model_id=model_id
-        )
-        
+        try:
+            audio_bytes = await tts_provider.text_to_speech(
+                text=text,
+                voice_id=voice_id,
+                model_id=model_id
+            )
+        except Exception as e:
+            raise TTSGenerationFailedException(reason=str(e))
+
         # 2. 스토리지 저장
-        file_name = f"audios/{user_id}/{uuid.uuid4()}.mp3"
-        file_url = await self.storage_service.save(
-            audio_bytes,
-            file_name,
-            content_type="audio/mpeg"
-        )
-        
+        try:
+            file_name = f"audios/{user_id}/{uuid.uuid4()}.mp3"
+            file_url = await self.storage_service.save(
+                audio_bytes,
+                file_name,
+                content_type="audio/mpeg"
+            )
+        except Exception as e:
+            raise TTSUploadFailedException(filename=file_name, reason=str(e))
+
         # 3. 메타데이터 저장
         audio = await self.audio_repo.create(
             user_id=user_id,
@@ -61,7 +77,7 @@ class TTSService:
             file_size=len(audio_bytes),
             mime_type="audio/mpeg"
         )
-        
+
         return audio
 
     async def get_voices(self) -> List[Dict[str, Any]]:

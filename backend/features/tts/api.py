@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -27,20 +27,14 @@ async def generate_speech(
     """TTS 음성 생성"""
     storage_service = get_storage_service()
     service = TTSService(db, storage_service)
-    
-    try:
-        audio = await service.generate_speech(
-            user_id=current_user.id,
-            text=request.text,
-            voice_id=request.voice_id,
-            model_id=request.model_id
-        )
-        return audio
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate speech: {str(e)}"
-        )
+
+    audio = await service.generate_speech(
+        user_id=current_user.id,
+        text=request.text,
+        voice_id=request.voice_id,
+        model_id=request.model_id
+    )
+    return audio
 
 @router.get("/voices", response_model=List[VoiceResponse])
 async def list_voices(

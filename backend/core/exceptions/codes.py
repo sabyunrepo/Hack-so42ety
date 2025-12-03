@@ -85,6 +85,18 @@ class ErrorCode(str, Enum):
     BIZ_BOOK_INVALID_PAGE_COUNT = "BIZ_107"
     """잘못된 페이지 수입니다"""
 
+    BIZ_TTS_GENERATION_FAILED = "BIZ_201"
+    """음성 생성에 실패했습니다"""
+
+    BIZ_TTS_UPLOAD_FAILED = "BIZ_202"
+    """음성 파일 업로드에 실패했습니다"""
+
+    BIZ_TTS_TEXT_TOO_LONG = "BIZ_203"
+    """텍스트가 너무 깁니다"""
+
+    BIZ_TTS_VOICE_NOT_FOUND = "BIZ_204"
+    """요청하신 음성을 찾을 수 없습니다"""
+
     # ==================== System (SYS_xxx) ====================
     SYS_INTERNAL_ERROR = "SYS_001"
     """서버 내부 오류가 발생했습니다"""
