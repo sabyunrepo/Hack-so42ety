@@ -3,10 +3,37 @@ Core Dependencies
 공통 의존성 주입 함수
 """
 
+from typing import Optional
+from fastapi import Depends
 from backend.core.config import settings
 from backend.infrastructure.storage.local import LocalStorageService
 from backend.infrastructure.storage.s3 import S3StorageService
 from backend.infrastructure.ai.factory import AIProviderFactory
+from backend.core.events.redis_streams_bus import RedisStreamsEventBus
+from backend.core.cache.service import CacheService
+
+# 전역 Event Bus 참조 (main.py의 lifespan에서 설정)
+_event_bus: Optional[RedisStreamsEventBus] = None
+
+
+def set_event_bus(event_bus_instance: RedisStreamsEventBus):
+    """Event Bus 설정 (lifespan에서 호출)"""
+    global _event_bus
+    _event_bus = event_bus_instance
+
+
+def get_event_bus() -> RedisStreamsEventBus:
+    """Event Bus 의존성 주입"""
+    if not _event_bus:
+        raise RuntimeError("Event bus not initialized. Check if lifespan started correctly.")
+    return _event_bus
+
+
+def get_cache_service(
+    event_bus: RedisStreamsEventBus = Depends(get_event_bus)
+) -> CacheService:
+    """CacheService 의존성 주입"""
+    return CacheService(event_bus=event_bus)
 
 
 def get_storage_service():
