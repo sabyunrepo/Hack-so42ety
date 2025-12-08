@@ -5,26 +5,13 @@ from uuid import UUID
 
 from backend.core.database.session import get_db
 from backend.core.auth.dependencies import get_current_user_object as get_current_user
+from backend.core.dependencies import get_storage_service, get_ai_factory
 from backend.features.auth.models import User
-from backend.infrastructure.storage.local import LocalStorageService
-from backend.infrastructure.storage.s3 import S3StorageService
-from backend.core.config import settings
 from backend.features.storybook.service import BookOrchestratorService
 from backend.features.storybook.repository import BookRepository
 from backend.features.storybook.schemas import CreateBookRequest, BookResponse, BookListResponse
-from backend.infrastructure.ai.factory import AIProviderFactory
 
 router = APIRouter()
-
-def get_storage_service():
-    """스토리지 서비스 의존성"""
-    if settings.storage_provider == "s3":
-        return S3StorageService()
-    return LocalStorageService()
-
-def get_ai_factory():
-    """AI Factory 의존성"""
-    return AIProviderFactory()
 
 def get_book_service(
     db: AsyncSession = Depends(get_db),

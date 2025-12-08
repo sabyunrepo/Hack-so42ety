@@ -35,9 +35,9 @@ class JWTManager:
         to_encode = data.copy()
 
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now() + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(
+            expire = datetime.now() + timedelta(
                 minutes=settings.jwt_access_token_expire_minutes
             )
 
@@ -69,9 +69,9 @@ class JWTManager:
         to_encode = data.copy()
 
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now() + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(
+            expire = datetime.now() + timedelta(
                 days=settings.jwt_refresh_token_expire_days
             )
 
