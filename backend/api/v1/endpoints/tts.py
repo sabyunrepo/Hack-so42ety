@@ -12,7 +12,7 @@ from backend.core.dependencies import (
 )
 from backend.features.auth.models import User
 from backend.features.tts.service import TTSService
-from backend.features.tts.repository import AudioRepository
+from backend.features.tts.repository import AudioRepository, VoiceRepository
 from backend.features.tts.schemas import GenerateSpeechRequest, AudioResponse, VoiceResponse
 
 router = APIRouter()
@@ -26,8 +26,10 @@ def get_tts_service(
 ) -> TTSService:
     """TTSService 의존성 주입"""
     audio_repo = AudioRepository(db)
+    voice_repo = VoiceRepository(db)
     return TTSService(
         audio_repo=audio_repo,
+        voice_repo=voice_repo,
         storage_service=storage_service,
         ai_factory=ai_factory,
         db_session=db,
@@ -109,14 +111,16 @@ async def generate_speech(
     },
 )
 async def list_voices(
+    current_user: User = Depends(get_current_user),
     service: TTSService = Depends(get_tts_service),
 ):
     """
-    사용 가능한 음성 목록 조회
+    사용자별 음성 목록 조회
 
-    ElevenLabs에서 사용 가능한 모든 음성 목록을 조회합니다.
+    사용자 개인 음성(private), 공개 음성(public), 기본 음성(default)을 포함한 목록을 조회합니다.
 
     Args:
+        current_user: 인증된 사용자 정보
         service: TTSService (의존성 주입)
 
     Returns:
@@ -126,11 +130,13 @@ async def list_voices(
             - preview_url: 미리듣기 URL (선택)
             - language: 지원 언어
             - gender: 성별 (male/female/neutral)
+            - visibility: 공개 범위 (private/public/default)
+            - status: 생성 상태 (processing/completed/failed)
 
     Note:
-        - 인증 불필요 (공개 API)
+        - 인증 필요
+        - 사용자 개인 음성 + 공개 음성 + 기본 음성 포함
         - TTS 생성 시 voice_id를 사용하여 음성 지정
-        - 각 음성마다 특징과 음색이 다름
 
     Example:
         ```
@@ -142,11 +148,13 @@ async def list_voices(
             "voice_id": "21m00Tcm4TlvDq8ikWAM",
             "name": "Rachel",
             "language": "en-US",
-            "gender": "female"
+            "gender": "female",
+            "visibility": "default",
+            "status": "completed"
           },
           ...
         ]
         ```
     """
-    voices = await service.get_voices()
+    voices = await service.get_voices(user_id=current_user.id)
     return voices
