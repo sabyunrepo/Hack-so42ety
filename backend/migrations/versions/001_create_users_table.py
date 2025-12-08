@@ -32,7 +32,7 @@ def upgrade() -> None:
     op.create_table(
         'users',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column('email', sa.String(255), unique=True, nullable=False, index=True),
+        sa.Column('email', sa.String(255), nullable=False),  # index=True 제거, 아래에서 명시적으로 생성
         sa.Column('password_hash', sa.String(255), nullable=True),
         sa.Column('oauth_provider', sa.String(50), nullable=True),
         sa.Column('oauth_id', sa.String(255), nullable=True),
@@ -42,6 +42,8 @@ def upgrade() -> None:
     )
 
     # 인덱스 생성
+    # 주의: Alembic의 create_index는 if_not_exists를 지원하지 않으므로
+    # 테이블 생성 시 index=True를 사용하지 않고 명시적으로 생성
     op.create_index('ix_users_id', 'users', ['id'])
     op.create_index('ix_users_email', 'users', ['email'], unique=True)
 

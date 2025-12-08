@@ -55,11 +55,10 @@ async def lifespan(app: FastAPI):
     # 데이터베이스 연결 확인
     try:
         async with engine.begin() as conn:
-            # 테이블 생성 (개발 모드에서만)
-            # 프로덕션에서는 Alembic 사용
-            if settings.app_env == "dev" and settings.debug:
-                await conn.run_sync(Base.metadata.create_all)
-                print("✓ Database tables created (development mode)")
+            # 연결 테스트만 수행 (테이블 생성은 entrypoint.sh에서 처리)
+            from sqlalchemy import text
+            await conn.execute(text("SELECT 1"))
+            print("✓ Database connection verified")
     except Exception as e:
         print(f"⚠ Database connection failed: {e}")
 
