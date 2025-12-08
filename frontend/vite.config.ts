@@ -92,6 +92,12 @@ export default defineConfig({
 
     // 로컬 개발 시 로컬 백엔드 API 프록시 (Docker)
     proxy: {
+      // API 전체 프록시 (백엔드로)
+      "/api": {
+        target: "http://localhost",
+        changeOrigin: true,
+      },
+      
       // TTS API 프록시 (로컬 Docker)
       "/tts": {
         target: "http://localhost:8000",

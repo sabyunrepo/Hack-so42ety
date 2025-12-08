@@ -32,8 +32,9 @@ class FileAccessService:
         """
         파일 경로에서 책 ID 추출
         
-        경로 형식: users/{user_id}/books/{book_id}/images/page_1.png
-        또는: users/{user_id}/books/{book_id}/audios/page_1.mp3
+        경로 형식:
+        - 공통 책: shared/books/{book_id}/images/page_1.png
+        - 사용자 책: users/{user_id}/books/{book_id}/images/page_1.png
         
         Args:
             file_path: 파일 경로
@@ -45,7 +46,12 @@ class FileAccessService:
             # 경로 파싱
             parts = file_path.split('/')
             
-            # users/{user_id}/books/{book_id}/... 형식 확인
+            # 공통 책: shared/books/{book_id}/... 형식 확인
+            if len(parts) >= 3 and parts[0] == 'shared' and parts[1] == 'books':
+                book_id_str = parts[2]
+                return uuid.UUID(book_id_str)
+            
+            # 사용자 책: users/{user_id}/books/{book_id}/... 형식 확인
             if len(parts) >= 4 and parts[0] == 'users' and parts[2] == 'books':
                 book_id_str = parts[3]
                 return uuid.UUID(book_id_str)
@@ -79,6 +85,10 @@ class FileAccessService:
             FileNotFoundError: 파일이 존재하지 않거나 책을 찾을 수 없음
             PermissionDenied: 접근 권한이 없음
         """
+        # 공통 책 파일: shared/books/ 경로는 모든 사용자 접근 가능
+        if file_path.startswith('shared/books/'):
+            return True
+        
         # 파일 경로에서 책 ID 추출
         book_id = self._extract_book_id_from_path(file_path)
         

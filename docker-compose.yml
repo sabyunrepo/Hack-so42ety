@@ -53,7 +53,7 @@ services:
     volumes:
       # Development mode: 소스 코드 실시간 반영
       - ./backend:/app/backend
-      - app-data:/app/data
+      - ./data:/app/data  # 공통 데이터 폴더 마운트
       - /Users/byeonsanghun/goinfre/Hack-so42ety/backup_hackathon_20251130/data:/app/backup_data
     environment:
       - APP_ENV=${APP_ENV:-dev}
