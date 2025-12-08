@@ -12,6 +12,7 @@ from sqlalchemy import select, and_, or_
 
 from backend.features.storybook.models import Book
 from backend.features.storybook.repository import BookRepository
+from backend.core.database.session import get_db
 
 logger = logging.getLogger(__name__)
 
