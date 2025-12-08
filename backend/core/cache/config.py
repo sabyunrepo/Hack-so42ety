@@ -19,6 +19,23 @@ def get_cache_config() -> dict:
         "endpoint": settings.redis_host,
         "port": settings.redis_port,
         "timeout": 1,
+        "serializer": {
+            "class": "aiocache.serializers.JsonSerializer"
+        },
+    }
+
+def get_cache_config_for_test() -> dict:
+    """
+    테스트용 aiocache 설정 반환 (JsonSerializer 인스턴스 포함)
+    
+    Returns:
+        dict: aiocache 설정 딕셔너리
+    """
+    return {
+        "cache": Cache.REDIS,
+        "endpoint": settings.redis_host,
+        "port": settings.redis_port,
+        "timeout": 1,
         "serializer": JsonSerializer(),
     }
 
