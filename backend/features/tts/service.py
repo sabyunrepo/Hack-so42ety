@@ -111,40 +111,6 @@ class TTSService:
 
         return audio
 
-    @cache_result(key="tts:voices", ttl=3600)
-    async def get_voices(self) -> List[Dict[str, Any]]:
-        """
-        사용 가능한 음성 목록 조회 (캐싱 자동 적용)
-        
-        데코레이터가 자동으로:
-        1. 캐시 조회
-        2. 캐시 미스 시 API 호출
-        3. 결과 캐시 저장
-        
-        Raises:
-            TTSAPIKeyNotConfiguredException: API 키가 설정되지 않은 경우
-            TTSAPIAuthenticationFailedException: API 인증 실패 시
-            TTSGenerationFailedException: 기타 TTS 생성 실패 시
-        """
-        try:
-            tts_provider = self.ai_factory.get_tts_provider()
-        except TTSAPIKeyNotConfiguredException:
-            # API 키가 없을 때는 그대로 전파
-            raise
-        except Exception as e:
-            # Provider 생성 실패 시
-            raise TTSGenerationFailedException(reason=f"TTS Provider 초기화 실패: {str(e)}")
-        
-        try:
-            voices = await tts_provider.get_available_voices()
-            return voices
-        except (TTSAPIKeyNotConfiguredException, TTSAPIAuthenticationFailedException):
-            # API 키 관련 예외는 그대로 전파
-            raise
-        except Exception as e:
-            # 기타 예외는 TTSGenerationFailedException으로 변환
-            raise TTSGenerationFailedException(reason=f"음성 목록 조회 실패: {str(e)}")
-    
     async def create_voice_clone(
         self,
         user_id: uuid.UUID,

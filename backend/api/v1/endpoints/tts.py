@@ -13,7 +13,14 @@ from backend.core.dependencies import (
 from backend.features.auth.models import User
 from backend.features.tts.service import TTSService
 from backend.features.tts.repository import AudioRepository, VoiceRepository
-from backend.features.tts.schemas import GenerateSpeechRequest, AudioResponse, VoiceResponse
+from backend.features.tts.schemas import (
+    GenerateSpeechRequest,
+    AudioResponse,
+    VoiceResponse,
+    CreateVoiceCloneRequest,
+)
+from backend.features.tts.models import VoiceVisibility
+from fastapi import UploadFile, File
 
 router = APIRouter()
 
@@ -158,3 +165,96 @@ async def list_voices(
     """
     voices = await service.get_voices(user_id=current_user.id)
     return voices
+
+
+@router.post(
+    "/voices/clone",
+    response_model=VoiceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Voice Clone 생성",
+    responses={
+        201: {"description": "Voice Clone 생성 성공"},
+        401: {"description": "인증 실패"},
+        500: {"description": "서버 오류 (ElevenLabs API 실패)"},
+    },
+)
+async def create_voice_clone(
+    name: str,
+    audio_file: UploadFile = File(...),
+    description: str = None,
+    visibility: str = "private",
+    current_user: User = Depends(get_current_user),
+    service: TTSService = Depends(get_tts_service),
+):
+    """
+    Voice Clone 생성
+    
+    오디오 파일을 업로드하여 ElevenLabs에서 Voice Clone을 생성합니다.
+    생성 후 Redis 큐에 등록되어 Scheduled Task가 자동으로 상태를 동기화합니다.
+    
+    Args:
+        name: Voice 이름
+        audio_file: 오디오 파일 (MP3, WAV 등)
+        description: Voice 설명 (선택)
+        visibility: 공개 범위 (private/public/default, 기본값: private)
+        current_user: 인증된 사용자 정보
+        service: TTSService (의존성 주입)
+    
+    Returns:
+        VoiceResponse: 생성된 Voice 정보
+            - voice_id: ElevenLabs Voice ID
+            - name: Voice 이름
+            - status: 생성 상태 (초기에는 processing)
+            - preview_url: 미리듣기 URL (완료 후 제공)
+    
+    Raises:
+        HTTPException 401: 인증 실패
+        HTTPException 500: ElevenLabs API 호출 실패
+    
+    Note:
+        - Voice 생성은 비동기로 처리됩니다
+        - 생성 완료까지 시간이 걸릴 수 있습니다
+        - 상태는 Scheduled Task가 주기적으로 확인하여 업데이트합니다
+        - 완료되면 preview_url이 제공됩니다
+    
+    Example:
+        ```
+        POST /api/v1/tts/voices/clone
+        Content-Type: multipart/form-data
+        
+        name: "My Custom Voice"
+        description: "나만의 커스텀 음성"
+        visibility: "private"
+        audio_file: [binary audio data]
+        ```
+    """
+    # 파일 읽기
+    audio_bytes = await audio_file.read()
+    
+    # Visibility 변환
+    try:
+        voice_visibility = VoiceVisibility(visibility)
+    except ValueError:
+        voice_visibility = VoiceVisibility.PRIVATE
+    
+    # Voice Clone 생성
+    voice = await service.create_voice_clone(
+        user_id=current_user.id,
+        name=name,
+        audio_file=audio_bytes,
+        visibility=voice_visibility,
+        description=description,
+    )
+    
+    # 응답 형식 변환
+    return {
+        "voice_id": voice.elevenlabs_voice_id,
+        "name": voice.name,
+        "language": voice.language,
+        "gender": voice.gender,
+        "preview_url": voice.preview_url,
+        "category": voice.category,
+        "visibility": voice.visibility.value,
+        "status": voice.status.value,
+        "is_custom": True,
+    }

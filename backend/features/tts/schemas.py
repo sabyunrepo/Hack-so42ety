@@ -50,12 +50,46 @@ class AudioResponse(BaseModel):
             }
         }
 
+class CreateVoiceCloneRequest(BaseModel):
+    name: str = Field(
+        ...,
+        description="Voice 이름",
+        min_length=1,
+        max_length=200,
+        example="My Custom Voice"
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Voice 설명",
+        max_length=500,
+        example="나만의 커스텀 음성"
+    )
+    visibility: Optional[str] = Field(
+        "private",
+        description="공개 범위 (private/public/default)",
+        example="private"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "My Custom Voice",
+                "description": "나만의 커스텀 음성",
+                "visibility": "private"
+            }
+        }
+
+
 class VoiceResponse(BaseModel):
     voice_id: str = Field(..., description="음성 고유 ID", example="21m00Tcm4TlvDq8ikWAM")
     name: str = Field(..., description="음성 이름", example="Rachel")
     language: str = Field(default="en", description="지원 언어", example="en-US")
     gender: str = Field(default="unknown", description="성별", example="female")
     preview_url: Optional[str] = Field(None, description="미리듣기 URL", example="https://storage.elevenlabs.io/voices/preview.mp3")
+    category: Optional[str] = Field(None, description="카테고리 (premade/cloned/custom)", example="cloned")
+    visibility: Optional[str] = Field(None, description="공개 범위 (private/public/default)", example="private")
+    status: Optional[str] = Field(None, description="생성 상태 (processing/completed/failed)", example="completed")
+    is_custom: Optional[bool] = Field(None, description="커스텀 Voice 여부", example=True)
 
     class Config:
         json_schema_extra = {
@@ -64,6 +98,10 @@ class VoiceResponse(BaseModel):
                 "name": "Rachel",
                 "language": "en-US",
                 "gender": "female",
-                "preview_url": "https://storage.elevenlabs.io/voices/rachel-preview.mp3"
+                "preview_url": "https://storage.elevenlabs.io/voices/rachel-preview.mp3",
+                "category": "cloned",
+                "visibility": "private",
+                "status": "completed",
+                "is_custom": True
             }
         }
