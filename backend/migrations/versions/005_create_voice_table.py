@@ -20,11 +20,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # ==================== Voice Enum Types ====================
-    # VoiceVisibility Enum
-    op.execute("CREATE TYPE voicevisibility AS ENUM ('private', 'public', 'default')")
+    # VoiceVisibility Enum (DO 블록으로 중복 체크)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'voicevisibility') THEN
+                CREATE TYPE voicevisibility AS ENUM ('private', 'public', 'default');
+            END IF;
+        END $$;
+    """)
     
-    # VoiceStatus Enum
-    op.execute("CREATE TYPE voicestatus AS ENUM ('processing', 'completed', 'failed')")
+    # VoiceStatus Enum (DO 블록으로 중복 체크)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'voicestatus') THEN
+                CREATE TYPE voicestatus AS ENUM ('processing', 'completed', 'failed');
+            END IF;
+        END $$;
+    """)
     
     # ==================== Voices Table ====================
     op.create_table(
@@ -37,8 +49,8 @@ def upgrade() -> None:
         sa.Column('gender', sa.String(length=20), nullable=False, server_default='unknown'),
         sa.Column('preview_url', sa.String(length=1024), nullable=True),
         sa.Column('category', sa.String(length=50), nullable=False, server_default='cloned'),
-        sa.Column('visibility', sa.Enum('private', 'public', 'default', name='voicevisibility'), nullable=False, server_default='private'),
-        sa.Column('status', sa.Enum('processing', 'completed', 'failed', name='voicestatus'), nullable=False, server_default='processing'),
+        sa.Column('visibility', postgresql.ENUM('private', 'public', 'default', name='voicevisibility', create_type=False), nullable=False, server_default='private'),
+        sa.Column('status', postgresql.ENUM('processing', 'completed', 'failed', name='voicestatus', create_type=False), nullable=False, server_default='processing'),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('completed_at', sa.DateTime(), nullable=True),
         sa.Column('meta_data', postgresql.JSON, nullable=True),
