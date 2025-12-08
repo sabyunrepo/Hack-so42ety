@@ -135,6 +135,15 @@ class Settings(BaseSettings):
     aws_s3_bucket_name: Optional[str] = Field(default=None, env="AWS_S3_BUCKET_NAME")
     aws_s3_region: str = Field(default="ap-northeast-2", env="AWS_S3_REGION")
 
+    # ==================== Redis Cache & Event Bus ====================
+    redis_host: str = Field(default="redis", env="REDIS_HOST")
+    redis_port: int = Field(default=6379, env="REDIS_PORT")
+    
+    @property
+    def redis_url(self) -> str:
+        """Redis 연결 URL"""
+        return f"redis://{self.redis_host}:{self.redis_port}"
+
     # ==================== CORS ====================
     cors_origins_str: str = Field(
         default="http://localhost:5173", env="CORS_ORIGINS"
