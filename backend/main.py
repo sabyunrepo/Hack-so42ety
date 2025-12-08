@@ -3,6 +3,7 @@ MoriAI Storybook Backend - Main Application
 FastAPI 통합 백엔드 서비스
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -15,12 +16,16 @@ from .core.middleware.auth import UserContextMiddleware
 from .core.events.redis_streams_bus import RedisStreamsEventBus
 from .core.dependencies import set_event_bus
 from .core.cache.config import initialize_cache
+from .core.tasks.voice_sync import sync_voice_status_periodically
 
 
 
 
 # 전역 Event Bus 인스턴스
 event_bus: RedisStreamsEventBus = None
+
+# 전역 Voice Sync Task 인스턴스
+voice_sync_task: asyncio.Task = None
 
 
 @asynccontextmanager
@@ -66,6 +71,7 @@ async def lifespan(app: FastAPI):
         print(f"⚠ Cache initialization failed: {e}")
 
     # Event Bus 시작
+    global voice_sync_task
     try:
         event_bus = RedisStreamsEventBus(
             redis_url=settings.redis_url,
@@ -77,6 +83,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠ Event Bus failed to start: {e}")
 
+    # Voice 동기화 작업 시작
+    try:
+        voice_sync_task = asyncio.create_task(
+            sync_voice_status_periodically(
+                event_bus=event_bus,
+                interval=60,  # 1분마다 실행
+            )
+        )
+        print("✓ Voice sync task started")
+    except Exception as e:
+        print(f"⚠ Voice sync task failed to start: {e}")
+
     print(f"✓ {settings.app_title} Started Successfully")
     print("=" * 60)
 
@@ -85,6 +103,18 @@ async def lifespan(app: FastAPI):
     # Shutdown
     print("=" * 60)
     print(f"{settings.app_title} Shutting Down...")
+    
+    # Voice 동기화 작업 중지
+    if voice_sync_task:
+        try:
+            voice_sync_task.cancel()
+            try:
+                await voice_sync_task
+            except asyncio.CancelledError:
+                pass
+            print("✓ Voice sync task stopped")
+        except Exception as e:
+            print(f"⚠ Voice sync task stop error: {e}")
     
     # Event Bus 중지
     if event_bus:
