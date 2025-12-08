@@ -22,10 +22,10 @@ class CacheService:
         self._cache = None
         self._setup_event_handlers()
     
-    async def _get_cache(self):
+    def _get_cache(self):
         """캐시 인스턴스 가져오기 (lazy initialization)"""
         if not self._cache:
-            self._cache = await caches.get("default")
+            self._cache = caches.get("default")
         return self._cache
     
     def _setup_event_handlers(self):
@@ -38,9 +38,17 @@ class CacheService:
         """캐시 조회"""
         start = time.time()
         try:
-            cache = await self._get_cache()
+            cache = self._get_cache()
             result = await cache.get(key)
             duration = time.time() - start
+            
+            # aiocache의 JsonSerializer가 문자열로 반환하는 경우 처리
+            if isinstance(result, str):
+                try:
+                    import json
+                    result = json.loads(result)
+                except (json.JSONDecodeError, TypeError):
+                    pass  # JSON이 아니면 그대로 반환
             
             if result is not None:
                 logger.debug(f"Cache hit: {key} (duration: {duration*1000:.2f}ms)")
@@ -55,7 +63,7 @@ class CacheService:
     async def set(self, key: str, value: Any, ttl: int = 3600) -> None:
         """캐시 저장"""
         try:
-            cache = await self._get_cache()
+            cache = self._get_cache()
             await cache.set(key, value, ttl=ttl)
             logger.debug(f"Cache set: {key} (ttl: {ttl}s)")
         except Exception as e:
@@ -64,7 +72,7 @@ class CacheService:
     async def delete(self, key: str) -> None:
         """캐시 삭제"""
         try:
-            cache = await self._get_cache()
+            cache = self._get_cache()
             await cache.delete(key)
             logger.info(f"Cache deleted: {key}")
         except Exception as e:
