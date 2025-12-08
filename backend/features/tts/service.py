@@ -6,6 +6,9 @@ from .models import Audio
 from .repository import AudioRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
+from backend.core.cache.service import cache_result
+from backend.core.events.bus import EventBus
+from backend.core.events.types import EventType
 from .exceptions import (
     TTSGenerationFailedException,
     TTSUploadFailedException,
@@ -28,11 +31,15 @@ class TTSService:
         storage_service: AbstractStorageService,
         ai_factory: AIProviderFactory,
         db_session: AsyncSession,
+        cache_service,  # CacheService (순환 참조 방지)
+        event_bus: EventBus,  # EventBus
     ):
         self.audio_repo = audio_repo
         self.storage_service = storage_service
         self.ai_factory = ai_factory
         self.db_session = db_session
+        self.cache_service = cache_service  # 데코레이터에서 사용
+        self.event_bus = event_bus
 
     async def generate_speech(
         self,
@@ -97,9 +104,15 @@ class TTSService:
 
         return audio
 
+    @cache_result(key="tts:voices", ttl=3600)
     async def get_voices(self) -> List[Dict[str, Any]]:
         """
-        사용 가능한 음성 목록 조회
+        사용 가능한 음성 목록 조회 (캐싱 자동 적용)
+        
+        데코레이터가 자동으로:
+        1. 캐시 조회
+        2. 캐시 미스 시 API 호출
+        3. 결과 캐시 저장
         
         Raises:
             TTSAPIKeyNotConfiguredException: API 키가 설정되지 않은 경우
@@ -116,7 +129,8 @@ class TTSService:
             raise TTSGenerationFailedException(reason=f"TTS Provider 초기화 실패: {str(e)}")
         
         try:
-            return await tts_provider.get_available_voices()
+            voices = await tts_provider.get_available_voices()
+            return voices
         except (TTSAPIKeyNotConfiguredException, TTSAPIAuthenticationFailedException):
             # API 키 관련 예외는 그대로 전파
             raise
