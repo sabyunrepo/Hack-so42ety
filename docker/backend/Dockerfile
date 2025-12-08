@@ -42,6 +42,9 @@ RUN useradd -m -u 1000 appuser && \
 COPY backend/ /app/backend/
 RUN chown -R appuser:appuser /app/backend
 
+# Copy entrypoint script
+COPY docker/backend/entrypoint.sh /app/entrypoint.sh
+
 # Switch to app user
 USER appuser
 
@@ -56,5 +59,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
 
-# Run application
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Set entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
