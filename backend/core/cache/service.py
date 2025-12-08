@@ -10,6 +10,7 @@ from functools import wraps
 from aiocache import caches
 from ..events.bus import EventBus
 from ..events.types import Event, EventType
+from .metrics import cache_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -50,49 +51,154 @@ class CacheService:
                 except (json.JSONDecodeError, TypeError):
                     pass  # JSON이 아니면 그대로 반환
             
+            # 메트릭 기록
             if result is not None:
-                logger.debug(f"Cache hit: {key} (duration: {duration*1000:.2f}ms)")
+                cache_metrics.record_hit(key, duration)
+                logger.info(
+                    f"Cache hit: {key}",
+                    extra={
+                        "cache_key": key,
+                        "duration_ms": duration * 1000,
+                        "hit": True,
+                    }
+                )
             else:
-                logger.debug(f"Cache miss: {key} (duration: {duration*1000:.2f}ms)")
+                cache_metrics.record_miss(key, duration)
+                logger.info(
+                    f"Cache miss: {key}",
+                    extra={
+                        "cache_key": key,
+                        "duration_ms": duration * 1000,
+                        "hit": False,
+                    }
+                )
             
             return result
         except Exception as e:
-            logger.error(f"Cache get error: {e}", exc_info=True)
+            cache_metrics.record_error(key)
+            logger.error(
+                f"Cache get error: {key}",
+                extra={
+                    "cache_key": key,
+                    "error": str(e),
+                },
+                exc_info=True
+            )
             return None
     
     async def set(self, key: str, value: Any, ttl: int = 3600) -> None:
         """캐시 저장"""
+        start = time.time()
         try:
             cache = self._get_cache()
             await cache.set(key, value, ttl=ttl)
-            logger.debug(f"Cache set: {key} (ttl: {ttl}s)")
+            duration = time.time() - start
+            cache_metrics.record_set(key, duration)
+            logger.info(
+                f"Cache set: {key}",
+                extra={
+                    "cache_key": key,
+                    "ttl": ttl,
+                    "duration_ms": duration * 1000,
+                }
+            )
         except Exception as e:
-            logger.error(f"Cache set error: {e}", exc_info=True)
+            cache_metrics.record_error(key)
+            logger.error(
+                f"Cache set error: {key}",
+                extra={
+                    "cache_key": key,
+                    "error": str(e),
+                },
+                exc_info=True
+            )
     
     async def delete(self, key: str) -> None:
         """캐시 삭제"""
+        start = time.time()
         try:
             cache = self._get_cache()
             await cache.delete(key)
-            logger.info(f"Cache deleted: {key}")
+            duration = time.time() - start
+            cache_metrics.record_delete(key, duration)
+            logger.info(
+                f"Cache deleted: {key}",
+                extra={
+                    "cache_key": key,
+                    "duration_ms": duration * 1000,
+                }
+            )
         except Exception as e:
-            logger.error(f"Cache delete error: {e}", exc_info=True)
+            cache_metrics.record_error(key)
+            logger.error(
+                f"Cache delete error: {key}",
+                extra={
+                    "cache_key": key,
+                    "error": str(e),
+                },
+                exc_info=True
+            )
     
     # 이벤트 핸들러들
     async def _handle_voice_created(self, event: Event) -> None:
         """Voice 생성 이벤트 처리"""
+        logger.info(
+            f"Voice created event received: {event.event_id}",
+            extra={
+                "event_id": event.event_id,
+                "event_type": event.type.value,
+                "cache_key": "tts:voices",
+            }
+        )
         await self.delete("tts:voices")
-        logger.info(f"Cache invalidated: tts:voices (event: {event.event_id})")
+        logger.info(
+            f"Cache invalidated: tts:voices",
+            extra={
+                "event_id": event.event_id,
+                "event_type": event.type.value,
+                "cache_key": "tts:voices",
+            }
+        )
     
     async def _handle_voice_updated(self, event: Event) -> None:
         """Voice 수정 이벤트 처리"""
+        logger.info(
+            f"Voice updated event received: {event.event_id}",
+            extra={
+                "event_id": event.event_id,
+                "event_type": event.type.value,
+                "cache_key": "tts:voices",
+            }
+        )
         await self.delete("tts:voices")
-        logger.info(f"Cache invalidated: tts:voices (event: {event.event_id})")
+        logger.info(
+            f"Cache invalidated: tts:voices",
+            extra={
+                "event_id": event.event_id,
+                "event_type": event.type.value,
+                "cache_key": "tts:voices",
+            }
+        )
     
     async def _handle_voice_deleted(self, event: Event) -> None:
         """Voice 삭제 이벤트 처리"""
+        logger.info(
+            f"Voice deleted event received: {event.event_id}",
+            extra={
+                "event_id": event.event_id,
+                "event_type": event.type.value,
+                "cache_key": "tts:voices",
+            }
+        )
         await self.delete("tts:voices")
-        logger.info(f"Cache invalidated: tts:voices (event: {event.event_id})")
+        logger.info(
+            f"Cache invalidated: tts:voices",
+            extra={
+                "event_id": event.event_id,
+                "event_type": event.type.value,
+                "cache_key": "tts:voices",
+            }
+        )
 
 
 def cache_result(
