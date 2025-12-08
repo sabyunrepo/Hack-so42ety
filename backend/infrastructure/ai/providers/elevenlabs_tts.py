@@ -204,3 +204,145 @@ class ElevenLabsTTSProvider(TTSProvider):
             raise TTSGenerationFailedException(reason=f"ElevenLabs API 요청 실패: {str(e)}")
 
         return response.json()
+    
+    async def clone_voice(
+        self,
+        name: str,
+        audio_file: bytes,
+        description: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Voice Clone 생성
+        
+        Args:
+            name: Voice 이름
+            audio_file: 오디오 파일 (bytes)
+            description: Voice 설명 (선택)
+        
+        Returns:
+            Dict[str, Any]: {
+                "voice_id": str,
+                "name": str,
+                "language": str,
+                "gender": str,
+                "category": str,
+                ...
+            }
+        
+        Raises:
+            TTSAPIAuthenticationFailedException: API 인증 실패 시
+            TTSGenerationFailedException: 기타 API 오류 시
+        """
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # multipart/form-data로 파일 업로드
+                files = {
+                    "files": ("audio.mp3", audio_file, "audio/mpeg"),
+                }
+                data = {
+                    "name": name,
+                }
+                if description:
+                    data["description"] = description
+                
+                response = await client.post(
+                    f"{self.base_url}/voices/add",
+                    headers={"xi-api-key": self.api_key},
+                    files=files,
+                    data=data,
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise TTSAPIAuthenticationFailedException(
+                    provider="elevenlabs",
+                    reason="API 키가 유효하지 않거나 만료되었습니다"
+                )
+            raise TTSGenerationFailedException(
+                reason=f"ElevenLabs Voice Clone API 오류: {e.response.status_code} - {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise TTSGenerationFailedException(
+                reason=f"ElevenLabs Voice Clone API 요청 실패: {str(e)}"
+            )
+        
+        data = response.json()
+        
+        # ElevenLabs 응답 형식을 표준 형식으로 변환
+        return {
+            "voice_id": data.get("voice_id", ""),
+            "name": data.get("name", name),
+            "language": data.get("labels", {}).get("language", "en"),
+            "gender": data.get("labels", {}).get("gender", "unknown"),
+            "category": data.get("category", "cloned"),
+            "preview_url": data.get("preview_url"),  # 초기에는 None일 수 있음
+            "description": data.get("description", description),
+            "labels": data.get("labels", {}),
+        }
+    
+    async def get_voice_details(self, voice_id: str) -> Dict[str, Any]:
+        """
+        Voice 상세 정보 조회 (상태 포함)
+        
+        Args:
+            voice_id: ElevenLabs Voice ID
+        
+        Returns:
+            Dict[str, Any]: {
+                "voice_id": str,
+                "name": str,
+                "status": str,  # "processing", "completed", "failed"
+                "preview_url": Optional[str],
+                "language": str,
+                "gender": str,
+                "category": str,
+                ...
+            }
+        
+        Raises:
+            TTSAPIAuthenticationFailedException: API 인증 실패 시
+            TTSGenerationFailedException: 기타 API 오류 시
+        """
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    f"{self.base_url}/voices/{voice_id}",
+                    headers={"xi-api-key": self.api_key},
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise TTSAPIAuthenticationFailedException(
+                    provider="elevenlabs",
+                    reason="API 키가 유효하지 않거나 만료되었습니다"
+                )
+            if e.response.status_code == 404:
+                raise TTSGenerationFailedException(
+                    reason=f"Voice를 찾을 수 없습니다: {voice_id}"
+                )
+            raise TTSGenerationFailedException(
+                reason=f"ElevenLabs API 오류: {e.response.status_code} - {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise TTSGenerationFailedException(
+                reason=f"ElevenLabs API 요청 실패: {str(e)}"
+            )
+        
+        data = response.json()
+        
+        # preview_url이 있으면 완료로 간주
+        preview_url = data.get("preview_url")
+        status = "completed" if preview_url else "processing"
+        
+        # ElevenLabs 응답 형식을 표준 형식으로 변환
+        return {
+            "voice_id": data.get("voice_id", voice_id),
+            "name": data.get("name", ""),
+            "status": status,
+            "preview_url": preview_url,
+            "language": data.get("labels", {}).get("language", "en"),
+            "gender": data.get("labels", {}).get("gender", "unknown"),
+            "category": data.get("category", "generated"),
+            "description": data.get("description"),
+            "labels": data.get("labels", {}),
+        }
