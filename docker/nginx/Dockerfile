@@ -1,10 +1,18 @@
-# Nginx Dockerfile - Production (Cloudflare Tunnel - HTTP Only)
-FROM nginx:alpine
+FROM nginx:1.25-alpine
 
-# Copy production nginx configuration (HTTP only, no SSL)
-COPY docker/nginx/nginx.conf.prod /etc/nginx/conf.d/default.conf
+# Build argument for environment (default: dev)
+ARG APP_ENV=dev
 
-EXPOSE 80
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf /etc/nginx/nginx.conf
 
-# Use default nginx entrypoint
+# Copy environment-specific nginx configuration
+COPY docker/nginx/conf.d/nginx.${APP_ENV}.conf /etc/nginx/nginx.conf
+
+# Create cache directory and set permissions
+RUN mkdir -p /var/cache/nginx && \
+    chown -R nginx:nginx /var/cache/nginx /var/log/nginx
+
+EXPOSE 80 443
+
 CMD ["nginx", "-g", "daemon off;"]
