@@ -8,7 +8,7 @@ import uuid
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.models.user import User
+from backend.features.auth.models import User
 from backend.domain.models.book import Book
 from backend.core.auth.providers.credentials import CredentialsAuthProvider
 

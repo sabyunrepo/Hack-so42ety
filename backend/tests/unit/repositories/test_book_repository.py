@@ -7,9 +7,9 @@ import pytest
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.models.user import User
-from backend.domain.models.book import Book
-from backend.domain.repositories.book_repository import BookRepository
+from backend.features.auth.models import User
+from backend.features.storybook.models import Book
+from backend.features.storybook.repository import BookRepository
 
 
 @pytest.mark.asyncio

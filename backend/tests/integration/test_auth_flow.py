@@ -7,8 +7,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.models.user import User
-from backend.domain.repositories.user_repository import UserRepository
+from backend.features.auth.models import User
+from backend.features.auth.repository import UserRepository
 
 
 class TestAuthRegistrationFlow:

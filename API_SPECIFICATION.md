@@ -3,8 +3,8 @@
 **Base URL**: `http://localhost:8000/api/v1` (개발 환경)  
 **Base URL**: `http://localhost/api/v1` (Nginx 프록시 사용 시)
 
-**API 버전**: v1  
-**문서 업데이트**: 2025-11-30
+**API 버전**: v1.1
+**문서 업데이트**: 2025-12-02
 
 ---
 
@@ -246,9 +246,32 @@ Content-Type: application/json
           "id": "770e8400-e29b-41d4-a716-446655440002",
           "sequence": 1,
           "speaker": "Narrator",
-          "text_en": "Once upon a time, there was a brave little mouse...",
-          "text_ko": "옛날 옛적에, 용감한 작은 쥐가 있었습니다...",
-          "audio_url": "http://localhost/static/sound/550e8400.../dialogue_1.mp3"
+          "translations": [
+            {
+              "language_code": "en",
+              "text": "Once upon a time, there was a brave little mouse...",
+              "is_primary": true
+            },
+            {
+              "language_code": "ko",
+              "text": "옛날 옛적에, 용감한 작은 쥐가 있었습니다...",
+              "is_primary": false
+            }
+          ],
+          "audios": [
+            {
+              "language_code": "en",
+              "voice_id": "TxWD6rImY3v4izkm2VL0",
+              "audio_url": "http://localhost/static/sound/550e8400.../dialogue_1_en.mp3",
+              "duration": 3.5
+            },
+            {
+              "language_code": "ko",
+              "voice_id": "pNInz6obpgDQGcFmaJgB",
+              "audio_url": "http://localhost/static/sound/550e8400.../dialogue_1_ko.mp3",
+              "duration": 4.2
+            }
+          ]
         }
       ]
     }
@@ -375,9 +398,32 @@ Authorization: Bearer {access_token}
           "id": "770e8400-e29b-41d4-a716-446655440002",
           "sequence": 1,
           "speaker": "Narrator",
-          "text_en": "Once upon a time, there was a brave little mouse...",
-          "text_ko": "옛날 옛적에, 용감한 작은 쥐가 있었습니다...",
-          "audio_url": "http://localhost/static/sound/550e8400.../dialogue_1.mp3"
+          "translations": [
+            {
+              "language_code": "en",
+              "text": "Once upon a time, there was a brave little mouse...",
+              "is_primary": true
+            },
+            {
+              "language_code": "ko",
+              "text": "옛날 옛적에, 용감한 작은 쥐가 있었습니다...",
+              "is_primary": false
+            }
+          ],
+          "audios": [
+            {
+              "language_code": "en",
+              "voice_id": "TxWD6rImY3v4izkm2VL0",
+              "audio_url": "http://localhost/static/sound/550e8400.../dialogue_1_en.mp3",
+              "duration": 3.5
+            },
+            {
+              "language_code": "ko",
+              "voice_id": "pNInz6obpgDQGcFmaJgB",
+              "audio_url": "http://localhost/static/sound/550e8400.../dialogue_1_ko.mp3",
+              "duration": 4.2
+            }
+          ]
         }
       ]
     }
@@ -671,6 +717,7 @@ API 문서는 Swagger UI를 통해 확인할 수 있습니다:
 
 | 날짜 | 버전 | 변경 내용 |
 |------|------|-----------|
+| 2025-12-02 | v1.1 | 다국어 지원 구조 업데이트 (Dialogue 응답 형식 변경) |
 | 2025-11-30 | v1.0 | 초기 API 명세 작성 |
 
 ---
