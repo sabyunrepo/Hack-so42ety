@@ -18,8 +18,13 @@ interface Voice {
   preview_url?: string;
 }
 
-interface GetVoicesResponse {
-  voices: Voice[];
+// 백엔드 응답 형식
+interface VoiceResponse {
+  voice_id: string;
+  name: string;
+  language: string;
+  gender: string;
+  preview_url?: string;
 }
 
 export default function Creator() {
@@ -41,8 +46,17 @@ export default function Creator() {
   useEffect(() => {
     const fetchVoices = async () => {
       try {
-        const data: GetVoicesResponse = await getVoices();
-        const voiceList = data.voices || [];
+        // 백엔드는 배열을 직접 반환
+        const data: VoiceResponse[] = await getVoices();
+        
+        // 백엔드 응답을 프론트엔드 형식으로 변환
+        const voiceList: Voice[] = (data || []).map((voice) => ({
+          voice_id: voice.voice_id,
+          voice_label: voice.name,
+          state: voice.preview_url ? "success" : "pending",
+          preview_url: voice.preview_url,
+        }));
+        
         setVoices(voiceList);
         if (voiceList.length > 0) {
           setSelectedVoice(voiceList[0].voice_id);
