@@ -59,6 +59,9 @@ services:
       - APP_ENV=${APP_ENV:-dev}
       - DEBUG=${DEBUG:-true}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-moriai_user}:${POSTGRES_PASSWORD:-moriai_password}@postgres:5432/${POSTGRES_DB:-moriai_db}
+      - POSTGRES_USER=${POSTGRES_USER:-moriai_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-moriai_password}
+      - POSTGRES_DB=${POSTGRES_DB:-moriai_db}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
       - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
