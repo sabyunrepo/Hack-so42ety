@@ -4,7 +4,12 @@ from typing import List
 
 from backend.core.database.session import get_db
 from backend.core.auth.dependencies import get_current_user_object as get_current_user
-from backend.core.dependencies import get_storage_service, get_ai_factory
+from backend.core.dependencies import (
+    get_storage_service,
+    get_ai_factory,
+    get_cache_service,
+    get_event_bus,
+)
 from backend.features.auth.models import User
 from backend.features.tts.service import TTSService
 from backend.features.tts.repository import AudioRepository
@@ -16,6 +21,8 @@ def get_tts_service(
     db: AsyncSession = Depends(get_db),
     storage_service = Depends(get_storage_service),
     ai_factory = Depends(get_ai_factory),
+    cache_service = Depends(get_cache_service),
+    event_bus = Depends(get_event_bus),
 ) -> TTSService:
     """TTSService 의존성 주입"""
     audio_repo = AudioRepository(db)
@@ -24,6 +31,8 @@ def get_tts_service(
         storage_service=storage_service,
         ai_factory=ai_factory,
         db_session=db,
+        cache_service=cache_service,
+        event_bus=event_bus,
     )
 
 @router.post(
