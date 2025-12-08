@@ -12,8 +12,15 @@ from .core.config import settings
 from .core.database import engine, Base
 from .core.middleware import setup_cors
 from .core.middleware.auth import UserContextMiddleware
+from .core.events.redis_streams_bus import RedisStreamsEventBus
+from .core.dependencies import set_event_bus
+from .core.cache.config import initialize_cache
 
 
+
+
+# 전역 Event Bus 인스턴스
+event_bus: RedisStreamsEventBus = None
 
 
 @asynccontextmanager
@@ -23,11 +30,15 @@ async def lifespan(app: FastAPI):
 
     Startup:
         - 데이터베이스 연결 확인
+        - Event Bus 시작
         - 로깅 초기화
 
     Shutdown:
+        - Event Bus 중지
         - 데이터베이스 연결 종료
     """
+    global event_bus
+    
     # Startup
     print("=" * 60)
     print(f"{settings.app_title} Starting...")
@@ -47,6 +58,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠ Database connection failed: {e}")
 
+    # aiocache 초기화
+    try:
+        initialize_cache()
+        print("✓ Cache initialized")
+    except Exception as e:
+        print(f"⚠ Cache initialization failed: {e}")
+
+    # Event Bus 시작
+    try:
+        event_bus = RedisStreamsEventBus(
+            redis_url=settings.redis_url,
+            consumer_group="cache-service"
+        )
+        await event_bus.start()
+        set_event_bus(event_bus)  # 의존성 주입을 위해 설정
+        print("✓ Event Bus started")
+    except Exception as e:
+        print(f"⚠ Event Bus failed to start: {e}")
+
     print(f"✓ {settings.app_title} Started Successfully")
     print("=" * 60)
 
@@ -55,6 +85,15 @@ async def lifespan(app: FastAPI):
     # Shutdown
     print("=" * 60)
     print(f"{settings.app_title} Shutting Down...")
+    
+    # Event Bus 중지
+    if event_bus:
+        try:
+            await event_bus.stop()
+            print("✓ Event Bus stopped")
+        except Exception as e:
+            print(f"⚠ Event Bus stop error: {e}")
+    
     await engine.dispose()
     print("✓ Database connections closed")
     print("=" * 60)

@@ -29,6 +29,7 @@ aiohttp==3.9.1
 
 # ==================== Caching ====================
 aiocache==0.12.2  # Async caching library with Redis backend
+redis[hiredis]==5.0.1  # Redis async client (replaces aioredis for Python 3.12 compatibility)
 
 # ==================== AI Providers ====================
 google-generativeai==0.3.1  # Google Gemini

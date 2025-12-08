@@ -1,7 +1,7 @@
 # ==================== Multi-Stage Build ====================
 
 # Stage 1: Base Python Image
-FROM python:3.11-slim AS base
+FROM python:3.12-slim AS base
 
 # Set working directory
 WORKDIR /app
@@ -21,14 +21,16 @@ FROM base AS dependencies
 COPY backend/requirements.txt .
 
 # Install Python dependencies
+# Note: Python 3.12에서 distutils를 사용하려면 setuptools를 먼저 설치해야 함
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir setuptools && \
     pip install --no-cache-dir -r requirements.txt
 
 # ==================== Stage 3: Production ====================
 FROM base AS production
 
 # Copy installed packages from dependencies stage
-COPY --from=dependencies /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=dependencies /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=dependencies /usr/local/bin /usr/local/bin
 
 # Create app user (non-root)
