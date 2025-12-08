@@ -28,6 +28,16 @@ class CreateBookRequest(BaseModel):
         description="동화 테마 (adventure, education, fantasy, friendship 등)",
         example="adventure"
     )
+    is_public: bool = Field(
+        default=False,
+        description="공개 여부 (기본값: False)",
+        example=False
+    )
+    visibility: str = Field(
+        default="private",
+        description="공개 범위 (private, public) (기본값: private)",
+        example="private"
+    )
 
     class Config:
         json_schema_extra = {

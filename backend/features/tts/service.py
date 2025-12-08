@@ -86,14 +86,16 @@ class TTSService:
         except Exception as e:
             raise TTSGenerationFailedException(reason=str(e))
 
-        # 2. 스토리지 저장
+        # 2. 스토리지 저장 (경로 변경: users/{user_id}/audios/standalone/{uuid}.mp3)
         try:
-            file_name = f"audios/{user_id}/{uuid.uuid4()}.mp3"
-            file_url = await self.storage_service.save(
+            file_name = f"users/{user_id}/audios/standalone/{uuid.uuid4()}.mp3"
+            storage_url = await self.storage_service.save(
                 audio_bytes,
                 file_name,
                 content_type="audio/mpeg"
             )
+            # DB에 저장할 URL: API 경로로 변환
+            file_url = f"/api/v1/files/{file_name}"
         except Exception as e:
             raise TTSUploadFailedException(filename=file_name, reason=str(e))
 

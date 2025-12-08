@@ -100,3 +100,43 @@ async def get_current_user_object(
         return user
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid user ID format")
+
+
+async def get_optional_user_object(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    선택적 사용자 객체 반환 (인증되지 않은 경우 None)
+    
+    공개 파일 접근 시 사용
+    """
+    if credentials is None:
+        return None
+    
+    try:
+        # JWT 토큰 검증
+        payload = JWTManager.verify_token(credentials.credentials, token_type="access")
+        
+        if payload is None:
+            return None
+        
+        # user_id 추출
+        user_id: Optional[str] = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        # 사용자 객체 조회
+        from backend.features.auth.repository import UserRepository
+        import uuid
+        
+        user_repo = UserRepository(db)
+        try:
+            user_uuid = uuid.UUID(user_id)
+            user = await user_repo.get(user_uuid)
+            return user
+        except ValueError:
+            return None
+    except Exception:
+        # 인증 실패 시 None 반환 (공개 파일 접근 허용)
+        return None

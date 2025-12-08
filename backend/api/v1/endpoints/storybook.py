@@ -89,7 +89,9 @@ async def create_book(
         prompt=request.prompt,
         num_pages=request.num_pages,
         target_age=request.target_age,
-        theme=request.theme
+        theme=request.theme,
+        is_public=request.is_public,  # 기본값 False
+        visibility=request.visibility,  # 기본값 "private"
     )
     return book
 

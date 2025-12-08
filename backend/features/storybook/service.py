@@ -85,7 +85,9 @@ class BookOrchestratorService:
             title=generated_data.get("title", "Untitled Story"),
             target_age=target_age,
             theme=theme,
-            status=BookStatus.CREATING
+            status=BookStatus.CREATING,
+            is_public=is_public,
+            visibility=visibility,
         )
         
         try:
@@ -110,14 +112,16 @@ class BookOrchestratorService:
                     except Exception as e:
                         raise AIGenerationFailedException(stage="이미지", reason=str(e))
 
-                    # 스토리지 저장
+                    # 스토리지 저장 (경로 변경: users/{user_id}/books/{book_id}/images/page_{i+1}.png)
                     try:
-                        file_name = f"books/{book.id}/pages/{i+1}.png"
-                        image_url = await self.storage_service.save(
+                        file_name = f"users/{user_id}/books/{book.id}/images/page_{i+1}.png"
+                        storage_url = await self.storage_service.save(
                             image_bytes,
                             file_name,
                             content_type="image/png"
                         )
+                        # DB에 저장할 URL: API 경로로 변환
+                        image_url = f"/api/v1/files/{file_name}"
                     except Exception as e:
                         raise ImageUploadFailedException(filename=file_name, reason=str(e))
                 
@@ -160,12 +164,14 @@ class BookOrchestratorService:
                         raise AIGenerationFailedException(stage="음성", reason=str(e))
 
                     try:
-                        audio_file_name = f"books/{book.id}/pages/{i+1}.mp3"
-                        audio_url = await self.storage_service.save(
+                        audio_file_name = f"users/{user_id}/books/{book.id}/audios/page_{i+1}.mp3"
+                        storage_url = await self.storage_service.save(
                             audio_bytes,
                             audio_file_name,
                             content_type="audio/mpeg"
                         )
+                        # DB에 저장할 URL: API 경로로 변환
+                        audio_url = f"/api/v1/files/{audio_file_name}"
                     except Exception as e:
                         raise ImageUploadFailedException(filename=audio_file_name, reason=str(e))
 
@@ -219,13 +225,15 @@ class BookOrchestratorService:
         if len(stories) < 1 or len(stories) > 20:
             raise InvalidPageCountException(page_count=len(stories))
 
-        # 1. 책 엔티티 생성
+        # 1. 책 엔티티 생성 (기본값: is_public=False, visibility="private")
         book = await self.book_repo.create(
             user_id=user_id,
             title=stories[0][:20] if stories else "Untitled Story", # 첫 문장을 제목으로 임시 사용
             target_age="5-7", # 기본값
             theme="custom",
-            status=BookStatus.CREATING
+            status=BookStatus.CREATING,
+            is_public=False,  # 기본값
+            visibility="private",  # 기본값
         )
         
         try:
@@ -247,14 +255,16 @@ class BookOrchestratorService:
                 except Exception as e:
                     raise AIGenerationFailedException(stage="이미지", reason=str(e))
 
-                # 생성된 이미지 저장
+                # 생성된 이미지 저장 (경로 변경)
                 try:
-                    file_name = f"books/{book.id}/pages/{i+1}.png"
-                    image_url = await self.storage_service.save(
+                    file_name = f"users/{user_id}/books/{book.id}/images/page_{i+1}.png"
+                    storage_url = await self.storage_service.save(
                         generated_image_bytes,
                         file_name,
                         content_type="image/png"
                     )
+                    # DB에 저장할 URL: API 경로로 변환
+                    image_url = f"/api/v1/files/{file_name}"
                 except Exception as e:
                     raise ImageUploadFailedException(filename=file_name, reason=str(e))
                 
@@ -291,12 +301,14 @@ class BookOrchestratorService:
                         raise AIGenerationFailedException(stage="음성", reason=str(e))
 
                     try:
-                        audio_file_name = f"books/{book.id}/pages/{i+1}.mp3"
-                        audio_url = await self.storage_service.save(
+                        audio_file_name = f"users/{user_id}/books/{book.id}/audios/page_{i+1}.mp3"
+                        storage_url = await self.storage_service.save(
                             audio_bytes,
                             audio_file_name,
                             content_type="audio/mpeg"
                         )
+                        # DB에 저장할 URL: API 경로로 변환
+                        audio_url = f"/api/v1/files/{audio_file_name}"
                     except Exception as e:
                         raise ImageUploadFailedException(filename=audio_file_name, reason=str(e))
 

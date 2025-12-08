@@ -54,6 +54,22 @@ class Book(Base):
     # 기본 제공 책 여부 (공통 라이브러리)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # 공개/비공개 설정
+    is_public: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+        index=True,
+    )
+    visibility: Mapped[str] = mapped_column(
+        String(20),
+        default="private",
+        server_default="private",
+        nullable=False,
+        index=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
