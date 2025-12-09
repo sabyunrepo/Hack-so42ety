@@ -110,6 +110,15 @@ export const createVoiceClone = async ({
     formData.append("description", description);
   }
 
-  const response = await apiClient.post<VoiceCloneResponse>("/tts/voices/clone", formData);
+  // ✅ Content-Type을 명시적으로 제거하여 브라우저가 자동으로 multipart/form-data 설정하도록 함
+  const response = await apiClient.post<VoiceCloneResponse>(
+    "/tts/voices/clone", 
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
   return response.data;
 };
