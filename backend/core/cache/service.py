@@ -156,61 +156,85 @@ class CacheService:
     # 이벤트 핸들러들
     async def _handle_voice_created(self, event: Event) -> None:
         """Voice 생성 이벤트 처리"""
+        user_id = event.payload.get("user_id")
+        if not user_id:
+            logger.warning(f"Voice created event missing user_id: {event.event_id}")
+            return
+        
+        cache_key = f"tts:voices:{user_id}"
         logger.info(
             f"Voice created event received: {event.event_id}",
             extra={
                 "event_id": event.event_id,
                 "event_type": event.type.value,
-                "cache_key": "tts:voices",
+                "user_id": user_id,
+                "cache_key": cache_key,
             }
         )
-        await self.delete("tts:voices")
+        await self.delete(cache_key)
         logger.info(
-            f"Cache invalidated: tts:voices",
+            f"Cache invalidated: {cache_key}",
             extra={
                 "event_id": event.event_id,
                 "event_type": event.type.value,
-                "cache_key": "tts:voices",
+                "user_id": user_id,
+                "cache_key": cache_key,
             }
         )
     
     async def _handle_voice_updated(self, event: Event) -> None:
         """Voice 수정 이벤트 처리"""
+        user_id = event.payload.get("user_id")
+        if not user_id:
+            logger.warning(f"Voice updated event missing user_id: {event.event_id}")
+            return
+        
+        cache_key = f"tts:voices:{user_id}"
         logger.info(
             f"Voice updated event received: {event.event_id}",
             extra={
                 "event_id": event.event_id,
                 "event_type": event.type.value,
-                "cache_key": "tts:voices",
+                "user_id": user_id,
+                "cache_key": cache_key,
             }
         )
-        await self.delete("tts:voices")
+        await self.delete(cache_key)
         logger.info(
-            f"Cache invalidated: tts:voices",
+            f"Cache invalidated: {cache_key}",
             extra={
                 "event_id": event.event_id,
                 "event_type": event.type.value,
-                "cache_key": "tts:voices",
+                "user_id": user_id,
+                "cache_key": cache_key,
             }
         )
     
     async def _handle_voice_deleted(self, event: Event) -> None:
         """Voice 삭제 이벤트 처리"""
+        user_id = event.payload.get("user_id")
+        if not user_id:
+            logger.warning(f"Voice deleted event missing user_id: {event.event_id}")
+            return
+        
+        cache_key = f"tts:voices:{user_id}"
         logger.info(
             f"Voice deleted event received: {event.event_id}",
             extra={
                 "event_id": event.event_id,
                 "event_type": event.type.value,
-                "cache_key": "tts:voices",
+                "user_id": user_id,
+                "cache_key": cache_key,
             }
         )
-        await self.delete("tts:voices")
+        await self.delete(cache_key)
         logger.info(
-            f"Cache invalidated: tts:voices",
+            f"Cache invalidated: {cache_key}",
             extra={
                 "event_id": event.event_id,
                 "event_type": event.type.value,
-                "cache_key": "tts:voices",
+                "user_id": user_id,
+                "cache_key": cache_key,
             }
         )
 
