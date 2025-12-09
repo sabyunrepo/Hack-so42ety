@@ -104,12 +104,12 @@ export const createVoiceClone = async ({
   const formData = new FormData();
 
   formData.append("name", name.trim());
-  formData.append("file", file);
+  formData.append("audio_file", file);  // ✅ 백엔드와 일치하도록 'audio_file'로 변경
 
   if (description) {
     formData.append("description", description);
   }
 
-  const response = await apiClient.post<VoiceCloneResponse>("/tts/clone/create", formData);
+  const response = await apiClient.post<VoiceCloneResponse>("/tts/voices/clone", formData);
   return response.data;
 };

@@ -94,19 +94,7 @@ export default defineConfig({
     proxy: {
       // API 전체 프록시 (백엔드로)
       "/api": {
-        target: "http://localhost",
-        changeOrigin: true,
-      },
-      
-      // TTS API 프록시 (로컬 Docker)
-      "/tts": {
         target: "http://localhost:8000",
-        changeOrigin: true,
-      },
-
-      // Storybook API 프록시 (로컬 Docker)
-      "/storybook": {
-        target: "http://localhost:8001",
         changeOrigin: true,
       },
       // /data는 플러그인이 직접 서빙하므로 프록시 불필요

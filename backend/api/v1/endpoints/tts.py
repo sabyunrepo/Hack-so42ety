@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -179,10 +179,10 @@ async def list_voices(
     },
 )
 async def create_voice_clone(
-    name: str,
+    name: str = Form(...),
     audio_file: UploadFile = File(...),
-    description: str = None,
-    visibility: str = "private",
+    description: str = Form(None),
+    visibility: str = Form("private"),
     current_user: User = Depends(get_current_user),
     service: TTSService = Depends(get_tts_service),
 ):
@@ -228,6 +228,9 @@ async def create_voice_clone(
         audio_file: [binary audio data]
         ```
     """
+    # 디버깅: 받은 데이터 로깅
+    logger.info(f"Voice clone request - name: {name}, file: {audio_file.filename}, size: {audio_file.size}")
+    
     # 파일 읽기
     audio_bytes = await audio_file.read()
     
