@@ -21,7 +21,7 @@ class CacheService:
     def __init__(self, event_bus: EventBus):
         self.event_bus = event_bus
         self._cache = None
-        self._setup_event_handlers()
+        self._handlers_registered = False
     
     def _get_cache(self):
         """캐시 인스턴스 가져오기 (lazy initialization)"""
@@ -29,14 +29,25 @@ class CacheService:
             self._cache = caches.get("default")
         return self._cache
     
-    def _setup_event_handlers(self):
-        """이벤트 핸들러 등록"""
-        self.event_bus.subscribe(EventType.VOICE_CREATED, self._handle_voice_created)
-        self.event_bus.subscribe(EventType.VOICE_UPDATED, self._handle_voice_updated)
-        self.event_bus.subscribe(EventType.VOICE_DELETED, self._handle_voice_deleted)
+    async def _setup_event_handlers(self):
+        """이벤트 핸들러 등록 (비동기)"""
+        if self._handlers_registered:
+            return
+        
+        try:
+            await self.event_bus.subscribe(EventType.VOICE_CREATED, self._handle_voice_created)
+            await self.event_bus.subscribe(EventType.VOICE_UPDATED, self._handle_voice_updated)
+            await self.event_bus.subscribe(EventType.VOICE_DELETED, self._handle_voice_deleted)
+            self._handlers_registered = True
+            logger.info("Event handlers registered successfully")
+        except Exception as e:
+            logger.error(f"Failed to register event handlers: {e}", exc_info=True)
     
     async def get(self, key: str) -> Optional[Any]:
         """캐시 조회"""
+        # 이벤트 핸들러 등록 (최초 1회)
+        await self._setup_event_handlers()
+        
         start = time.time()
         try:
             cache = self._get_cache()
@@ -88,6 +99,9 @@ class CacheService:
     
     async def set(self, key: str, value: Any, ttl: int = 3600) -> None:
         """캐시 저장"""
+        # 이벤트 핸들러 등록 (최초 1회)
+        await self._setup_event_handlers()
+        
         start = time.time()
         try:
             cache = self._get_cache()
