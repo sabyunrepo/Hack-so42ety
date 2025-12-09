@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
+import logging
 
 from backend.core.database.session import get_db
 from backend.core.auth.dependencies import get_current_user_object as get_current_user
@@ -21,6 +22,8 @@ from backend.features.tts.schemas import (
 )
 from backend.features.tts.models import VoiceVisibility
 from fastapi import UploadFile, File
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
