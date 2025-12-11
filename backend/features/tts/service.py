@@ -100,8 +100,8 @@ class TTSService:
                 file_name,
                 content_type="audio/mpeg"
             )
-            # DB에 저장할 URL: API 경로로 변환
-            file_url = f"/api/v1/files/{file_name}"
+            # DB에 저장할 URL: API 경로 변환 없이 순수 경로 저장 (API에서 동적 생성)
+            file_url = file_name
         except Exception as e:
             raise TTSUploadFailedException(filename=file_name, reason=str(e))
 
@@ -350,7 +350,7 @@ class TTSService:
             audio_bytes = await tts_provider.text_to_speech(
                 text=word,
                 voice_id=voice_id,
-                model_id="eleven_multilingual_v2",
+                model_id="eleven_v3",
             )
         except (TTSAPIKeyNotConfiguredException, TTSAPIAuthenticationFailedException):
             raise

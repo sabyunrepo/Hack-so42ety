@@ -299,7 +299,7 @@ def custom_openapi():
 
     # JWT 보안 스키마 추가
     openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
+        "HTTPBearer": {
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "JWT",
