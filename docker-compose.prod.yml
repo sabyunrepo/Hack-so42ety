@@ -51,6 +51,13 @@ services:
 
   # ==================== Backend (Production Settings) ====================
   backend:
+    build:
+      context: .
+      dockerfile: ./docker/backend/Dockerfile
+    image: moriai-backend:latest
+    container_name: moriai-backend
+    restart: unless-stopped
+    init: true
     environment:
       - APP_ENV=prod
       - DEBUG=false
