@@ -7,9 +7,12 @@ import boto3
 from botocore.exceptions import ClientError
 from typing import Optional, BinaryIO, Union
 import mimetypes
+import logging
 
 from .base import AbstractStorageService
 from ...core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class S3StorageService(AbstractStorageService):
@@ -41,7 +44,13 @@ class S3StorageService(AbstractStorageService):
         path: str, 
         content_type: Optional[str] = None
     ) -> str:
-        """파일 S3 업로드"""
+        """
+        파일 S3 업로드
+        
+        Returns:
+            str: 파일 경로 (Pre-signed URL 아님)
+                 예: "shared/books/{id}/audios/page_1.mp3"
+        """
         # path 앞의 슬래시 제거
         key = path.lstrip("/")
         
@@ -67,11 +76,13 @@ class S3StorageService(AbstractStorageService):
                     key,
                     ExtraArgs={"ContentType": content_type}
                 )
-                
-            return self.get_url(key)
+            
+            # ✅ 경로만 반환 (Pre-signed URL 생성하지 않음)
+            # API 응답 시 get_url()로 동적 생성
+            return key
             
         except ClientError as e:
-            # TODO: 로깅 추가
+            logger.error(f"S3 upload failed for {key}: {e}")
             raise e
 
     async def get(self, path: str) -> bytes:
@@ -106,7 +117,36 @@ class S3StorageService(AbstractStorageService):
         except ClientError:
             return False
 
-    def get_url(self, path: str) -> str:
-        """파일 접근 URL 반환"""
+    def get_url(self, path: str, expires_in: Optional[int] = None) -> str:
+        """
+        Pre-signed URL 생성
+        
+        S3 버킷을 private으로 설정하고 Pre-signed URL로 임시 접근 권한 부여
+        
+        Args:
+            path: 파일 경로
+            expires_in: URL 만료 시간 (초). None이면 settings에서 가져옴
+        
+        Returns:
+            str: Pre-signed URL (만료 시간 포함)
+        """
         key = path.lstrip("/")
-        return f"{self.base_url}/{key}"
+        
+        if expires_in is None:
+            expires_in = settings.aws_s3_presigned_url_expiration
+        
+        try:
+            presigned_url = self.s3_client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': self.bucket_name,
+                    'Key': key
+                },
+                ExpiresIn=expires_in
+            )
+            logger.debug(f"Generated pre-signed URL for {key}, expires in {expires_in}s")
+            return presigned_url
+        except ClientError as e:
+            logger.error(f"Failed to generate pre-signed URL for {key}: {e}")
+            # Fallback: 공개 URL 반환 (버킷이 public일 경우)
+            return f"{self.base_url}/{key}"
