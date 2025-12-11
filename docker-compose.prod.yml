@@ -24,11 +24,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 2G
+          cpus: '0.5'
+          memory: 512M
         reservations:
-          cpus: '1'
-          memory: 1G
+          cpus: '0.25'
+          memory: 256M
     logging:
       driver: "json-file"
       options:
@@ -50,9 +50,9 @@ services:
     command: >
       sh -c "
       if [ -n \"$$REDIS_PASSWORD\" ]; then
-        redis-server --appendonly yes --appendfsync everysec --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass \"$$REDIS_PASSWORD\"
+        redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass \"$$REDIS_PASSWORD\"
       else
-        redis-server --appendonly yes --appendfsync everysec --maxmemory 512mb --maxmemory-policy allkeys-lru
+        redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
       fi
       "
     networks:
@@ -69,11 +69,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
+          cpus: '0.3'
           memory: 256M
+        reservations:
+          cpus: '0.15'
+          memory: 128M
     logging:
       driver: "json-file"
       options:
@@ -143,11 +143,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 2G
+          cpus: '0.8'
+          memory: 1536M
         reservations:
-          cpus: '1'
-          memory: 1G
+          cpus: '0.4'
+          memory: 768M
     logging:
       driver: "json-file"
       options:
@@ -168,11 +168,7 @@ services:
     restart: "no"
     networks:
       - moriai-network
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
+    # 리소스 제한 제거 - 빌드 후 자동 종료되는 일시적 컨테이너
     logging:
       driver: "json-file"
       options:
@@ -208,11 +204,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
+          cpus: '0.3'
           memory: 256M
+        reservations:
+          cpus: '0.15'
+          memory: 128M
     logging:
       driver: "json-file"
       options:
