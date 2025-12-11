@@ -87,3 +87,18 @@ class InvalidPageCountException(ValidationException):
             message=f"페이지 수는 {min_pages}~{max_pages} 사이여야 합니다",
             details={"requested": page_count, "min": min_pages, "max": max_pages},
         )
+
+
+class BookQuotaExceededException(BusinessLogicException):
+    """책 생성 한도 초과"""
+
+    def __init__(self, current_count: int, max_allowed: int, user_id: str):
+        super().__init__(
+            error_code=ErrorCode.BIZ_BOOK_QUOTA_EXCEEDED,
+            message=f"책 생성 한도를 초과했습니다 ({current_count}/{max_allowed}).",
+            details={
+                "current_count": current_count,
+                "max_allowed": max_allowed,
+                "user_id": user_id
+            },
+        )

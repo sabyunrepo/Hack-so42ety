@@ -4,8 +4,9 @@ Book Repository
 """
 
 import uuid
+from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,7 +51,9 @@ class BookRepository(AbstractRepository[Book]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_user_books(self, user_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[Book]:
+    async def get_user_books(
+        self, user_id: uuid.UUID, skip: int = 0, limit: int = 100
+    ) -> List[Book]:
         """
         사용자의 동화책 목록 조회 (다국어 데이터 포함)
 
@@ -121,7 +124,9 @@ class BookRepository(AbstractRepository[Book]):
         page_id: uuid.UUID,
         speaker: str,
         sequence: int,
-        translations: List[dict],  # [{"language_code": "en", "text": "...", "is_primary": True}, ...]
+        translations: List[
+            dict
+        ],  # [{"language_code": "en", "text": "...", "is_primary": True}, ...]
     ) -> Dialogue:
         """
         대사 추가 (다국어 번역 포함)
@@ -135,11 +140,7 @@ class BookRepository(AbstractRepository[Book]):
         Returns:
             Dialogue: 생성된 대사 (번역 포함)
         """
-        dialogue = Dialogue(
-            page_id=page_id,
-            speaker=speaker,
-            sequence=sequence
-        )
+        dialogue = Dialogue(page_id=page_id, speaker=speaker, sequence=sequence)
         self.session.add(dialogue)
         await self.session.flush()
 
@@ -149,7 +150,7 @@ class BookRepository(AbstractRepository[Book]):
                 dialogue_id=dialogue.id,
                 language_code=trans_data["language_code"],
                 text=trans_data["text"],
-                is_primary=trans_data.get("is_primary", False)
+                is_primary=trans_data.get("is_primary", False),
             )
             self.session.add(translation)
 
@@ -163,7 +164,7 @@ class BookRepository(AbstractRepository[Book]):
         language_code: str,
         voice_id: str,
         audio_url: str,
-        duration: Optional[float] = None
+        duration: Optional[float] = None,
     ) -> DialogueAudio:
         """
         대사 오디오 추가
@@ -183,9 +184,61 @@ class BookRepository(AbstractRepository[Book]):
             language_code=language_code,
             voice_id=voice_id,
             audio_url=audio_url,
-            duration=duration
+            duration=duration,
         )
         self.session.add(audio)
         await self.session.flush()
         await self.session.refresh(audio)
         return audio
+
+    # ==================== Quota Management Methods ====================
+
+    async def count_active_books(self, user_id: uuid.UUID) -> int:
+        """
+        사용자의 활성(삭제되지 않은) 도서 개수를 계산합니다.
+
+        Args:
+            user_id: 사용자 UUID
+
+        Returns:
+            int: 활성 도서의 개수
+        """
+        query = select(func.count(Book.id)).where(
+            Book.user_id == user_id,
+            Book.is_deleted == False,  # 삭제되지 않은 도서만 계산
+        )
+        result = await self.session.execute(query)
+        # 결과가 없을 경우 안전하게 0을 반환
+        return result.scalar() or 0
+
+    async def can_create_book(self, user_id: uuid.UUID, max_books: int) -> bool:
+        """
+        사용자가 새 도서를 생성할 수 있는지 확인합니다 (할당량 검사).
+
+        Args:
+            user_id: 사용자 UUID
+            max_books: 사용자의 등급에 허용된 최대 도서 개수
+
+        Returns:
+            bool: 생성 가능하면 True, 할당량을 초과했거나 같으면 False
+        """
+        current_count = await self.count_active_books(user_id)
+        return current_count < max_books
+
+    async def soft_delete(self, book_id: uuid.UUID) -> bool:
+        """
+        도서를 소프트 삭제합니다 (AbstractRepository의 update() 사용).
+
+        Args:
+            book_id: Book UUID
+
+        Returns:
+            bool: 성공적으로 업데이트되었으면 True, 도서가 발견되지 않았으면 False
+        """
+        # AbstractRepository의 update 메서드를 호출하여 is_deleted와 deleted_at을 업데이트합니다.
+        updated_book = await self.update(
+            book_id, is_deleted=True, deleted_at=datetime.utcnow()
+        )
+
+        # update()는 객체를 찾지 못하면 None을 반환하므로, None이 아니면 성공으로 간주합니다.
+        return updated_book is not None

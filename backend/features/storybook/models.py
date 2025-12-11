@@ -70,6 +70,19 @@ class Book(Base):
         index=True,
     )
 
+    # Soft delete support for quota tracking
+    is_deleted: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+        index=True,  # For fast quota queries: WHERE user_id = ? AND is_deleted = false
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )

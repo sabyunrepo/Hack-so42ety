@@ -175,23 +175,23 @@ db-backup-prod: ## 데이터베이스 백업 (프로덕션 환경)
 # ==================== Testing ====================
 test: ## 전체 테스트 실행 (개발 환경)
 	@echo "$(BLUE)Running all tests (dev)...$(NC)"
-	$(DOCKER_COMPOSE_DEV) exec backend pytest tests/ -v
+	$(DOCKER_COMPOSE_DEV) exec backend bash -c "cd backend && pytest tests/ -v"
 
 test-unit: ## 단위 테스트만 실행
 	@echo "$(BLUE)Running unit tests...$(NC)"
-	$(DOCKER_COMPOSE_DEV) exec backend pytest tests/unit/ -v
+	$(DOCKER_COMPOSE_DEV) exec backend bash -c "cd backend && pytest tests/unit/ -v"
 
 test-integration: ## 통합 테스트만 실행
 	@echo "$(BLUE)Running integration tests...$(NC)"
-	$(DOCKER_COMPOSE_DEV) exec backend pytest tests/integration/ -v
+	$(DOCKER_COMPOSE_DEV) exec backend bash -c "cd backend && pytest tests/integration/ -v"
 
 test-e2e: ## E2E 테스트 실행
 	@echo "$(BLUE)Running E2E tests...$(NC)"
-	$(DOCKER_COMPOSE_DEV) exec backend pytest tests/e2e/ -v
+	$(DOCKER_COMPOSE_DEV) exec backend bash -c "cd backend && pytest tests/e2e/ -v"
 
 test-coverage: ## 테스트 커버리지 리포트
 	@echo "$(BLUE)Generating test coverage report...$(NC)"
-	$(DOCKER_COMPOSE_DEV) exec backend pytest tests/ --cov=backend --cov-report=html --cov-report=term
+	$(DOCKER_COMPOSE_DEV) exec backend bash -c "cd backend && pytest tests/ --cov=backend --cov-report=html --cov-report=term"
 	@echo "$(GREEN)✓ Coverage report generated: htmlcov/index.html$(NC)"
 
 # ==================== Code Quality ====================
