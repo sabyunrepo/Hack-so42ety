@@ -165,6 +165,10 @@ class Settings(BaseSettings):
     )
     cors_allow_headers: str = Field(default="*", env="CORS_ALLOW_HEADERS")
 
+    # ==================== Business Logic ====================
+    max_books_per_user: int = Field(default=3, env="MAX_BOOKS_PER_USER")
+    max_pages_per_book: int = Field(default=5, env="MAX_PAGES_PER_BOOK")
+
     # ==================== Feature Flags ====================
     use_template_mode: bool = Field(default=False, env="USE_TEMPLATE_MODE")
 

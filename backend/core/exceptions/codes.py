@@ -85,6 +85,9 @@ class ErrorCode(str, Enum):
     BIZ_BOOK_INVALID_PAGE_COUNT = "BIZ_107"
     """잘못된 페이지 수입니다"""
 
+    BIZ_BOOK_QUOTA_EXCEEDED = "BIZ_108"
+    """책 생성 한도를 초과했습니다"""
+
     BIZ_TTS_GENERATION_FAILED = "BIZ_201"
     """음성 생성에 실패했습니다"""
 
