@@ -76,7 +76,35 @@ jobs:
             git pull origin dev
             
             echo "🔄 Stopping existing containers..."
-            docker compose -f docker-compose.yml down || true
+            # 1. 먼저 컨테이너 중지 (graceful shutdown)
+            docker compose -f docker-compose.yml stop || true
+            
+            # 2. 컨테이너 제거 및 네트워크 정리
+            docker compose -f docker-compose.yml down --remove-orphans || true
+            
+            # 3. 포트를 사용하는 남은 컨테이너 강제 종료
+            echo "🔍 Checking for containers using ports 6379, 5432, 80..."
+            for port in 6379 5432 80; do
+              container_id=$(docker ps -q --filter "publish=$port" || true)
+              if [ -n "$container_id" ]; then
+                echo "⚠️ Found container using port $port: $container_id"
+                docker stop $container_id || true
+                docker rm $container_id || true
+              fi
+            done
+            
+            # 4. 특정 컨테이너 이름으로 강제 제거 (혹시 모를 경우)
+            for container in moriai-redis moriai-postgres moriai-nginx moriai-backend moriai-frontend-builder; do
+              if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
+                echo "⚠️ Removing leftover container: $container"
+                docker stop $container || true
+                docker rm $container || true
+              fi
+            done
+            
+            # 5. 컨테이너가 완전히 종료될 때까지 대기
+            echo "⏳ Waiting for containers to fully stop (5s)..."
+            sleep 5
             
             echo "🏗️ Building images..."
             docker compose -f docker-compose.yml build --no-cache
@@ -282,7 +310,35 @@ jobs:
             git pull origin main
             
             echo "🔄 Stopping existing containers..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production down || true
+            # 1. 먼저 컨테이너 중지 (graceful shutdown)
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production stop || true
+            
+            # 2. 컨테이너 제거 및 네트워크 정리
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production down --remove-orphans || true
+            
+            # 3. 포트를 사용하는 남은 컨테이너 강제 종료
+            echo "🔍 Checking for containers using ports 6379, 5432, 80..."
+            for port in 6379 5432 80; do
+              container_id=$(docker ps -q --filter "publish=$port" || true)
+              if [ -n "$container_id" ]; then
+                echo "⚠️ Found container using port $port: $container_id"
+                docker stop $container_id || true
+                docker rm $container_id || true
+              fi
+            done
+            
+            # 4. 특정 컨테이너 이름으로 강제 제거 (혹시 모를 경우)
+            for container in moriai-redis-prod moriai-postgres-prod moriai-nginx-prod moriai-backend-prod moriai-frontend-builder-prod; do
+              if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
+                echo "⚠️ Removing leftover container: $container"
+                docker stop $container || true
+                docker rm $container || true
+              fi
+            done
+            
+            # 5. 컨테이너가 완전히 종료될 때까지 대기
+            echo "⏳ Waiting for containers to fully stop (5s)..."
+            sleep 5
             
             echo "🏗️ Building production images..."
             docker compose -f docker-compose.yml -f docker-compose.prod.yml build
