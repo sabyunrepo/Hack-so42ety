@@ -20,16 +20,39 @@ jobs:
       - name: 🔑 Setup SSH Key
         run: |
           mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # SSH Private Key 설정
           echo "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          # SSH known_hosts 설정 (타임아웃 및 오류 처리)
-          ssh-keyscan -p 23 -T 10 14.36.34.122 >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # SSH known_hosts 설정 (타임아웃 10초, 오류 무시)
+          echo "🔍 Scanning host key for 14.36.34.122:23..."
+          ssh-keyscan -p 23 -T 10 14.36.34.122 >> ~/.ssh/known_hosts 2>/dev/null || {
+            echo "⚠️ ssh-keyscan failed, but continuing..."
+          }
+          
           # SSH config 설정 (StrictHostKeyChecking)
           echo "Host 14.36.34.122" >> ~/.ssh/config
           echo "  Port 23" >> ~/.ssh/config
           echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
           echo "  UserKnownHostsFile ~/.ssh/known_hosts" >> ~/.ssh/config
+          echo "  ConnectTimeout 10" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
+          
+          echo "✅ SSH setup completed"
+      
+      - name: 🔍 Test SSH Connection
+        env:
+          DEV_HOST: "14.36.34.122"
+          DEV_PORT: "23"
+          DEV_USER: "${{ secrets.DEV_SSH_USER || 'ubuntu' }}"
+        run: |
+          echo "🔍 Testing SSH connection to ${DEV_USER}@${DEV_HOST}:${DEV_PORT}..."
+          ssh -p ${DEV_PORT} -o ConnectTimeout=10 ${DEV_USER}@${DEV_HOST} "echo '✅ SSH connection successful'" || {
+            echo "❌ SSH connection failed!"
+            exit 1
+          }
       
       - name: 📊 Deploy to Dev Server
         env:
@@ -97,15 +120,43 @@ jobs:
       - name: 🔑 Setup SSH Key
         run: |
           mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # SSH Private Key 설정
           echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          # SSH known_hosts 설정 (타임아웃 및 오류 처리)
-          ssh-keyscan -T 10 ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # PROD_HOST 확인
+          if [ -z "${{ secrets.PROD_HOST }}" ]; then
+            echo "❌ PROD_HOST is not set!"
+            exit 1
+          fi
+          
+          # SSH known_hosts 설정 (타임아웃 10초, 오류 무시)
+          echo "🔍 Scanning host key for ${{ secrets.PROD_HOST }}..."
+          ssh-keyscan -T 10 ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || {
+            echo "⚠️ ssh-keyscan failed, but continuing..."
+          }
+          
           # SSH config 설정 (StrictHostKeyChecking)
           echo "Host ${{ secrets.PROD_HOST }}" >> ~/.ssh/config
           echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
           echo "  UserKnownHostsFile ~/.ssh/known_hosts" >> ~/.ssh/config
+          echo "  ConnectTimeout 10" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
+          
+          echo "✅ SSH setup completed"
+      
+      - name: 🔍 Test SSH Connection
+        env:
+          PROD_HOST: "${{ secrets.PROD_HOST }}"
+          PROD_USER: "${{ secrets.PROD_SSH_USER || 'ubuntu' }}"
+        run: |
+          echo "🔍 Testing SSH connection to ${PROD_USER}@${PROD_HOST}..."
+          ssh -o ConnectTimeout=10 ${PROD_USER}@${PROD_HOST} "echo '✅ SSH connection successful'" || {
+            echo "❌ SSH connection failed!"
+            exit 1
+          }
       
       - name: 🗄️ Backup Database
         env:
