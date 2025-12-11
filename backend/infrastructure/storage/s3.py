@@ -38,6 +38,26 @@ class S3StorageService(AbstractStorageService):
         
         self.base_url = f"https://{self.bucket_name}.s3.{self.region_name}.amazonaws.com"
 
+    def _normalize_key(self, path: str) -> str:
+        """
+        경로를 S3 키로 정규화
+        
+        Local Storage 형식의 경로(/api/v1/files/...)를 S3 경로로 변환
+        
+        Args:
+            path: 파일 경로 (예: "/api/v1/files/shared/books/{id}/videos/page_1.mp4" 또는 "shared/books/{id}/videos/page_1.mp4")
+        
+        Returns:
+            str: S3 키 (예: "shared/books/{id}/videos/page_1.mp4")
+        """
+        key = path.lstrip("/")
+        
+        # /api/v1/files/ 접두사 제거 (Local Storage 형식인 경우)
+        if key.startswith("api/v1/files/"):
+            key = key[len("api/v1/files/"):]
+        
+        return key
+
     async def save(
         self, 
         file_data: Union[bytes, BinaryIO], 
@@ -87,7 +107,7 @@ class S3StorageService(AbstractStorageService):
 
     async def get(self, path: str) -> bytes:
         """파일 S3 다운로드"""
-        key = path.lstrip("/")
+        key = self._normalize_key(path)
         
         try:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
@@ -99,7 +119,7 @@ class S3StorageService(AbstractStorageService):
 
     async def delete(self, path: str) -> bool:
         """파일 S3 삭제"""
-        key = path.lstrip("/")
+        key = self._normalize_key(path)
         
         try:
             self.s3_client.delete_object(Bucket=self.bucket_name, Key=key)
@@ -109,7 +129,7 @@ class S3StorageService(AbstractStorageService):
 
     async def exists(self, path: str) -> bool:
         """파일 존재 여부 확인"""
-        key = path.lstrip("/")
+        key = self._normalize_key(path)
         
         try:
             self.s3_client.head_object(Bucket=self.bucket_name, Key=key)
@@ -124,13 +144,13 @@ class S3StorageService(AbstractStorageService):
         S3 버킷을 private으로 설정하고 Pre-signed URL로 임시 접근 권한 부여
         
         Args:
-            path: 파일 경로
+            path: 파일 경로 (예: "/api/v1/files/shared/books/{id}/videos/page_1.mp4" 또는 "shared/books/{id}/videos/page_1.mp4")
             expires_in: URL 만료 시간 (초). None이면 settings에서 가져옴
         
         Returns:
             str: Pre-signed URL (만료 시간 포함)
         """
-        key = path.lstrip("/")
+        key = self._normalize_key(path)
         
         if expires_in is None:
             expires_in = settings.aws_s3_presigned_url_expiration
