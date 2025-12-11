@@ -1,9 +1,21 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
 
 class GenerateSpeechRequest(BaseModel):
+    """TTS 음성 생성 요청 스키마"""
+    model_config = ConfigDict(
+        protected_namespaces=(),  # Suppress 'model_' namespace warning
+        json_schema_extra={
+            "example": {
+                "text": "안녕하세요. 오늘 날씨가 참 좋네요.",
+                "voice_id": "21m00Tcm4TlvDq8ikWAM",
+                "model_id": "eleven_multilingual_v2"
+            }
+        }
+    )
+    
     text: str = Field(
         ...,
         description="변환할 텍스트",
@@ -21,15 +33,6 @@ class GenerateSpeechRequest(BaseModel):
         description="모델 ID (기본값: eleven_multilingual_v2)",
         example="eleven_multilingual_v2"
     )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "text": "안녕하세요. 오늘 날씨가 참 좋네요.",
-                "voice_id": "21m00Tcm4TlvDq8ikWAM",
-                "model_id": "eleven_multilingual_v2"
-            }
-        }
 
 class AudioResponse(BaseModel):
     id: UUID = Field(..., description="오디오 고유 ID")

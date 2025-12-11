@@ -60,8 +60,9 @@ htmlcov/
 docker-compose.override.yml
 
 # ==================== Data ====================
-data/
+data/*
 !data/.gitkeep
+!data/shared/
 backups/
 *.log
 
@@ -97,3 +98,5 @@ dmypy.json
 
 # ==================== OS ====================
 Thumbs.db
+
+/backup_hackathon_20251130

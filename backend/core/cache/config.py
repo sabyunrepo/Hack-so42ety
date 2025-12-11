@@ -18,7 +18,7 @@ def get_cache_config() -> dict:
         "cache": Cache.REDIS,
         "endpoint": settings.redis_host,
         "port": settings.redis_port,
-        "timeout": 1,
+        "timeout": 10,  # Increased from 1 to 10 seconds for large file metadata caching
         "serializer": {
             "class": "aiocache.serializers.JsonSerializer"
         },
@@ -35,7 +35,7 @@ def get_cache_config_for_test() -> dict:
         "cache": Cache.REDIS,
         "endpoint": settings.redis_host,
         "port": settings.redis_port,
-        "timeout": 1,
+        "timeout": 10,  # Increased from 1 to 10 seconds for large file metadata caching
         "serializer": JsonSerializer(),
     }
 

@@ -127,7 +127,7 @@ class Voice(Base):
 
     # 공개 범위
     visibility: Mapped[VoiceVisibility] = mapped_column(
-        SQLEnum(VoiceVisibility, name="voicevisibility"),
+        SQLEnum(VoiceVisibility, name="voicevisibility", values_callable=lambda x: [e.value for e in x]),
         default=VoiceVisibility.PRIVATE,
         server_default="private",
         nullable=False,
@@ -136,7 +136,7 @@ class Voice(Base):
 
     # 생성 상태
     status: Mapped[VoiceStatus] = mapped_column(
-        SQLEnum(VoiceStatus, name="voicestatus"),
+        SQLEnum(VoiceStatus, name="voicestatus", values_callable=lambda x: [e.value for e in x]),
         default=VoiceStatus.PROCESSING,
         server_default="processing",
         nullable=False,
