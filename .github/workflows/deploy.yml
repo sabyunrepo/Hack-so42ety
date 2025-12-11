@@ -316,29 +316,73 @@ jobs:
             # 2. 컨테이너 제거 및 네트워크 정리
             docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production down --remove-orphans || true
             
-            # 3. 포트를 사용하는 남은 컨테이너 강제 종료
-            echo "🔍 Checking for containers using ports 6379, 5432, 80..."
-            for port in 6379 5432 80; do
-              container_id=$(docker ps -q --filter "publish=$port" || true)
-              if [ -n "$container_id" ]; then
-                echo "⚠️ Found container using port $port: $container_id"
-                docker stop $container_id || true
-                docker rm $container_id || true
-              fi
-            done
-            
-            # 4. 특정 컨테이너 이름으로 강제 제거 (혹시 모를 경우)
-            for container in moriai-redis-prod moriai-postgres-prod moriai-nginx-prod moriai-backend-prod moriai-frontend-builder-prod; do
+            # 3. 특정 컨테이너 이름으로 강제 제거 (혹시 모를 경우)
+            echo "🔍 Checking for leftover containers..."
+            for container in moriai-redis-prod moriai-postgres-prod moriai-nginx-prod moriai-backend-prod moriai-frontend-builder-prod moriai-cloudflared-prod; do
               if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
                 echo "⚠️ Removing leftover container: $container"
-                docker stop $container || true
-                docker rm $container || true
+                docker stop $container 2>/dev/null || true
+                docker rm -f $container 2>/dev/null || true
               fi
             done
             
-            # 5. 컨테이너가 완전히 종료될 때까지 대기
-            echo "⏳ Waiting for containers to fully stop (5s)..."
-            sleep 5
+            # 4. 호스트 포트를 직접 확인하고 해제 (더 정확한 방법)
+            echo "🔍 Checking for processes using ports 6379, 5432, 80..."
+            for port in 6379 5432 80; do
+              # ss 명령어로 포트 사용 프로세스 확인
+              if command -v ss >/dev/null 2>&1; then
+                pids=$(ss -tlnp | grep ":${port} " | grep -oP 'pid=\K[0-9]+' | sort -u || true)
+              elif command -v lsof >/dev/null 2>&1; then
+                pids=$(lsof -ti:${port} 2>/dev/null || true)
+              else
+                # netstat 사용 (구버전 호환)
+                pids=$(netstat -tlnp 2>/dev/null | grep ":${port} " | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' | sort -u || true)
+              fi
+              
+              if [ -n "$pids" ]; then
+                echo "⚠️ Found process(es) using port $port: $pids"
+                for pid in $pids; do
+                  # Docker 컨테이너 프로세스인지 확인
+                  if [ -f "/proc/${pid}/cgroup" ] && grep -q docker "/proc/${pid}/cgroup" 2>/dev/null; then
+                    echo "   → Killing Docker container process: $pid"
+                    kill -9 $pid 2>/dev/null || true
+                  else
+                    echo "   → Killing host process: $pid"
+                    kill -9 $pid 2>/dev/null || true
+                  fi
+                done
+                sleep 1
+              fi
+              
+              # Docker 컨테이너가 포트를 사용하는지 다시 확인
+              container_id=$(docker ps -a --format '{{.ID}}\t{{.Names}}\t{{.Ports}}' | grep -E ":(${port}|127\.0\.0\.1:${port})" | awk '{print $1}' | head -1 || true)
+              if [ -n "$container_id" ]; then
+                echo "⚠️ Found Docker container using port $port: $container_id"
+                docker stop $container_id 2>/dev/null || true
+                docker rm -f $container_id 2>/dev/null || true
+              fi
+            done
+            
+            # 5. 모든 moriai 관련 컨테이너 강제 제거
+            echo "🧹 Cleaning up all moriai containers..."
+            docker ps -a --filter "name=moriai" --format '{{.ID}}' | xargs -r docker rm -f 2>/dev/null || true
+            
+            # 6. 컨테이너와 포트가 완전히 해제될 때까지 대기
+            echo "⏳ Waiting for containers and ports to fully release (10s)..."
+            sleep 10
+            
+            # 7. 최종 포트 확인
+            echo "🔍 Final port check..."
+            for port in 6379 5432 80; do
+              if command -v ss >/dev/null 2>&1; then
+                if ss -tln | grep -q ":${port} "; then
+                  echo "⚠️ WARNING: Port $port is still in use!"
+                  ss -tlnp | grep ":${port} " || true
+                else
+                  echo "✓ Port $port is free"
+                fi
+              fi
+            done
             
             echo "🏗️ Building production images..."
             docker compose -f docker-compose.yml -f docker-compose.prod.yml build
