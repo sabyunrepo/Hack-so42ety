@@ -22,7 +22,14 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p 23 14.36.34.122 >> ~/.ssh/known_hosts
+          # SSH known_hosts 설정 (타임아웃 및 오류 처리)
+          ssh-keyscan -p 23 -T 10 14.36.34.122 >> ~/.ssh/known_hosts 2>/dev/null || true
+          # SSH config 설정 (StrictHostKeyChecking)
+          echo "Host 14.36.34.122" >> ~/.ssh/config
+          echo "  Port 23" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
+          echo "  UserKnownHostsFile ~/.ssh/known_hosts" >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
       
       - name: 📊 Deploy to Dev Server
         env:
@@ -92,7 +99,13 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+          # SSH known_hosts 설정 (타임아웃 및 오류 처리)
+          ssh-keyscan -T 10 ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          # SSH config 설정 (StrictHostKeyChecking)
+          echo "Host ${{ secrets.PROD_HOST }}" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
+          echo "  UserKnownHostsFile ~/.ssh/known_hosts" >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
       
       - name: 🗄️ Backup Database
         env:
