@@ -93,8 +93,18 @@ const Viewer: React.FC = () => {
   };
 
   // Helper to check if url is video
+  // Helper to check if url is video
   const isVideo = (url?: string) => {
-    return url?.toLowerCase().endsWith('.mp4');
+    if (!url) return false;
+    // Presigned URL에는 쿼리 파라미터가 포함되므로 endsWith 대신 includes 사용
+    // 또는 URL 객체로 파싱하여 pathname 확인이 더 정확함
+    try {
+      const urlObj = new URL(url);
+      return urlObj.pathname.toLowerCase().endsWith('.mp4');
+    } catch {
+      // URL 파싱 실패 시 단순 문자열 체크
+      return url.toLowerCase().includes('.mp4');
+    }
   };
 
   // Calculate total pages (cover + content pages + back cover)
