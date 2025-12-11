@@ -44,7 +44,13 @@ class S3StorageService(AbstractStorageService):
         path: str, 
         content_type: Optional[str] = None
     ) -> str:
-        """파일 S3 업로드"""
+        """
+        파일 S3 업로드
+        
+        Returns:
+            str: 파일 경로 (Pre-signed URL 아님)
+                 예: "shared/books/{id}/audios/page_1.mp3"
+        """
         # path 앞의 슬래시 제거
         key = path.lstrip("/")
         
@@ -70,11 +76,13 @@ class S3StorageService(AbstractStorageService):
                     key,
                     ExtraArgs={"ContentType": content_type}
                 )
-                
-            return self.get_url(key)
+            
+            # ✅ 경로만 반환 (Pre-signed URL 생성하지 않음)
+            # API 응답 시 get_url()로 동적 생성
+            return key
             
         except ClientError as e:
-            # TODO: 로깅 추가
+            logger.error(f"S3 upload failed for {key}: {e}")
             raise e
 
     async def get(self, path: str) -> bytes:

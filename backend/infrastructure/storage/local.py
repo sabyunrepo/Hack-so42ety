@@ -35,7 +35,13 @@ class LocalStorageService(AbstractStorageService):
         path: str, 
         content_type: Optional[str] = None
     ) -> str:
-        """파일 저장"""
+        """
+        파일 저장
+        
+        Returns:
+            str: 파일 경로
+                 예: "shared/books/{id}/audios/page_1.mp3"
+        """
         full_path = self.base_path / path
         
         # 상위 디렉토리 생성
@@ -51,8 +57,10 @@ class LocalStorageService(AbstractStorageService):
                 content = content.encode('utf-8')
             async with aiofiles.open(full_path, "wb") as f:
                 await f.write(content)
-                
-        return self.get_url(path)
+        
+        # ✅ 경로만 반환 (일관성 유지)
+        # API 응답 시 get_url()로 /api/v1/files/ 경로 생성
+        return path.lstrip("/")
 
     async def get(self, path: str) -> bytes:
         """파일 조회"""

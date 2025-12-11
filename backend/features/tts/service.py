@@ -361,14 +361,19 @@ class TTSService:
         
         # 6. 파일 저장
         try:
-            audio_url = await self.storage_service.save(
+            audio_path = await self.storage_service.save(
                 audio_bytes,
                 str(file_path),
                 content_type="audio/mpeg"
             )
-            # storage_service.save()가 반환하는 URL 그대로 사용
-            # Local: /api/v1/files/... 상대 경로
-            # S3: Pre-signed URL
+            # ✅ 경로만 저장됨
+            # Local: "shared/books/{id}/words/word.mp3"
+            # S3: "shared/books/{id}/words/word.mp3"
+            
+            # ✅ API 응답용 URL 생성
+            audio_url = self.storage_service.get_url(audio_path)
+            # Local: "/api/v1/files/shared/books/{id}/words/word.mp3"
+            # S3: "https://bucket.s3.amazonaws.com/.../word.mp3?Signature=..."
         except Exception as e:
             raise TTSUploadFailedException(
                 filename=str(file_path),
