@@ -293,7 +293,7 @@ def upgrade() -> None:
             '{book_1_id}'::uuid,
             '{system_user_id}'::uuid,
             'My Playground Day',
-            '/api/v1/files/shared/books/{book_1_id}/images/0_page_1.png',
+            '/shared/books/{book_1_id}/images/0_page_1.png',
             'completed',
             '{default_voice_id}',
             true,
@@ -306,11 +306,11 @@ def upgrade() -> None:
     
     # Book 1 Pages
     pages_book_1 = [
-        ('f4fe37c1-876b-4628-a3a4-f92112c96b26', 1, f'/api/v1/files/shared/books/{book_1_id}/videos/page_1.mp4'),
-        ('d2fc4c22-762f-44f9-904a-9d887718b5b0', 2, f'/api/v1/files/shared/books/{book_1_id}/videos/page_2.mp4'),
-        ('e4e92c8b-2654-4da5-8116-60325b599785', 3, f'/api/v1/files/shared/books/{book_1_id}/videos/page_3.mp4'),
-        ('418dcd35-92b8-4399-a109-f3e37d536f2c', 4, f'/api/v1/files/shared/books/{book_1_id}/videos/page_4.mp4'),
-        ('1b486846-cfe8-4b17-aeeb-23b01fd82c07', 5, f'/api/v1/files/shared/books/{book_1_id}/videos/page_5.mp4'),
+        ('f4fe37c1-876b-4628-a3a4-f92112c96b26', 1, f'/shared/books/{book_1_id}/videos/page_1.mp4'),
+        ('d2fc4c22-762f-44f9-904a-9d887718b5b0', 2, f'/shared/books/{book_1_id}/videos/page_2.mp4'),
+        ('e4e92c8b-2654-4da5-8116-60325b599785', 3, f'/shared/books/{book_1_id}/videos/page_3.mp4'),
+        ('418dcd35-92b8-4399-a109-f3e37d536f2c', 4, f'/shared/books/{book_1_id}/videos/page_4.mp4'),
+        ('1b486846-cfe8-4b17-aeeb-23b01fd82c07', 5, f'/shared/books/{book_1_id}/videos/page_5.mp4'),
     ]
     
     for page_id, seq, image_url in pages_book_1:
@@ -368,7 +368,7 @@ def upgrade() -> None:
                 '{dialogue_id}'::uuid,
                 'en',
                 'uzyfnLLlKo55AbgBU5uH',
-                '/api/v1/files/shared/books/{book_1_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
+                '/shared/books/{book_1_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
                 NOW(),
                 NOW()
             );
@@ -383,7 +383,7 @@ def upgrade() -> None:
             '{book_2_id}'::uuid,
             '{system_user_id}'::uuid,
             'My Mountain Adventure',
-            '/api/v1/files/shared/books/32e543c7-a845-4cfb-a93d-a0153dc9e063/images/0_page_1.png',
+            '/shared/books/32e543c7-a845-4cfb-a93d-a0153dc9e063/images/0_page_1.png',
             'completed',
             '{default_voice_id}',
             true,
@@ -396,10 +396,10 @@ def upgrade() -> None:
     
     # Book 2 Pages
     pages_book_2 = [
-        ('3baf370f-8f4c-4bef-b091-6c3f2bc34cd4', 1, f'/api/v1/files/shared/books/{book_2_id}/videos/page_1.mp4'),
-        ('7e409966-7aa9-4d8c-83a3-d344cba3a120', 2, f'/api/v1/files/shared/books/{book_2_id}/videos/page_2.mp4'),
-        ('ebe3f128-2e74-47e4-ab9a-80c2fffabe5c', 3, f'/api/v1/files/shared/books/{book_2_id}/videos/page_3.mp4'),
-        ('c0129b75-faea-4207-92db-606339c1a89f', 4, f'/api/v1/files/shared/books/{book_2_id}/videos/page_4.mp4'),
+        ('3baf370f-8f4c-4bef-b091-6c3f2bc34cd4', 1, f'/shared/books/{book_2_id}/videos/page_1.mp4'),
+        ('7e409966-7aa9-4d8c-83a3-d344cba3a120', 2, f'/shared/books/{book_2_id}/videos/page_2.mp4'),
+        ('ebe3f128-2e74-47e4-ab9a-80c2fffabe5c', 3, f'/shared/books/{book_2_id}/videos/page_3.mp4'),
+        ('c0129b75-faea-4207-92db-606339c1a89f', 4, f'/shared/books/{book_2_id}/videos/page_4.mp4'),
     ]
     
     for page_id, seq, image_url in pages_book_2:
@@ -456,7 +456,7 @@ def upgrade() -> None:
                 '{dialogue_id}'::uuid,
                 'en',
                 'uzyfnLLlKo55AbgBU5uH',
-                '/api/v1/files/shared/books/{book_2_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
+                '/shared/books/{book_2_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
                 NOW(),
                 NOW()
             );
