@@ -1,9 +1,21 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
 
 class GenerateSpeechRequest(BaseModel):
+    """TTS 음성 생성 요청 스키마"""
+    model_config = ConfigDict(
+        protected_namespaces=(),  # Suppress 'model_' namespace warning
+        json_schema_extra={
+            "example": {
+                "text": "안녕하세요. 오늘 날씨가 참 좋네요.",
+                "voice_id": "21m00Tcm4TlvDq8ikWAM",
+                "model_id": "eleven_multilingual_v2"
+            }
+        }
+    )
+    
     text: str = Field(
         ...,
         description="변환할 텍스트",
@@ -21,15 +33,6 @@ class GenerateSpeechRequest(BaseModel):
         description="모델 ID (기본값: eleven_multilingual_v2)",
         example="eleven_multilingual_v2"
     )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "text": "안녕하세요. 오늘 날씨가 참 좋네요.",
-                "voice_id": "21m00Tcm4TlvDq8ikWAM",
-                "model_id": "eleven_multilingual_v2"
-            }
-        }
 
 class AudioResponse(BaseModel):
     id: UUID = Field(..., description="오디오 고유 ID")
@@ -103,5 +106,29 @@ class VoiceResponse(BaseModel):
                 "visibility": "private",
                 "status": "completed",
                 "is_custom": True
+            }
+        }
+
+
+class WordTTSResponse(BaseModel):
+    """단어 TTS 생성 응답 스키마"""
+    success: bool = Field(..., description="성공 여부", example=True)
+    word: str = Field(..., description="변환된 단어", example="hello")
+    file_path: str = Field(..., description="파일 시스템 경로", example="/data/shared/books/{book_id}/words/hello.mp3")
+    audio_url: str = Field(..., description="API 접근 URL", example="/api/v1/files/shared/books/{book_id}/words/hello.mp3")
+    cached: bool = Field(..., description="캐시 사용 여부", example=False)
+    duration_ms: Optional[int] = Field(None, description="생성 소요 시간 (밀리초)", example=245)
+    voice_id: str = Field(..., description="사용된 음성 ID", example="uzyfnLLlKo55AbgBU5uH")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "word": "hello",
+                "file_path": "/data/shared/books/32e543c7-a845-4cfb-a93d-a0153dc9e063/words/hello.mp3",
+                "audio_url": "/api/v1/files/shared/books/32e543c7-a845-4cfb-a93d-a0153dc9e063/words/hello.mp3",
+                "cached": False,
+                "duration_ms": 245,
+                "voice_id": "uzyfnLLlKo55AbgBU5uH"
             }
         }

@@ -125,7 +125,7 @@ class Settings(BaseSettings):
     # ==================== Storage ====================
     storage_provider: str = Field(default="local", env="STORAGE_PROVIDER")
     storage_base_path: str = Field(default="/app/data", env="STORAGE_BASE_PATH")
-    storage_base_url: str = Field(default="http://localhost:8000/static", env="STORAGE_BASE_URL")
+    storage_base_url: str = Field(default="/api/v1/files", env="STORAGE_BASE_URL")
 
     # AWS S3 (if STORAGE_PROVIDER=s3)
     aws_access_key_id: Optional[str] = Field(default=None, env="AWS_ACCESS_KEY_ID")
@@ -134,6 +134,9 @@ class Settings(BaseSettings):
     )
     aws_s3_bucket_name: Optional[str] = Field(default=None, env="AWS_S3_BUCKET_NAME")
     aws_s3_region: str = Field(default="ap-northeast-2", env="AWS_S3_REGION")
+    aws_s3_presigned_url_expiration: int = Field(
+        default=3600, env="AWS_S3_PRESIGNED_URL_EXPIRATION"
+    )  # Pre-signed URL 만료 시간 (초, 기본 1시간)
 
     # ==================== Redis Cache & Event Bus ====================
     redis_host: str = Field(default="redis", env="REDIS_HOST")

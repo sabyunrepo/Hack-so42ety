@@ -112,16 +112,17 @@ class BookOrchestratorService:
                     except Exception as e:
                         raise AIGenerationFailedException(stage="이미지", reason=str(e))
 
-                    # 스토리지 저장 (경로 변경: users/{user_id}/books/{book_id}/images/page_{i+1}.png)
+                    # 스토리지 저장 (Book의 base_path 사용)
                     try:
-                        file_name = f"users/{user_id}/books/{book.id}/images/page_{i+1}.png"
-                        storage_url = await self.storage_service.save(
+                        file_name = f"{book.base_path}/images/page_{i+1}.png"
+                        image_url = await self.storage_service.save(
                             image_bytes,
                             file_name,
                             content_type="image/png"
                         )
-                        # DB에 저장할 URL: API 경로로 변환
-                        image_url = f"/api/v1/files/{file_name}"
+                        # storage_service.save()가 반환하는 URL 그대로 사용
+                        # Local: /api/v1/files/...
+                        # S3: Pre-signed URL
                     except Exception as e:
                         raise ImageUploadFailedException(filename=file_name, reason=str(e))
                 
@@ -164,14 +165,13 @@ class BookOrchestratorService:
                         raise AIGenerationFailedException(stage="음성", reason=str(e))
 
                     try:
-                        audio_file_name = f"users/{user_id}/books/{book.id}/audios/page_{i+1}.mp3"
-                        storage_url = await self.storage_service.save(
+                        audio_file_name = f"{book.base_path}/audios/page_{i+1}.mp3"
+                        audio_url = await self.storage_service.save(
                             audio_bytes,
                             audio_file_name,
                             content_type="audio/mpeg"
                         )
-                        # DB에 저장할 URL: API 경로로 변환
-                        audio_url = f"/api/v1/files/{audio_file_name}"
+                        # storage_service.save()가 반환하는 URL 그대로 사용
                     except Exception as e:
                         raise ImageUploadFailedException(filename=audio_file_name, reason=str(e))
 
@@ -255,16 +255,15 @@ class BookOrchestratorService:
                 except Exception as e:
                     raise AIGenerationFailedException(stage="이미지", reason=str(e))
 
-                # 생성된 이미지 저장 (경로 변경)
+                # 생성된 이미지 저장 (Book의 base_path 사용)
                 try:
-                    file_name = f"users/{user_id}/books/{book.id}/images/page_{i+1}.png"
-                    storage_url = await self.storage_service.save(
+                    file_name = f"{book.base_path}/images/page_{i+1}.png"
+                    image_url = await self.storage_service.save(
                         generated_image_bytes,
                         file_name,
                         content_type="image/png"
                     )
-                    # DB에 저장할 URL: API 경로로 변환
-                    image_url = f"/api/v1/files/{file_name}"
+                    # storage_service.save()가 반환하는 URL 그대로 사용
                 except Exception as e:
                     raise ImageUploadFailedException(filename=file_name, reason=str(e))
                 
@@ -301,14 +300,13 @@ class BookOrchestratorService:
                         raise AIGenerationFailedException(stage="음성", reason=str(e))
 
                     try:
-                        audio_file_name = f"users/{user_id}/books/{book.id}/audios/page_{i+1}.mp3"
-                        storage_url = await self.storage_service.save(
+                        audio_file_name = f"{book.base_path}/audios/page_{i+1}.mp3"
+                        audio_url = await self.storage_service.save(
                             audio_bytes,
                             audio_file_name,
                             content_type="audio/mpeg"
                         )
-                        # DB에 저장할 URL: API 경로로 변환
-                        audio_url = f"/api/v1/files/{audio_file_name}"
+                        # storage_service.save()가 반환하는 URL 그대로 사용
                     except Exception as e:
                         raise ImageUploadFailedException(filename=audio_file_name, reason=str(e))
 

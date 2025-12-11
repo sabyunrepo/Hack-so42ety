@@ -17,15 +17,10 @@ export default defineConfig({
     proxy: {
       // API 요청은 nginx를 통해 백엔드로 전달
       "/api": {
-        target: "http://localhost",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
-      
-      // 파일 서빙도 백엔드에서 처리
-      "/data": {
-        target: "http://localhost",
-        changeOrigin: true,
-      },
+      // /data는 플러그인이 직접 서빙하므로 프록시 불필요
     },
   },
 });
