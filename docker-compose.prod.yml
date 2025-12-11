@@ -7,7 +7,6 @@ services:
       # Remove source code mount for production (rely on image)
       # Only mount data and backup
       - app-data:/app/data
-      - /Users/byeonsanghun/goinfre/Hack-so42ety/backup_hackathon_20251130/data:/app/backup_data
 
   nginx:
     build:

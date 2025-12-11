@@ -83,21 +83,31 @@ const LoginPage = () => {
             </div>
 
             <div className="mt-6 flex justify-center">
-              <GoogleLogin
-                onSuccess={async (credentialResponse) => {
-                  if (credentialResponse.credential) {
-                    try {
-                      await googleLogin(credentialResponse.credential);
-                      navigate("/");
-                    } catch (err) {
-                      setError(getUserFriendlyErrorMessage(err));
+              {/* Google OAuth - 에러 핸들링 개선 */}
+              <div className="w-full">
+                <GoogleLogin
+                  onSuccess={async (credentialResponse) => {
+                    if (credentialResponse.credential) {
+                      try {
+                        await googleLogin(credentialResponse.credential);
+                        navigate("/");
+                      } catch (err) {
+                        console.error("Google login error:", err);
+                        setError(getUserFriendlyErrorMessage(err));
+                      }
                     }
-                  }
-                }}
-                onError={() => {
-                  setError("Google 로그인에 실패했습니다");
-                }}
-              />
+                  }}
+                  onError={() => {
+                    console.error("Google OAuth 403 - 테스트 사용자 설정을 확인하세요");
+                    setError("Google 로그인 오류: OAuth 동의 화면에서 테스트 사용자를 추가해주세요");
+                  }}
+                  useOneTap={false}
+                  theme="outline"
+                  size="large"
+                  text="continue_with"
+                  width="100%"
+                />
+              </div>
             </div>
           </div>
         </form>
