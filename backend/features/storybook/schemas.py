@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict
 from uuid import UUID
 from datetime import datetime
+from backend.core.config import settings
 
 class CreateBookRequest(BaseModel):
     prompt: str = Field(
@@ -14,10 +15,17 @@ class CreateBookRequest(BaseModel):
     num_pages: int = Field(
         default=5,
         ge=1,
-        le=20,
         description="생성할 페이지 수",
         example=5
     )
+
+    @field_validator("num_pages")
+    @classmethod
+    def validate_num_pages(cls, v: int) -> int:
+        """페이지 수 검증"""
+        if v > settings.max_pages_per_book:
+            raise ValueError(f"페이지 수는 {settings.max_pages_per_book} 이하여야 합니다")
+        return v
     target_age: str = Field(
         default="5-7",
         description="대상 연령대",

@@ -211,20 +211,6 @@ class BookRepository(AbstractRepository[Book]):
         # 결과가 없을 경우 안전하게 0을 반환
         return result.scalar() or 0
 
-    async def can_create_book(self, user_id: uuid.UUID, max_books: int) -> bool:
-        """
-        사용자가 새 도서를 생성할 수 있는지 확인합니다 (할당량 검사).
-
-        Args:
-            user_id: 사용자 UUID
-            max_books: 사용자의 등급에 허용된 최대 도서 개수
-
-        Returns:
-            bool: 생성 가능하면 True, 할당량을 초과했거나 같으면 False
-        """
-        current_count = await self.count_active_books(user_id)
-        return current_count < max_books
-
     async def soft_delete(self, book_id: uuid.UUID) -> bool:
         """
         도서를 소프트 삭제합니다 (AbstractRepository의 update() 사용).
@@ -241,4 +227,4 @@ class BookRepository(AbstractRepository[Book]):
         )
 
         # update()는 객체를 찾지 못하면 None을 반환하므로, None이 아니면 성공으로 간주합니다.
-        return updated_book is not None
+        return updated_book
