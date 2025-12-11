@@ -26,18 +26,20 @@ jobs:
           echo "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          # SSH known_hosts 설정 (타임아웃 10초, 오류 무시)
+          # SSH known_hosts 설정
           echo "🔍 Scanning host key for 14.36.34.122:23..."
-          ssh-keyscan -p 23 -T 10 14.36.34.122 >> ~/.ssh/known_hosts 2>/dev/null || {
-            echo "⚠️ ssh-keyscan failed, but continuing..."
-          }
+          ssh-keyscan -p 23 -T 10 14.36.34.122 >> ~/.ssh/known_hosts 2>/dev/null || echo "⚠️ ssh-keyscan failed, but continuing..."
           
-          # SSH config 설정 (StrictHostKeyChecking)
-          echo "Host 14.36.34.122" >> ~/.ssh/config
-          echo "  Port 23" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
-          echo "  UserKnownHostsFile ~/.ssh/known_hosts" >> ~/.ssh/config
-          echo "  ConnectTimeout 10" >> ~/.ssh/config
+          # SSH config 설정
+          cat > ~/.ssh/config << 'EOF'
+          Host 14.36.34.122
+            Port 23
+            StrictHostKeyChecking accept-new
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ConnectTimeout 30
+            ServerAliveInterval 60
+            ServerAliveCountMax 3
+          EOF
           chmod 600 ~/.ssh/config
           
           echo "✅ SSH setup completed"
@@ -49,7 +51,7 @@ jobs:
           DEV_USER: "${{ secrets.DEV_SSH_USER || 'ubuntu' }}"
         run: |
           echo "🔍 Testing SSH connection to ${DEV_USER}@${DEV_HOST}:${DEV_PORT}..."
-          ssh -p ${DEV_PORT} -o ConnectTimeout=10 ${DEV_USER}@${DEV_HOST} "echo '✅ SSH connection successful'" || {
+          ssh -p ${DEV_PORT} ${DEV_USER}@${DEV_HOST} "echo '✅ SSH connection successful'" || {
             echo "❌ SSH connection failed!"
             exit 1
           }
@@ -117,14 +119,21 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
       
+      - name: 🔍 Check Runner IP
+        run: |
+          echo "🔍 GitHub Actions Runner 정보:"
+          echo "Runner IP: $(curl -s --max-time 5 https://api.ipify.org || echo '확인 불가')"
+          echo ""
+          echo "GitHub Actions IP 범위 (일부):"
+          curl -s --max-time 5 https://api.github.com/meta | jq -r '.actions[]' | head -5 || echo "확인 불가"
+          echo ""
+      
       - name: 🔑 Setup SSH Key
+        env:
+          PROD_HOST: "${{ secrets.PROD_HOST }}"
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          
-          # SSH Private Key 설정
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
           
           # PROD_HOST 확인
           if [ -z "${{ secrets.PROD_HOST }}" ]; then
@@ -132,31 +141,116 @@ jobs:
             exit 1
           fi
           
-          # SSH known_hosts 설정 (타임아웃 10초, 오류 무시)
+          echo "📋 설정 정보:"
+          echo "  PROD_HOST: ${{ secrets.PROD_HOST }}"
+          echo "  PROD_USER: ${{ secrets.PROD_SSH_USER || 'ubuntu' }}"
+          echo ""
+          
+          # SSH Private Key 설정
+          echo "🔑 Setting up SSH Private Key..."
+          if [ -z "${{ secrets.PROD_SSH_KEY }}" ]; then
+            echo "❌ PROD_SSH_KEY is not set!"
+            exit 1
+          fi
+          
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          # SSH Key 유효성 확인
+          if ! head -1 ~/.ssh/id_rsa | grep -q "BEGIN.*PRIVATE KEY"; then
+            echo "❌ SSH Key 형식이 올바르지 않습니다!"
+            echo "첫 줄: $(head -1 ~/.ssh/id_rsa)"
+            exit 1
+          fi
+          
+          echo "✅ SSH Key 설정 완료"
+          echo ""
+          
+          # SSH known_hosts 설정
           echo "🔍 Scanning host key for ${{ secrets.PROD_HOST }}..."
           ssh-keyscan -T 10 ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || {
             echo "⚠️ ssh-keyscan failed, but continuing..."
           }
           
-          # SSH config 설정 (StrictHostKeyChecking)
-          echo "Host ${{ secrets.PROD_HOST }}" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
-          echo "  UserKnownHostsFile ~/.ssh/known_hosts" >> ~/.ssh/config
-          echo "  ConnectTimeout 10" >> ~/.ssh/config
+          # SSH config 설정 (최적화)
+          cat > ~/.ssh/config << EOF
+          Host ${{ secrets.PROD_HOST }}
+            User ${{ secrets.PROD_SSH_USER || 'ubuntu' }}
+            StrictHostKeyChecking accept-new
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ConnectTimeout 60
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+            TCPKeepAlive yes
+            LogLevel ERROR
+          EOF
           chmod 600 ~/.ssh/config
           
-          echo "✅ SSH setup completed"
+          echo "✅ SSH config 설정 완료"
+          echo ""
+          echo "📋 SSH config 내용:"
+          cat ~/.ssh/config
+          echo ""
       
-      - name: 🔍 Test SSH Connection
+      - name: 🔍 Test SSH Connection (상세 디버깅)
         env:
           PROD_HOST: "${{ secrets.PROD_HOST }}"
-          PROD_USER: "${{ secrets.PROD_SSH_USER || 'ubuntu' }}"
+          PROD_USER: "${{ secrets.PROD_SSH_USER || 'sabyun' }}"
         run: |
-          echo "🔍 Testing SSH connection to ${PROD_USER}@${PROD_HOST}..."
-          ssh -o ConnectTimeout=10 ${PROD_USER}@${PROD_HOST} "echo '✅ SSH connection successful'" || {
-            echo "❌ SSH connection failed!"
+          echo "🔍 SSH 연결 테스트 시작..."
+          echo ""
+          echo "📋 연결 정보:"
+          echo "  Host: ${PROD_HOST}"
+          echo "  User: ${PROD_USER}"
+          echo "  Port: 22"
+          echo ""
+          
+          # 포트 연결 테스트
+          echo "🔍 포트 22 연결 테스트..."
+          if command -v nc &> /dev/null; then
+            timeout 10 nc -zv ${PROD_HOST} 22 2>&1 || echo "⚠️ 포트 연결 실패"
+          else
+            timeout 10 bash -c "</dev/tcp/${PROD_HOST}/22" 2>&1 || echo "⚠️ 포트 연결 실패"
+          fi
+          echo ""
+          
+          # SSH 연결 테스트 (상세 로그)
+          echo "🔍 SSH 연결 테스트 (상세 모드)..."
+          SSH_OUTPUT=$(ssh -v -o ConnectTimeout=60 -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} "echo '✅ SSH connection successful'" 2>&1)
+          SSH_EXIT_CODE=$?
+          
+          if [ $SSH_EXIT_CODE -eq 0 ]; then
+            echo "✅ SSH connection successful!"
+            echo "$SSH_OUTPUT" | grep -E "(Authenticated|successful)" || echo "$SSH_OUTPUT"
+          else
+            echo "❌ SSH connection failed! (exit code: $SSH_EXIT_CODE)"
+            echo ""
+            echo "📋 상세 오류 로그:"
+            echo "$SSH_OUTPUT" | tail -20
+            echo ""
+            
+            # 오류 분석
+            if echo "$SSH_OUTPUT" | grep -qi "Connection timed out"; then
+              echo "🔍 원인: Connection timed out"
+              echo "  → 네트워크 레벨에서 연결 차단"
+              echo "  → Security Group 또는 Network ACL 확인 필요"
+            elif echo "$SSH_OUTPUT" | grep -qi "Connection refused"; then
+              echo "🔍 원인: Connection refused"
+              echo "  → SSH 서비스가 실행 중이지 않거나 포트가 다름"
+            elif echo "$SSH_OUTPUT" | grep -qi "Permission denied"; then
+              echo "🔍 원인: Permission denied"
+              echo "  → SSH Key 인증 실패"
+              echo "  → GitHub Secrets의 PROD_SSH_KEY 확인 필요"
+            fi
+            echo ""
+            echo "🔧 해결 방법:"
+            echo "  1. AWS Console → EC2 → Security Groups"
+            echo "  2. 인스턴스의 Security Group (sg-0bd8f1b8b2a2bf792) 선택"
+            echo "  3. Inbound Rules 확인: SSH (22) 0.0.0.0/0 허용"
+            echo "  4. VPC → Network ACLs → SSH (22) 포트 명시적 허용 확인"
+            echo ""
             exit 1
-          }
+          fi
       
       - name: 🗄️ Backup Database
         env:
@@ -214,7 +308,7 @@ jobs:
         run: |
           echo "🏥 Checking production service health..."
           sleep 5
-          curl -f http://${PROD_HOST}/api/health || echo "⚠️ Health check failed"
+          curl -f --max-time 10 http://${PROD_HOST}/api/health || echo "⚠️ Health check failed"
       
       - name: 📊 Check Service Status
         env:
