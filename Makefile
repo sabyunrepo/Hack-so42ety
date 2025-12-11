@@ -1,6 +1,7 @@
 .PHONY: help setup dev prod test clean migrate backup down \
 	dev-build dev-logs dev-logs-backend dev-logs-nginx dev-stop dev-down dev-restart \
 	prod-build prod-logs prod-logs-backend prod-logs-nginx prod-logs-cloudflared prod-stop prod-down prod-restart \
+	prod-deploy prod-update prod-health prod-status prod-pull \
 	db-shell db-shell-prod db-migrate db-migrate-prod db-rollback db-rollback-prod db-reset db-backup db-backup-prod \
 	test-unit test-integration test-e2e test-coverage lint format format-check \
 	frontend-dev frontend-build frontend-test \
@@ -118,6 +119,116 @@ prod-down: ## 프로덕션 모드 중지 및 컨테이너 제거
 prod-restart: ## 프로덕션 모드 재시작
 	@echo "$(BLUE)Restarting production environment...$(NC)"
 	$(DOCKER_COMPOSE_PROD) restart
+
+prod-deploy: ## 🚀 프로덕션 초기 배포 (환경 설정 + 빌드 + 실행 + 마이그레이션)
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)🚀 Production Deployment Starting...$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 1/5: Checking environment...$(NC)"
+	@if [ ! -f .env.production ]; then \
+		echo "$(RED)❌ .env.production not found!$(NC)"; \
+		echo "$(YELLOW)Creating from template...$(NC)"; \
+		cp .env.production.example .env.production; \
+		echo "$(YELLOW)⚠️  Please edit .env.production with your credentials$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✓ Environment file found$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 2/5: Pulling latest code...$(NC)"
+	git pull origin main
+	@echo "$(GREEN)✓ Code updated$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 3/5: Building production images...$(NC)"
+	$(DOCKER_COMPOSE_PROD) build --no-cache
+	@echo "$(GREEN)✓ Images built$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 4/5: Starting services...$(NC)"
+	$(DOCKER_COMPOSE_PROD) up -d
+	@echo "$(GREEN)✓ Services started$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 5/5: Running database migrations...$(NC)"
+	@sleep 10
+	$(DOCKER_COMPOSE_PROD) exec -T backend alembic upgrade head
+	@echo "$(GREEN)✓ Migrations completed$(NC)"
+	@echo ""
+	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(GREEN)🎉 Deployment completed successfully!$(NC)"
+	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(BLUE)Run 'make prod-status' to check service health$(NC)"
+
+prod-update: ## 🔄 프로덕션 업데이트 (코드 업데이트 + 재빌드 + 재시작 + 마이그레이션)
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)🔄 Production Update Starting...$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 1/6: Backing up database...$(NC)"
+	$(MAKE) db-backup-prod
+	@echo "$(GREEN)✓ Database backed up$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 2/6: Pulling latest code...$(NC)"
+	git pull origin main
+	@echo "$(GREEN)✓ Code updated$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 3/6: Rebuilding images...$(NC)"
+	$(DOCKER_COMPOSE_PROD) build
+	@echo "$(GREEN)✓ Images rebuilt$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 4/6: Restarting services...$(NC)"
+	$(DOCKER_COMPOSE_PROD) up -d --force-recreate
+	@echo "$(GREEN)✓ Services restarted$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 5/6: Running migrations...$(NC)"
+	@sleep 10
+	$(DOCKER_COMPOSE_PROD) exec -T backend alembic upgrade head
+	@echo "$(GREEN)✓ Migrations completed$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 6/6: Checking service health...$(NC)"
+	$(MAKE) prod-health
+	@echo ""
+	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(GREEN)🎉 Update completed successfully!$(NC)"
+	@echo "$(GREEN)========================================$(NC)"
+
+prod-pull: ## 📥 코드 업데이트만 (Git Pull)
+	@echo "$(BLUE)Pulling latest code...$(NC)"
+	git pull origin main
+	@echo "$(GREEN)✓ Code updated$(NC)"
+	@echo "$(YELLOW)Run 'make prod-update' to apply changes$(NC)"
+
+prod-health: ## 🏥 프로덕션 서비스 헬스체크
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)🏥 Production Health Check$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Backend API:$(NC)"
+	@curl -f http://localhost/api/health 2>/dev/null && echo " $(GREEN)✓ OK$(NC)" || echo " $(RED)✗ Failed$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Nginx:$(NC)"
+	@curl -f http://localhost 2>/dev/null > /dev/null && echo " $(GREEN)✓ OK$(NC)" || echo " $(RED)✗ Failed$(NC)"
+	@echo ""
+	@echo "$(YELLOW)PostgreSQL:$(NC)"
+	@$(DOCKER_COMPOSE_PROD) exec -T postgres pg_isready -U moriai_user 2>/dev/null && echo " $(GREEN)✓ OK$(NC)" || echo " $(RED)✗ Failed$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Redis:$(NC)"
+	@$(DOCKER_COMPOSE_PROD) exec -T redis redis-cli ping 2>/dev/null && echo " $(GREEN)✓ OK$(NC)" || echo " $(RED)✗ Failed$(NC)"
+	@echo ""
+
+prod-status: ## 📊 프로덕션 서비스 상태 확인 (상세)
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)📊 Production Status$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Running Containers:$(NC)"
+	@$(DOCKER_COMPOSE_PROD) ps
+	@echo ""
+	@echo "$(YELLOW)Resource Usage:$(NC)"
+	@docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | head -n 10
+	@echo ""
+	@echo "$(YELLOW)Disk Usage:$(NC)"
+	@df -h | grep -E '(Filesystem|/dev/root|/dev/xvda|/dev/nvme)'
+	@echo ""
+	@$(MAKE) prod-health
 
 # ==================== Database ====================
 db-shell: ## PostgreSQL 셸 접속 (개발 환경)
