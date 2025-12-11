@@ -308,7 +308,6 @@ class TTSService:
         
         # 3. 파일 경로 설정 (Book의 base_path 사용)
         file_path = Path(f"{book.base_path}/words/{word}.mp3")
-        audio_url = f"/api/v1/files/{file_path}"
         
         # 4. 캐시 확인 (파일 존재 여부)
         try:
@@ -319,6 +318,11 @@ class TTSService:
         
         # 캐시된 파일이 있으면 바로 반환
         if file_exists:
+            # storage_service.get_url()을 사용하여 URL 생성
+            # Local: /api/v1/files/... 상대 경로
+            # S3: Pre-signed URL
+            audio_url = self.storage_service.get_url(str(file_path))
+            
             logger.info(f"Word TTS 캐시 사용: book={book_id}, word={word}")
             return {
                 "success": True,
@@ -357,11 +361,14 @@ class TTSService:
         
         # 6. 파일 저장
         try:
-            await self.storage_service.save(
+            audio_url = await self.storage_service.save(
                 audio_bytes,
                 str(file_path),
                 content_type="audio/mpeg"
             )
+            # storage_service.save()가 반환하는 URL 그대로 사용
+            # Local: /api/v1/files/... 상대 경로
+            # S3: Pre-signed URL
         except Exception as e:
             raise TTSUploadFailedException(
                 filename=str(file_path),
