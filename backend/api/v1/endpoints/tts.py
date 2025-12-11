@@ -12,6 +12,7 @@ from backend.core.dependencies import (
     get_cache_service,
     get_event_bus,
 )
+from backend.infrastructure.storage.base import AbstractStorageService
 from backend.features.auth.models import User
 from backend.features.tts.service import TTSService
 from backend.features.tts.repository import AudioRepository, VoiceRepository
@@ -34,6 +35,14 @@ from fastapi import UploadFile, File
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+def convert_audio_url(audio, storage_service) -> None:
+    """
+    Audio 모델의 파일 경로를 API 응답용 URL로 변환
+    """
+    if hasattr(audio, "file_path") and audio.file_path:
+        # file_path(순수 경로)를 기반으로 file_url(접근 URL) 생성
+        audio.file_url = storage_service.get_url(audio.file_path)
 
 def get_tts_service(
     db: AsyncSession = Depends(get_db),
@@ -70,20 +79,19 @@ async def generate_speech(
     request: GenerateSpeechRequest,
     current_user: User = Depends(get_current_user),
     service: TTSService = Depends(get_tts_service),
+    storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
     텍스트를 음성으로 변환 (ElevenLabs API)
-
+    
     지정된 음성과 텍스트로 자연스러운 음성 파일을 생성합니다.
-
-    Args:
+        Args:
         request (GenerateSpeechRequest): 음성 생성 요청
             - text: 변환할 텍스트 (최대 5000자)
             - voice_id: 음성 ID (선택, 기본값: Rachel)
             - model_id: 모델 ID (선택, 기본값: eleven_multilingual_v2)
         current_user: 인증된 사용자 정보
         service: TTSService (의존성 주입)
-
     Returns:
         AudioResponse: 생성된 음성 파일 정보
             - id: 오디오 고유 ID (UUID)
@@ -92,16 +100,13 @@ async def generate_speech(
             - text: 변환된 텍스트
             - voice_id: 사용된 음성 ID
             - created_at: 생성 시간
-
     Raises:
         HTTPException 401: 인증 실패
         HTTPException 500: ElevenLabs API 호출 실패
-
     Note:
         - 최대 텍스트 길이: 5000자
         - 지원 언어: 다국어 (한국어, 영어, 일본어, 중국어 등)
         - 사용 가능한 음성 목록은 GET /voices에서 확인
-
     Example:
         ```
         POST /api/v1/tts/generate
@@ -118,6 +123,10 @@ async def generate_speech(
         voice_id=request.voice_id,
         model_id=request.model_id
     )
+    
+    # URL 변환: 경로 -> API URL 또는 Pre-signed URL
+    convert_audio_url(audio, storage_service)
+    
     return audio
 
 @router.get(

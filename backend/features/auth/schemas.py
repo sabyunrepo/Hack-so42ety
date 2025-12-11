@@ -19,8 +19,8 @@ class UserRegisterRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "email": "user@example.com",
-                "password": "SecurePass123!"
+                "email": "system@moriai.ai",
+                "password": "123123123"
             }
         }
 
@@ -34,8 +34,8 @@ class UserLoginRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "email": "user@example.com",
-                "password": "SecurePass123!"
+                "email": "system@moriai.ai",
+                "password": "123123123"
             }
         }
 
