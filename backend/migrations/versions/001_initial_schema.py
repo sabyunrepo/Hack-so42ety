@@ -58,6 +58,7 @@ def upgrade() -> None:
         sa.Column('target_age', sa.String(50), nullable=True),
         sa.Column('theme', sa.String(100), nullable=True),
         sa.Column('status', sa.String(50), nullable=False),
+        sa.Column('voice_id', sa.String(100), nullable=True),
         sa.Column('is_default', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('is_public', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('visibility', sa.String(20), nullable=False, server_default='private'),
@@ -284,15 +285,17 @@ def upgrade() -> None:
 
     # ==================== Initial Data: Shared Book 1 ====================
     book_1_id = '1c8e135a-8e4a-46fb-ac24-13baaacfd586'
+    default_voice_id = 'uzyfnLLlKo55AbgBU5uH'  # Default ElevenLabs voice for shared books
     
     op.execute(f"""
-        INSERT INTO books (id, user_id, title, cover_image, status, is_default, is_public, visibility, created_at, updated_at)
+        INSERT INTO books (id, user_id, title, cover_image, status, voice_id, is_default, is_public, visibility, created_at, updated_at)
         VALUES (
             '{book_1_id}'::uuid,
             '{system_user_id}'::uuid,
             'My Playground Day',
             '/api/v1/files/shared/books/{book_1_id}/images/0_page_1.png',
             'completed',
+            '{default_voice_id}',
             true,
             true,
             'public',
@@ -375,13 +378,14 @@ def upgrade() -> None:
     book_2_id = '32e543c7-a845-4cfb-a93d-a0153dc9e063'
     
     op.execute(f"""
-        INSERT INTO books (id, user_id, title, cover_image, status, is_default, is_public, visibility, created_at, updated_at)
+        INSERT INTO books (id, user_id, title, cover_image, status, voice_id, is_default, is_public, visibility, created_at, updated_at)
         VALUES (
             '{book_2_id}'::uuid,
             '{system_user_id}'::uuid,
             'My Mountain Adventure',
             '/api/v1/files/shared/books/32e543c7-a845-4cfb-a93d-a0153dc9e063/images/0_page_1.png',
             'completed',
+            '{default_voice_id}',
             true,
             true,
             'public',
