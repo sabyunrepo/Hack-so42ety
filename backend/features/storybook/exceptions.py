@@ -81,9 +81,24 @@ class AIGenerationFailedException(BusinessLogicException):
 class InvalidPageCountException(ValidationException):
     """잘못된 페이지 수"""
 
-    def __init__(self, page_count: int, min_pages: int = 1, max_pages: int = 20):
+    def __init__(self, page_count: int, min_pages: int = 1, max_pages: int = 5):
         super().__init__(
             error_code=ErrorCode.BIZ_BOOK_INVALID_PAGE_COUNT,
             message=f"페이지 수는 {min_pages}~{max_pages} 사이여야 합니다",
             details={"requested": page_count, "min": min_pages, "max": max_pages},
+        )
+
+
+class BookQuotaExceededException(BusinessLogicException):
+    """책 생성 한도 초과"""
+
+    def __init__(self, current_count: int, max_allowed: int, user_id: str):
+        super().__init__(
+            error_code=ErrorCode.BIZ_BOOK_QUOTA_EXCEEDED,
+            message=f"책 생성 한도를 초과했습니다 ({current_count}/{max_allowed}).",
+            details={
+                "current_count": current_count,
+                "max_allowed": max_allowed,
+                "user_id": user_id
+            },
         )

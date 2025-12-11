@@ -13,6 +13,26 @@ until PGPASSWORD=$POSTGRES_PASSWORD psql -h "postgres" -U "$POSTGRES_USER" -d "$
 done
 echo "✓ PostgreSQL is ready"
 
+# 만약 APP_ENV 가 설정되어 있고 dev라면 테스트 DB 생성
+if [ "$APP_ENV" = "dev" ]; then
+  echo "🔧 Creating test database & user (if not exists)..."
+  DEFAULT_DB="postgres"
+
+  PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U "$POSTGRES_USER" -d $DEFAULT_DB -tc \
+    "SELECT 1 FROM pg_roles WHERE rolname='test_user';" | grep -q 1 || \
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U "$POSTGRES_USER" -d $DEFAULT_DB -c \
+      "CREATE USER test_user WITH PASSWORD 'test_password';"
+
+  PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U "$POSTGRES_USER" -d $DEFAULT_DB -tc \
+    "SELECT 1 FROM pg_database WHERE datname='test_db';" | grep -q 1 || \
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U "$POSTGRES_USER" -d $DEFAULT_DB -c \
+      "CREATE DATABASE test_db OWNER test_user;"
+
+  echo "✓ Test DB ready"
+else
+  echo "ℹ️ Skipping test database setup (ENABLE_TEST_DB not true)"
+fi
+
 # 2. Alembic 마이그레이션 실행
 echo "🔄 Running database migrations..."
 cd /app/backend
