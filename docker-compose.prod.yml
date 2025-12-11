@@ -1,14 +1,26 @@
 services:
   # ==================== PostgreSQL (Production Settings) ====================
   postgres:
+    image: postgres:16-alpine
+    container_name: moriai-postgres-prod
+    restart: unless-stopped
     environment:
       # 프로덕션 환경 변수는 .env 파일에서 관리
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     ports:
       # 프로덕션에서는 외부 포트 노출 제거 (내부 네트워크만 사용)
       - "127.0.0.1:5432:5432"
+    networks:
+      - moriai-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
@@ -25,16 +37,35 @@ services:
 
   # ==================== Redis (Production Settings) ====================
   redis:
+    image: redis:7-alpine
+    container_name: moriai-redis-prod
+    restart: unless-stopped
     ports:
       # 프로덕션에서는 외부 포트 노출 제거
       - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    # Redis command: 비밀번호가 있을 때만 --requirepass 옵션 추가
+    # Docker Compose 환경 변수는 $$로 이스케이프하고, 쉘에서 조건부 처리
     command: >
-      redis-server
-      --appendonly yes
-      --appendfsync everysec
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-      --requirepass ${REDIS_PASSWORD:-}
+      sh -c "
+      if [ -n \"$$REDIS_PASSWORD\" ]; then
+        redis-server --appendonly yes --appendfsync everysec --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass \"$$REDIS_PASSWORD\"
+      else
+        redis-server --appendonly yes --appendfsync everysec --maxmemory 512mb --maxmemory-policy allkeys-lru
+      fi
+      "
+    networks:
+      - moriai-network
+    healthcheck:
+      # Redis healthcheck: 비밀번호가 있으면 -a 옵션 사용, 없으면 일반 ping
+      # Docker Compose에서 환경 변수는 healthcheck 실행 시점에 해석되지 않으므로
+      # 쉘 스크립트로 처리
+      test: ["CMD-SHELL", "sh -c 'if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping; else redis-cli ping; fi' | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     deploy:
       resources:
         limits:
@@ -51,16 +82,64 @@ services:
 
   # ==================== Backend (Production Settings) ====================
   backend:
+    build:
+      context: .
+      dockerfile: ./docker/backend/Dockerfile
+    image: moriai-backend:latest
+    container_name: moriai-backend-prod
+    restart: unless-stopped
+    init: true
+    volumes:
+      # 프로덕션: 데이터만 마운트 (소스 코드는 이미지에 포함)
+      - app-data:/app/data
     environment:
       - APP_ENV=prod
       - DEBUG=false
       - LOG_LEVEL=INFO
-      # Redis 비밀번호 추가 (설정된 경우)
+      # Database
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # Redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-    volumes:
-      # Remove source code mount for production (rely on image)
-      # Only mount data
-      - app-data:/app/data
+      # JWT
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      # Google OAuth
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # AI APIs
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - KLING_ACCESS_KEY=${KLING_ACCESS_KEY}
+      - KLING_SECRET_KEY=${KLING_SECRET_KEY}
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      # Storage
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-local}
+      - STORAGE_BASE_PATH=/app/data
+      - STORAGE_BASE_URL=${STORAGE_BASE_URL:-/api/v1/files}
+      # AWS S3 (if STORAGE_PROVIDER=s3)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME:-}
+      - AWS_S3_REGION=${AWS_S3_REGION:-ap-northeast-2}
+      - AWS_S3_PRESIGNED_URL_EXPIRATION=${AWS_S3_PRESIGNED_URL_EXPIRATION:-3600}
+    env_file:
+      - .env
+    networks:
+      - moriai-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits:
@@ -108,13 +187,24 @@ services:
       args:
         APP_ENV: prod
     image: moriai-nginx:prod
+    container_name: moriai-nginx-prod
+    restart: unless-stopped
+    ports:
+      # 프로덕션: 내부 네트워크만 또는 Cloudflare Tunnel 사용 시 불필요
+      - "127.0.0.1:80:80"
     volumes:
       - app-data:/app/data:ro
       # Mount frontend build output
       - frontend-dist:/usr/share/nginx/html:ro
+    environment:
+      - BACKEND_PORT=8000
+    networks:
+      - moriai-network
     depends_on:
-      - backend
-      - frontend-builder
+      backend:
+        condition: service_healthy
+      frontend-builder:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -131,10 +221,41 @@ services:
 
   # ==================== Cloudflare Tunnel ====================
   cloudflared:
-    profiles:
-      - production
+    image: cloudflare/cloudflared:latest
+    container_name: moriai-cloudflared-prod
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      - moriai-network
+    depends_on:
+      - nginx
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+
+# ==================== Networks ====================
+networks:
+  moriai-network:
+    driver: bridge
+    name: moriai-network
+
+# ==================== Volumes ====================
+volumes:
+  postgres-data:
+    driver: local
+    name: moriai-postgres-data-prod
+  redis-data:
+    driver: local
+    name: moriai-redis-data-prod
+  app-data:
+    driver: local
+    name: moriai-app-data-prod
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+  frontend-dist:
+    driver: local
+    name: moriai-frontend-dist-prod
