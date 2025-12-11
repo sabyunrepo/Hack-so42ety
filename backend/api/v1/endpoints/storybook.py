@@ -18,35 +18,56 @@ router = APIRouter()
 
 def convert_book_urls_to_api_format(book: Book, storage_service: AbstractStorageService) -> Book:
     """
-    Book 모델의 파일 경로를 API 응답용 URL로 변환
+    Book ORM 객체의 URL을 변환 (세션에서 분리하여 안전하게 수정)
     
-    - Local Storage: /api/v1/files/{path}
-    - S3 Storage: Pre-signed URL (동적 생성)
+    ⚠️ 핵심 아이디어: session.expunge()로 ORM 객체를 세션에서 분리한 후
+    URL을 변환하면 DB에 영향을 주지 않습니다.
     
     Args:
-        book: Book 모델 (ORM)
+        book: Book ORM 모델
         storage_service: Storage Service (Local 또는 S3)
     
     Returns:
-        Book: URL이 변환된 Book 모델
+        Book: URL이 변환된 Book 객체 (세션에서 분리됨)
     """
-    # Cover image URL 변환
+    # ORM 객체를 세션에서 분리 (이후 수정해도 DB에 영향 없음)
+    from sqlalchemy.orm import object_session
+    from sqlalchemy import inspect
+    
+    session = object_session(book)
+    if session:
+        # Book 객체 분리
+        if inspect(book).session is not None:
+            session.expunge(book)
+        
+        # 연관된 객체들도 모두 분리
+        for page in book.pages:
+            if inspect(page).session is not None:
+                session.expunge(page)
+            for dialogue in page.dialogues:
+                if inspect(dialogue).session is not None:
+                    session.expunge(dialogue)
+                for trans in dialogue.translations:
+                    if inspect(trans).session is not None:
+                        session.expunge(trans)
+                for audio in dialogue.audios:
+                    if inspect(audio).session is not None:
+                        session.expunge(audio)
+    
+    # 이제 안전하게 URL 변환 가능
     if book.cover_image:
         book.cover_image = storage_service.get_url(book.cover_image)
     
-    # 각 페이지의 URL 변환
     for page in book.pages:
-        # Page image URL 변환
         if page.image_url:
             page.image_url = storage_service.get_url(page.image_url)
         
-        # 각 대사의 오디오 URL 변환
         for dialogue in page.dialogues:
             for audio in dialogue.audios:
-                # Audio URL 변환 (경로 → API URL 또는 Pre-signed URL)
                 audio.audio_url = storage_service.get_url(audio.audio_url)
     
     return book
+
 
 def get_book_service(
     db: AsyncSession = Depends(get_db),
