@@ -112,9 +112,9 @@ class BookOrchestratorService:
                     except Exception as e:
                         raise AIGenerationFailedException(stage="이미지", reason=str(e))
 
-                    # 스토리지 저장 (경로 변경: users/{user_id}/books/{book_id}/images/page_{i+1}.png)
+                    # 스토리지 저장 (Book의 base_path 사용)
                     try:
-                        file_name = f"users/{user_id}/books/{book.id}/images/page_{i+1}.png"
+                        file_name = f"{book.base_path}/images/page_{i+1}.png"
                         storage_url = await self.storage_service.save(
                             image_bytes,
                             file_name,
@@ -164,7 +164,7 @@ class BookOrchestratorService:
                         raise AIGenerationFailedException(stage="음성", reason=str(e))
 
                     try:
-                        audio_file_name = f"users/{user_id}/books/{book.id}/audios/page_{i+1}.mp3"
+                        audio_file_name = f"{book.base_path}/audios/page_{i+1}.mp3"
                         storage_url = await self.storage_service.save(
                             audio_bytes,
                             audio_file_name,
@@ -255,9 +255,9 @@ class BookOrchestratorService:
                 except Exception as e:
                     raise AIGenerationFailedException(stage="이미지", reason=str(e))
 
-                # 생성된 이미지 저장 (경로 변경)
+                # 생성된 이미지 저장 (Book의 base_path 사용)
                 try:
-                    file_name = f"users/{user_id}/books/{book.id}/images/page_{i+1}.png"
+                    file_name = f"{book.base_path}/images/page_{i+1}.png"
                     storage_url = await self.storage_service.save(
                         generated_image_bytes,
                         file_name,
@@ -301,7 +301,7 @@ class BookOrchestratorService:
                         raise AIGenerationFailedException(stage="음성", reason=str(e))
 
                     try:
-                        audio_file_name = f"users/{user_id}/books/{book.id}/audios/page_{i+1}.mp3"
+                        audio_file_name = f"{book.base_path}/audios/page_{i+1}.mp3"
                         storage_url = await self.storage_service.save(
                             audio_bytes,
                             audio_file_name,

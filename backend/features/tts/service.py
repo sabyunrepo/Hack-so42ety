@@ -306,8 +306,8 @@ class TTSService:
         
         voice_id = book.voice_id
         
-        # 3. 파일 경로 설정 (shared/books/{book_id}/words/{word}.mp3)
-        file_path = Path(f"shared/books/{book_id}/words/{word}.mp3")
+        # 3. 파일 경로 설정 (Book의 base_path 사용)
+        file_path = Path(f"{book.base_path}/words/{word}.mp3")
         audio_url = f"/api/v1/files/{file_path}"
         
         # 4. 캐시 확인 (파일 존재 여부)
