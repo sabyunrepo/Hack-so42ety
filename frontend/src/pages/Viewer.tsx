@@ -93,7 +93,7 @@ const Viewer: React.FC = () => {
   };
 
   // Helper to check if url is video
-  const isVideo = (url: string) => {
+  const isVideo = (url?: string) => {
     return url?.toLowerCase().endsWith('.mp4');
   };
 
