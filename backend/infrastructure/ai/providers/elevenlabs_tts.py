@@ -5,6 +5,7 @@ ElevenLabs API를 사용한 고품질 음성 합성
 
 from typing import Optional, Dict, Any, List
 import httpx
+import logging
 
 from ..base import TTSProvider
 from ....core.config import settings
@@ -13,6 +14,8 @@ from ....features.tts.exceptions import (
     TTSAPIAuthenticationFailedException,
     TTSGenerationFailedException,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ElevenLabsTTSProvider(TTSProvider):
@@ -85,12 +88,37 @@ class ElevenLabsTTSProvider(TTSProvider):
                 )
                 response.raise_for_status()
         except httpx.HTTPStatusError as e:
+            error_details = {
+                "status_code": e.response.status_code,
+                "response_body": e.response.text,
+                "voice_id": voice_id,
+                "model_id": model_id,
+                "text": text[:50] + "..." if len(text) > 50 else text,
+            }
+            
+            logger.error(
+                f"ElevenLabs TTS API 오류 [text_to_speech]: status={e.response.status_code}, "
+                f"voice_id={voice_id}, model_id={model_id}, response={e.response.text[:200]}"
+            )
+            
             if e.response.status_code == 401:
                 raise TTSAPIAuthenticationFailedException(
                     provider="elevenlabs",
-                    reason="API 키가 유효하지 않거나 만료되었습니다"
+                    reason=f"API 키가 유효하지 않거나 만료되었습니다. Response: {e.response.text[:100]}"
                 )
-            raise TTSGenerationFailedException(reason=f"ElevenLabs API 오류: {e.response.status_code} - {e.response.text}")
+            elif e.response.status_code == 404:
+                raise TTSGenerationFailedException(
+                    reason=f"Voice ID '{voice_id}'를 찾을 수 없거나 현재 플랜에서 사용할 수 없습니다. "
+                    f"다른 voice를 선택하거나 ElevenLabs 구독을 확인해주세요. Response: {e.response.text}"
+                )
+            elif e.response.status_code == 422:
+                raise TTSGenerationFailedException(
+                    reason=f"ElevenLabs API 요청 형식 오류: {e.response.text}"
+                )
+            else:
+                raise TTSGenerationFailedException(
+                    reason=f"ElevenLabs API 오류 (HTTP {e.response.status_code}): {e.response.text[:200]}"
+                )
         except httpx.RequestError as e:
             raise TTSGenerationFailedException(reason=f"ElevenLabs API 요청 실패: {str(e)}")
 

@@ -58,6 +58,7 @@ def upgrade() -> None:
         sa.Column('target_age', sa.String(50), nullable=True),
         sa.Column('theme', sa.String(100), nullable=True),
         sa.Column('status', sa.String(50), nullable=False),
+        sa.Column('voice_id', sa.String(100), nullable=True),
         sa.Column('is_default', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('is_public', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('visibility', sa.String(20), nullable=False, server_default='private'),
@@ -268,12 +269,14 @@ def upgrade() -> None:
 
     # ==================== Initial Data: System User ====================
     system_user_id = '00000000-0000-0000-0000-000000000001'
+    system_password_hash = '$2b$12$Otv/lV/GXJf7PqpQFtaIkOjOooVovCN9KAMgXU6RJjBkix.Pz2TdK'  # Password: 123123123
     
     op.execute(f"""
-        INSERT INTO users (id, email, is_active, created_at, updated_at)
+        INSERT INTO users (id, email, password_hash, is_active, created_at, updated_at)
         VALUES (
             '{system_user_id}'::uuid,
             'system@moriai.ai',
+            '{system_password_hash}',
             true,
             NOW(),
             NOW()
@@ -282,15 +285,17 @@ def upgrade() -> None:
 
     # ==================== Initial Data: Shared Book 1 ====================
     book_1_id = '1c8e135a-8e4a-46fb-ac24-13baaacfd586'
+    default_voice_id = 'uzyfnLLlKo55AbgBU5uH'  # Default ElevenLabs voice for shared books
     
     op.execute(f"""
-        INSERT INTO books (id, user_id, title, cover_image, status, is_default, is_public, visibility, created_at, updated_at)
+        INSERT INTO books (id, user_id, title, cover_image, status, voice_id, is_default, is_public, visibility, created_at, updated_at)
         VALUES (
             '{book_1_id}'::uuid,
             '{system_user_id}'::uuid,
             'My Playground Day',
             '/api/v1/files/shared/books/{book_1_id}/images/0_page_1.png',
             'completed',
+            '{default_voice_id}',
             true,
             true,
             'public',
@@ -323,20 +328,20 @@ def upgrade() -> None:
 
     # Book 1 Dialogues
     dialogues_book_1 = [
-        ('0fd5f91b-324b-4490-b99b-1cb1c60e07b9', 'f4fe37c1-876b-4628-a3a4-f92112c96b26', 1, 'Narrator', 'I am at the playground. With my friends. It is hot. I drink water. Gulp, gulp!'),
-        ('bff6d8f3-21d3-4ea5-bfb5-8e2da80bcdb8', 'd2fc4c22-762f-44f9-904a-9d887718b5b0', 1, 'Narrator', 'We play hanging. I hang strong! Wow, I am strong!'),
-        ('89eca997-b44f-4c7f-a8f4-41d422a81314', 'e4e92c8b-2654-4da5-8116-60325b599785', 1, 'Narrator', 'We play with bubbles. Pop, pop, pop! So many bubbles. Fun, fun, fun!'),
-        ('748c9d28-ec0b-41f6-9839-de52848d5157', '418dcd35-92b8-4399-a109-f3e37d536f2c', 1, 'Narrator', 'I ride the swing. Up and down. I try to swing alone. Whee! So fun!'),
-        ('9f332b2a-9193-45a2-98fb-791da0e60a2d', '1b486846-cfe8-4b17-aeeb-23b01fd82c07', 1, 'Narrator', 'I look at bugs. With a magnifying glass. Wow! A bug. So cool!'),
+        ('0fd5f91b-324b-4490-b99b-1cb1c60e07b9', 'f4fe37c1-876b-4628-a3a4-f92112c96b26', 1, 1, 'Narrator', 'I am at the playground. With my friends. It is hot. I drink water. Gulp, gulp!'),
+        ('bff6d8f3-21d3-4ea5-bfb5-8e2da80bcdb8', 'd2fc4c22-762f-44f9-904a-9d887718b5b0', 2, 1, 'Narrator', 'We play hanging. I hang strong! Wow, I am strong!'),
+        ('89eca997-b44f-4c7f-a8f4-41d422a81314', 'e4e92c8b-2654-4da5-8116-60325b599785', 3, 1, 'Narrator', 'We play with bubbles. Pop, pop, pop! So many bubbles. Fun, fun, fun!'),
+        ('748c9d28-ec0b-41f6-9839-de52848d5157', '418dcd35-92b8-4399-a109-f3e37d536f2c', 4, 1, 'Narrator', 'I ride the swing. Up and down. I try to swing alone. Whee! So fun!'),
+        ('9f332b2a-9193-45a2-98fb-791da0e60a2d', '1b486846-cfe8-4b17-aeeb-23b01fd82c07', 5, 1, 'Narrator', 'I look at bugs. With a magnifying glass. Wow! A bug. So cool!'),
     ]
     
-    for dialogue_id, page_id, seq, speaker, text_en in dialogues_book_1:
+    for dialogue_id, page_id, page_seq, dialogue_seq, speaker, text_en in dialogues_book_1:
         op.execute(f"""
             INSERT INTO dialogues (id, page_id, sequence, speaker, created_at, updated_at)
             VALUES (
                 '{dialogue_id}'::uuid,
                 '{page_id}'::uuid,
-                {seq},
+                {dialogue_seq},
                 '{speaker}',
                 NOW(),
                 NOW()
@@ -363,7 +368,7 @@ def upgrade() -> None:
                 '{dialogue_id}'::uuid,
                 'en',
                 'uzyfnLLlKo55AbgBU5uH',
-                '/api/v1/files/shared/books/{book_1_id}/audios/{dialogue_id}.mp3',
+                '/api/v1/files/shared/books/{book_1_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
                 NOW(),
                 NOW()
             );
@@ -373,13 +378,14 @@ def upgrade() -> None:
     book_2_id = '32e543c7-a845-4cfb-a93d-a0153dc9e063'
     
     op.execute(f"""
-        INSERT INTO books (id, user_id, title, cover_image, status, is_default, is_public, visibility, created_at, updated_at)
+        INSERT INTO books (id, user_id, title, cover_image, status, voice_id, is_default, is_public, visibility, created_at, updated_at)
         VALUES (
             '{book_2_id}'::uuid,
             '{system_user_id}'::uuid,
             'My Mountain Adventure',
             '/api/v1/files/shared/books/32e543c7-a845-4cfb-a93d-a0153dc9e063/images/0_page_1.png',
             'completed',
+            '{default_voice_id}',
             true,
             true,
             'public',
@@ -411,19 +417,19 @@ def upgrade() -> None:
 
     # Book 2 Dialogues
     dialogues_book_2 = [
-        ('31245bae-cbaa-47ca-a3dd-7d9423a3eb60', '3baf370f-8f4c-4bef-b091-6c3f2bc34cd4', 1, 'Narrator', 'I go to the mountain. With Daddy and Grandpa. Yay! So fun!'),
-        ('7defa911-ae8f-48e0-b7b3-627fefe84d1d', '7e409966-7aa9-4d8c-83a3-d344cba3a120', 1, 'Narrator', 'Daddy gives me a piggyback ride. Up, up, up! Daddy is the best!'),
-        ('b970fbe5-e1df-401b-b09f-27c2d77da569', 'ebe3f128-2e74-47e4-ab9a-80c2fffabe5c', 1, 'Narrator', 'At the stream, I throw rocks. Splash, splash! I put my feet in the water. So cool!'),
-        ('78a7a45a-0baa-4460-94bb-d43175a5d20e', 'c0129b75-faea-4207-92db-606339c1a89f', 1, 'Narrator', 'We sit on chairs by the stream. I eat yummy corn. Yum, yum! So good!'),
+        ('31245bae-cbaa-47ca-a3dd-7d9423a3eb60', '3baf370f-8f4c-4bef-b091-6c3f2bc34cd4', 1, 1, 'Narrator', 'I go to the mountain. With Daddy and Grandpa. Yay! So fun!'),
+        ('7defa911-ae8f-48e0-b7b3-627fefe84d1d', '7e409966-7aa9-4d8c-83a3-d344cba3a120', 2, 1, 'Narrator', 'Daddy gives me a piggyback ride. Up, up, up! Daddy is the best!'),
+        ('b970fbe5-e1df-401b-b09f-27c2d77da569', 'ebe3f128-2e74-47e4-ab9a-80c2fffabe5c', 3, 1, 'Narrator', 'At the stream, I throw rocks. Splash, splash! I put my feet in the water. So cool!'),
+        ('78a7a45a-0baa-4460-94bb-d43175a5d20e', 'c0129b75-faea-4207-92db-606339c1a89f', 4, 1, 'Narrator', 'We sit on chairs by the stream. I eat yummy corn. Yum, yum! So good!'),
     ]
     
-    for dialogue_id, page_id, seq, speaker, text_en in dialogues_book_2:
+    for dialogue_id, page_id, page_seq, dialogue_seq, speaker, text_en in dialogues_book_2:
         op.execute(f"""
             INSERT INTO dialogues (id, page_id, sequence, speaker, created_at, updated_at)
             VALUES (
                 '{dialogue_id}'::uuid,
                 '{page_id}'::uuid,
-                {seq},
+                {dialogue_seq},
                 '{speaker}',
                 NOW(),
                 NOW()
@@ -450,7 +456,7 @@ def upgrade() -> None:
                 '{dialogue_id}'::uuid,
                 'en',
                 'uzyfnLLlKo55AbgBU5uH',
-                '/api/v1/files/shared/books/{book_2_id}/audios/{dialogue_id}.mp3',
+                '/api/v1/files/shared/books/{book_2_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
                 NOW(),
                 NOW()
             );

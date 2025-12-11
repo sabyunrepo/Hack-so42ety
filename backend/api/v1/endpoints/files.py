@@ -67,11 +67,79 @@ def get_filename(file_path: str) -> str:
     return file_path.split('/')[-1]
 
 
+@router.head(
+    "/files/{file_path:path}",
+    summary="파일 메타데이터 확인 (HEAD 요청)",
+    responses={
+        200: {"description": "파일 존재 확인 성공"},
+        401: {"description": "인증 필요"},
+        403: {"description": "접근 권한 없음"},
+        404: {"description": "파일을 찾을 수 없음"},
+    },
+)
+async def head_file(
+    file_path: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user_object),
+    storage_service: AbstractStorageService = Depends(get_storage_service),
+):
+    """
+    파일 메타데이터 확인 (HEAD 요청)
+    
+    브라우저가 오디오/비디오 파일 재생 전에 파일 크기 확인을 위해 사용합니다.
+    
+    Args:
+        file_path: 파일 경로
+        db: 데이터베이스 세션
+        current_user: 현재 사용자 (Optional)
+        storage_service: 스토리지 서비스
+    
+    Returns:
+        Response: 파일 메타데이터 (헤더만, 본문 없음)
+    """
+    current_user_id = current_user.id if current_user else None
+    
+    try:
+        # 1. 접근 권한 확인
+        access_service = FileAccessService(db)
+        await access_service.check_file_access(file_path, current_user_id)
+        
+        # 2. 파일 존재 여부 확인
+        file_exists = await storage_service.exists(file_path)
+        if not file_exists:
+            raise HTTPException(
+                status_code=404,
+                detail=f"File not found: {file_path}"
+            )
+        
+        # 3. 파일 메타데이터 반환 (본문 없음)
+        return Response(
+            status_code=200,
+            headers={
+                "Content-Type": get_content_type(file_path),
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=86400, immutable",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Expose-Headers": "Content-Length, Content-Type, Accept-Ranges",
+            }
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"HEAD request error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+
 @router.get(
     "/files/{file_path:path}",
     summary="파일 접근 (접근 제어 및 캐싱)",
     responses={
         200: {"description": "파일 반환 성공"},
+        206: {"description": "Partial Content (Range 요청)"},
         304: {"description": "Not Modified (캐시 유효)"},
         401: {"description": "인증 필요"},
         403: {"description": "접근 권한 없음"},
@@ -143,6 +211,9 @@ async def get_file(
                         "ETag": f'"{etag}"',
                         "Cache-Control": "public, max-age=86400, immutable",
                         "Content-Disposition": f'inline; filename="{get_filename(file_path)}"',
+                        "Accept-Ranges": "bytes",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Expose-Headers": "Content-Length, Content-Type, Accept-Ranges, ETag",
                     }
                 )
         
@@ -189,6 +260,9 @@ async def get_file(
                 "ETag": f'"{etag}"',
                 "Cache-Control": cache_control,
                 "Content-Disposition": f'inline; filename="{get_filename(file_path)}"',
+                "Accept-Ranges": "bytes",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Expose-Headers": "Content-Length, Content-Type, Accept-Ranges, ETag",
             }
         )
     
