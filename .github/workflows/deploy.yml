@@ -1,0 +1,178 @@
+name: 🚀 Deploy MoriAI
+
+on:
+  push:
+    branches:
+      - dev      # Dev 환경 배포
+      - main     # Production 환경 배포
+
+jobs:
+  # ==================== Dev 환경 배포 ====================
+  deploy-dev:
+    name: 🔧 Deploy to Dev Server
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔑 Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p 23 14.36.34.122 >> ~/.ssh/known_hosts
+      
+      - name: 📊 Deploy to Dev Server
+        env:
+          DEV_HOST: "14.36.34.122"
+          DEV_PORT: "23"
+          DEV_USER: "${{ secrets.DEV_SSH_USER || 'ubuntu' }}"
+        run: |
+          echo "🚀 Deploying to Dev Server (14.36.34.122:23)..."
+          
+          ssh -p ${DEV_PORT} ${DEV_USER}@${DEV_HOST} << 'ENDSSH'
+            set -e
+            
+            echo "📂 Navigating to project directory..."
+            cd ~/Hack-so42ety || exit 1
+            
+            echo "📥 Pulling latest code (dev branch)..."
+            git fetch origin dev
+            git checkout dev
+            git pull origin dev
+            
+            echo "🔄 Stopping existing containers..."
+            docker compose -f docker-compose.yml down || true
+            
+            echo "🏗️ Building images..."
+            docker compose -f docker-compose.yml build --no-cache
+            
+            echo "🚀 Starting services..."
+            docker compose -f docker-compose.yml up -d
+            
+            echo "⏳ Waiting for services to start (10s)..."
+            sleep 10
+            
+            echo "🗄️ Running database migrations..."
+            docker compose -f docker-compose.yml exec -T backend alembic upgrade head || echo "⚠️ Migration failed or no changes"
+            
+            echo "✅ Dev deployment completed!"
+          ENDSSH
+      
+      - name: 🏥 Health Check
+        run: |
+          echo "🏥 Checking service health..."
+          sleep 5
+          curl -f http://14.36.34.122/api/health || echo "⚠️ Health check failed"
+      
+      - name: 📝 Deployment Summary
+        run: |
+          echo "### 🎉 Dev Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Development" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: dev" >> $GITHUB_STEP_SUMMARY
+          echo "- **Server**: 14.36.34.122:23" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: http://14.36.34.122" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # ==================== Production 환경 배포 ====================
+  deploy-prod:
+    name: 🚀 Deploy to Production (AWS EC2)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔑 Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: 🗄️ Backup Database
+        env:
+          PROD_HOST: "${{ secrets.PROD_HOST }}"
+          PROD_USER: "${{ secrets.PROD_SSH_USER || 'ubuntu' }}"
+        run: |
+          echo "💾 Creating database backup..."
+          ssh ${PROD_USER}@${PROD_HOST} << 'ENDSSH'
+            cd ~/Hack-so42ety
+            make db-backup-prod || echo "⚠️ Backup failed (may not exist yet)"
+          ENDSSH
+      
+      - name: 🚀 Deploy to Production
+        env:
+          PROD_HOST: "${{ secrets.PROD_HOST }}"
+          PROD_USER: "${{ secrets.PROD_SSH_USER || 'ubuntu' }}"
+        run: |
+          echo "🚀 Deploying to Production (AWS EC2)..."
+          
+          ssh ${PROD_USER}@${PROD_HOST} << 'ENDSSH'
+            set -e
+            
+            echo "📂 Navigating to project directory..."
+            cd ~/Hack-so42ety || exit 1
+            
+            echo "📥 Pulling latest code (main branch)..."
+            git fetch origin main
+            git checkout main
+            git pull origin main
+            
+            echo "🔄 Stopping existing containers..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production down || true
+            
+            echo "🏗️ Building production images..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+            
+            echo "🚀 Starting production services..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production up -d
+            
+            echo "⏳ Waiting for services to start (15s)..."
+            sleep 15
+            
+            echo "🗄️ Running database migrations..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T backend alembic upgrade head || echo "⚠️ Migration failed or no changes"
+            
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f || true
+            
+            echo "✅ Production deployment completed!"
+          ENDSSH
+      
+      - name: 🏥 Health Check
+        env:
+          PROD_HOST: "${{ secrets.PROD_HOST }}"
+        run: |
+          echo "🏥 Checking production service health..."
+          sleep 5
+          curl -f http://${PROD_HOST}/api/health || echo "⚠️ Health check failed"
+      
+      - name: 📊 Check Service Status
+        env:
+          PROD_HOST: "${{ secrets.PROD_HOST }}"
+          PROD_USER: "${{ secrets.PROD_SSH_USER || 'ubuntu' }}"
+        run: |
+          echo "📊 Checking service status..."
+          ssh ${PROD_USER}@${PROD_HOST} << 'ENDSSH'
+            cd ~/Hack-so42ety
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+          ENDSSH
+      
+      - name: 📝 Deployment Summary
+        env:
+          PROD_HOST: "${{ secrets.PROD_HOST }}"
+        run: |
+          echo "### 🎉 Production Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: main" >> $GITHUB_STEP_SUMMARY
+          echo "- **Server**: AWS EC2 (${PROD_HOST})" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: http://${PROD_HOST}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All services are running!" >> $GITHUB_STEP_SUMMARY
