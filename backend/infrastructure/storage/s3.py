@@ -29,11 +29,15 @@ class S3StorageService(AbstractStorageService):
         self.access_key = settings.aws_access_key_id
         self.secret_key = settings.aws_secret_access_key
         
+        from botocore.config import Config
+        
         self.s3_client = boto3.client(
             "s3",
             region_name=self.region_name,
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
+            endpoint_url=f"https://s3.{self.region_name}.amazonaws.com",
+            config=Config(signature_version='s3v4')
         )
         
         self.base_url = f"https://{self.bucket_name}.s3.{self.region_name}.amazonaws.com"
