@@ -75,3 +75,36 @@ class TTSAPIAuthenticationFailedException(BusinessLogicException):
             message=f"{provider} API 인증에 실패했습니다. API 키를 확인해주세요.",
             details={"provider": provider, "reason": reason} if reason else {"provider": provider},
         )
+
+
+class WordTooLongException(ValidationException):
+    """단어가 너무 김"""
+
+    def __init__(self, word_length: int, max_length: int = 50):
+        super().__init__(
+            error_code=ErrorCode.BIZ_TTS_TEXT_TOO_LONG,
+            message=f"단어가 너무 깁니다 (최대 {max_length}자)",
+            details={"word_length": word_length, "max_length": max_length},
+        )
+
+
+class WordInvalidException(ValidationException):
+    """유효하지 않은 단어"""
+
+    def __init__(self, word: str, reason: str):
+        super().__init__(
+            error_code=ErrorCode.VALIDATION_FAILED,
+            message=f"유효하지 않은 단어입니다: {reason}",
+            details={"word": word, "reason": reason},
+        )
+
+
+class BookVoiceNotConfiguredException(BusinessLogicException):
+    """Book에 voice_id가 설정되지 않음"""
+
+    def __init__(self, book_id: str):
+        super().__init__(
+            error_code=ErrorCode.BIZ_TTS_VOICE_NOT_FOUND,
+            message="이 책에는 음성이 설정되지 않았습니다",
+            details={"book_id": book_id},
+        )

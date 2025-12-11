@@ -108,3 +108,27 @@ class VoiceResponse(BaseModel):
                 "is_custom": True
             }
         }
+
+
+class WordTTSResponse(BaseModel):
+    """단어 TTS 생성 응답 스키마"""
+    success: bool = Field(..., description="성공 여부", example=True)
+    word: str = Field(..., description="변환된 단어", example="hello")
+    file_path: str = Field(..., description="파일 시스템 경로", example="/data/shared/books/{book_id}/words/hello.mp3")
+    audio_url: str = Field(..., description="API 접근 URL", example="/api/v1/files/shared/books/{book_id}/words/hello.mp3")
+    cached: bool = Field(..., description="캐시 사용 여부", example=False)
+    duration_ms: Optional[int] = Field(None, description="생성 소요 시간 (밀리초)", example=245)
+    voice_id: str = Field(..., description="사용된 음성 ID", example="uzyfnLLlKo55AbgBU5uH")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "word": "hello",
+                "file_path": "/data/shared/books/32e543c7-a845-4cfb-a93d-a0153dc9e063/words/hello.mp3",
+                "audio_url": "/api/v1/files/shared/books/32e543c7-a845-4cfb-a93d-a0153dc9e063/words/hello.mp3",
+                "cached": False,
+                "duration_ms": 245,
+                "voice_id": "uzyfnLLlKo55AbgBU5uH"
+            }
+        }

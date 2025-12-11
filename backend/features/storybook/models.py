@@ -50,6 +50,9 @@ class Book(Base):
 
     # 상태 (draft, published)
     status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False)
+    
+    # TTS 음성 ID (ElevenLabs voice ID for word TTS)
+    voice_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # 기본 제공 책 여부 (공통 라이브러리)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -81,6 +84,22 @@ class Book(Base):
     pages: Mapped[List["Page"]] = relationship(
         "Page", back_populates="book", cascade="all, delete-orphan", order_by="Page.sequence"
     )
+
+    @property
+    def base_path(self) -> str:
+        """
+        Book의 기본 저장 경로 반환
+        
+        - 공통 책 (is_default=true): shared/books/{book_id}
+        - 사용자 책 (is_default=false): users/{user_id}/books/{book_id}
+        
+        Returns:
+            str: 파일 저장 기본 경로
+        """
+        if self.is_default:
+            return f"shared/books/{self.id}"
+        else:
+            return f"users/{self.user_id}/books/{self.id}"
 
     def __repr__(self) -> str:
         return f"<Book(id={self.id}, title={self.title}, user_id={self.user_id})>"
