@@ -6,12 +6,47 @@ from uuid import UUID
 from backend.core.database.session import get_db
 from backend.core.auth.dependencies import get_current_user_object as get_current_user
 from backend.core.dependencies import get_storage_service, get_ai_factory
+from backend.infrastructure.storage.base import AbstractStorageService
 from backend.features.auth.models import User
 from backend.features.storybook.service import BookOrchestratorService
 from backend.features.storybook.repository import BookRepository
 from backend.features.storybook.schemas import CreateBookRequest, BookResponse, BookListResponse
+from backend.features.storybook.models import Book
 
 router = APIRouter()
+
+
+def convert_book_urls_to_api_format(book: Book, storage_service: AbstractStorageService) -> Book:
+    """
+    Book 모델의 파일 경로를 API 응답용 URL로 변환
+    
+    - Local Storage: /api/v1/files/{path}
+    - S3 Storage: Pre-signed URL (동적 생성)
+    
+    Args:
+        book: Book 모델 (ORM)
+        storage_service: Storage Service (Local 또는 S3)
+    
+    Returns:
+        Book: URL이 변환된 Book 모델
+    """
+    # Cover image URL 변환
+    if book.cover_image:
+        book.cover_image = storage_service.get_url(book.cover_image)
+    
+    # 각 페이지의 URL 변환
+    for page in book.pages:
+        # Page image URL 변환
+        if page.image_url:
+            page.image_url = storage_service.get_url(page.image_url)
+        
+        # 각 대사의 오디오 URL 변환
+        for dialogue in page.dialogues:
+            for audio in dialogue.audios:
+                # Audio URL 변환 (경로 → API URL 또는 Pre-signed URL)
+                audio.audio_url = storage_service.get_url(audio.audio_url)
+    
+    return book
 
 def get_book_service(
     db: AsyncSession = Depends(get_db),
@@ -42,6 +77,7 @@ async def create_book(
     request: CreateBookRequest,
     current_user: User = Depends(get_current_user),
     service: BookOrchestratorService = Depends(get_book_service),
+    storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
     AI 기반 동화책 생성
@@ -60,6 +96,7 @@ async def create_book(
             - theme: 테마 (예: "adventure", "education", "fantasy")
         current_user: 인증된 사용자 정보 (JWT에서 추출)
         service: BookOrchestratorService (의존성 주입)
+        storage_service: Storage Service (URL 변환용)
 
     Returns:
         BookResponse: 생성된 동화책 정보
@@ -93,6 +130,10 @@ async def create_book(
         is_public=request.is_public,  # 기본값 False
         visibility=request.visibility,  # 기본값 "private"
     )
+    
+    # ✅ URL 변환: 경로 → API URL 또는 Pre-signed URL
+    book = convert_book_urls_to_api_format(book, storage_service)
+    
     return book
 
 @router.post(
@@ -113,6 +154,7 @@ async def create_book_with_images(
     voice_id: str = Form(None),
     current_user: User = Depends(get_current_user),
     service: BookOrchestratorService = Depends(get_book_service),
+    storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
     이미지 기반 동화책 생성 (Multipart/Form-Data)
@@ -126,6 +168,7 @@ async def create_book_with_images(
         voice_id (str, optional): TTS 음성 ID (기본값: 시스템 기본 음성)
         current_user: 인증된 사용자 정보
         service: BookOrchestratorService (의존성 주입)
+        storage_service: Storage Service (URL 변환용)
 
     Returns:
         BookResponse: 생성된 동화책 정보
@@ -158,6 +201,10 @@ async def create_book_with_images(
         image_content_types=content_types,
         voice_id=voice_id
     )
+    
+    # ✅ URL 변환
+    book = convert_book_urls_to_api_format(book, storage_service)
+    
     return book
 
 @router.get(
@@ -172,6 +219,7 @@ async def create_book_with_images(
 async def list_books(
     current_user: User = Depends(get_current_user),
     service: BookOrchestratorService = Depends(get_book_service),
+    storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
     내 동화책 목록 조회
@@ -181,6 +229,7 @@ async def list_books(
     Args:
         current_user: 인증된 사용자 정보 (JWT에서 추출)
         service: BookOrchestratorService (의존성 주입)
+        storage_service: Storage Service (URL 변환용)
 
     Returns:
         List[BookResponse]: 동화책 목록
@@ -192,6 +241,11 @@ async def list_books(
         HTTPException 401: 인증 실패
     """
     books = await service.get_books(current_user.id)
+    
+    # ✅ URL 변환: 각 책에 대해 경로 → API URL 변환
+    for book in books:
+        book = convert_book_urls_to_api_format(book, storage_service)
+    
     return books
 
 @router.get(
@@ -209,6 +263,7 @@ async def get_book(
     book_id: UUID,
     current_user: User = Depends(get_current_user),
     service: BookOrchestratorService = Depends(get_book_service),
+    storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
     동화책 상세 조회
@@ -219,6 +274,7 @@ async def get_book(
         book_id (UUID): 조회할 동화책의 고유 ID
         current_user: 인증된 사용자 정보
         service: BookOrchestratorService (의존성 주입)
+        storage_service: Storage Service (URL 변환용)
 
     Returns:
         BookResponse: 동화책 상세 정보
@@ -245,6 +301,9 @@ async def get_book(
             storybook_id=str(book_id),
             user_id=str(current_user.id)
         )
+    
+    # ✅ URL 변환
+    book = convert_book_urls_to_api_format(book, storage_service)
 
     return book
 

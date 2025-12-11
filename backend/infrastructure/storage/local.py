@@ -35,7 +35,13 @@ class LocalStorageService(AbstractStorageService):
         path: str, 
         content_type: Optional[str] = None
     ) -> str:
-        """파일 저장"""
+        """
+        파일 저장
+        
+        Returns:
+            str: 파일 경로
+                 예: "shared/books/{id}/audios/page_1.mp3"
+        """
         full_path = self.base_path / path
         
         # 상위 디렉토리 생성
@@ -51,8 +57,10 @@ class LocalStorageService(AbstractStorageService):
                 content = content.encode('utf-8')
             async with aiofiles.open(full_path, "wb") as f:
                 await f.write(content)
-                
-        return self.get_url(path)
+        
+        # ✅ 경로만 반환 (일관성 유지)
+        # API 응답 시 get_url()로 /api/v1/files/ 경로 생성
+        return path.lstrip("/")
 
     async def get(self, path: str) -> bytes:
         """파일 조회"""
@@ -79,8 +87,17 @@ class LocalStorageService(AbstractStorageService):
         return full_path.exists()
 
     def get_url(self, path: str) -> str:
-        """파일 접근 URL 반환"""
-        # URL 결합 시 슬래시 처리 주의
-        base = self.base_url.rstrip("/")
+        """
+        파일 접근 URL 반환
+        
+        Local 스토리지는 /api/v1/files/ 엔드포인트를 통해 접근
+        상대 경로를 반환하여 프론트엔드에서 사용 가능하게 함
+        
+        Args:
+            path: 파일 경로
+        
+        Returns:
+            str: /api/v1/files/{path} 형식의 상대 URL
+        """
         clean_path = path.lstrip("/")
-        return f"{base}/{clean_path}"
+        return f"/api/v1/files/{clean_path}"

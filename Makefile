@@ -1,4 +1,4 @@
-.PHONY: help setup dev prod test clean migrate backup \
+.PHONY: help setup dev prod test clean migrate backup down \
 	dev-build dev-logs dev-logs-backend dev-logs-nginx dev-stop dev-down dev-restart \
 	prod-build prod-logs prod-logs-backend prod-logs-nginx prod-logs-cloudflared prod-stop prod-down prod-restart \
 	db-shell db-shell-prod db-migrate db-migrate-prod db-rollback db-rollback-prod db-reset db-backup db-backup-prod \
@@ -77,6 +77,11 @@ dev-down: ## 개발 모드 중지 및 컨테이너 제거
 dev-restart: ## 개발 모드 재시작
 	@echo "$(BLUE)Restarting development environment...$(NC)"
 	$(DOCKER_COMPOSE_DEV) restart
+
+down: ## 모든 컨테이너 중지 및 제거 (기본: 개발 환경)
+	@echo "$(BLUE)Stopping and removing all containers...$(NC)"
+	$(DOCKER_COMPOSE_DEV) down
+	@echo "$(GREEN)✓ All containers stopped and removed$(NC)"
 
 # ==================== Production ====================
 prod-build: ## 프로덕션 모드 이미지 빌드

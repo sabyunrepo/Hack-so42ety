@@ -37,7 +37,7 @@ export const deleteBook = async (bookId: string) => {
 
 export const getWordTTS = async (word: string, book_id: string) => {
   const response = await apiClient.get(
-    `/tts/word/generate/${book_id}/${encodeURIComponent(word)}`
+    `/tts/words/${book_id}/${encodeURIComponent(word)}`
   );
   return response.data;
 };
@@ -104,12 +104,21 @@ export const createVoiceClone = async ({
   const formData = new FormData();
 
   formData.append("name", name.trim());
-  formData.append("file", file);
+  formData.append("audio_file", file);  // ✅ 백엔드와 일치하도록 'audio_file'로 변경
 
   if (description) {
     formData.append("description", description);
   }
 
-  const response = await apiClient.post<VoiceCloneResponse>("/tts/clone/create", formData);
+  // ✅ Content-Type을 명시적으로 제거하여 브라우저가 자동으로 multipart/form-data 설정하도록 함
+  const response = await apiClient.post<VoiceCloneResponse>(
+    "/tts/voices/clone", 
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
   return response.data;
 };

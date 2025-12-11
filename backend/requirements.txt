@@ -11,8 +11,8 @@ psycopg2-binary==2.9.9   # PostgreSQL sync driver (for Alembic)
 
 # ==================== Authentication ====================
 python-jose[cryptography]==3.3.0  # JWT
-passlib[bcrypt]==1.7.4            # Password hashing
-bcrypt==4.1.1
+passlib[bcrypt]==1.7.4            # Password hashing (pinned for stability)
+bcrypt==4.1.1                     # Bcrypt backend (pinned for passlib compatibility)
 google-auth==2.25.2               # Google OAuth
 google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.2.0
