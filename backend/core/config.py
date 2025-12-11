@@ -106,6 +106,14 @@ class Settings(BaseSettings):
     kling_max_polling_time: int = Field(default=600, env="KLING_MAX_POLLING_TIME")
     kling_api_key: Optional[str] = Field(default=None, env="KLING_API_KEY")
 
+    # Runware Video Generation
+    runware_api_key: Optional[str] = Field(default=None, env="RUNWARE_API_KEY")
+    runware_api_url: str = Field(
+        default="https://api.runware.ai/v1", env="RUNWARE_API_URL"
+    )
+    runware_video_mode: str = Field(default="std", env="RUNWARE_VIDEO_MODE")
+    runware_video_duration: int = Field(default=5, env="RUNWARE_VIDEO_DURATION")
+
     @property
     def kling_access_keys(self) -> List[str]:
         """Kling Access Keys를 JSON 파싱하여 리스트로 반환"""

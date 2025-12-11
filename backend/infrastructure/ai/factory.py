@@ -19,6 +19,7 @@ from .base import (
 from .providers.google_ai import GoogleAIProvider
 from .providers.elevenlabs_tts import ElevenLabsTTSProvider
 from .providers.kling import KlingVideoProvider
+from .providers.runware_video import RunwareVideoProvider
 from .providers.custom_model import CustomModelProvider
 
 
@@ -62,9 +63,11 @@ class AIProviderFactory:
     def get_video_provider(provider_type: Optional[str] = None) -> VideoGenerationProvider:
         """비디오 생성 Provider 반환"""
         ptype = provider_type or settings.ai_video_provider
-        
+
         if ptype == VideoProviderType.KLING:
             return KlingVideoProvider()
+        elif ptype == VideoProviderType.RUNWARE:
+            return RunwareVideoProvider()
         else:
             return KlingVideoProvider()
 
