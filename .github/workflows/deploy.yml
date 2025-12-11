@@ -311,10 +311,10 @@ jobs:
             
             echo "🔄 Stopping existing containers..."
             # 1. 먼저 컨테이너 중지 (graceful shutdown)
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production stop || true
+            docker compose -f docker-compose.prod.yml stop || true
             
             # 2. 컨테이너 제거 및 네트워크 정리
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production down --remove-orphans || true
+            docker compose -f docker-compose.prod.yml down --remove-orphans || true
             
             # 3. 특정 컨테이너 이름으로 강제 제거 (혹시 모를 경우)
             echo "🔍 Checking for leftover containers..."
