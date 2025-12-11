@@ -5,6 +5,7 @@ services:
     container_name: moriai-postgres
     restart: unless-stopped
     environment:
+      APP_ENV: ${APP_ENV:-dev}
       POSTGRES_USER: ${POSTGRES_USER:-moriai_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-moriai_password}
       POSTGRES_DB: ${POSTGRES_DB:-moriai_db}
@@ -46,6 +47,7 @@ services:
       dockerfile: ./docker/backend/Dockerfile
     image: moriai-backend:latest
     container_name: moriai-backend
+    working_dir: /app/backend
     restart: unless-stopped
     init: true
     ports:

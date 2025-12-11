@@ -81,7 +81,7 @@ class AIGenerationFailedException(BusinessLogicException):
 class InvalidPageCountException(ValidationException):
     """잘못된 페이지 수"""
 
-    def __init__(self, page_count: int, min_pages: int = 1, max_pages: int = 20):
+    def __init__(self, page_count: int, min_pages: int = 1, max_pages: int = 5):
         super().__init__(
             error_code=ErrorCode.BIZ_BOOK_INVALID_PAGE_COUNT,
             message=f"페이지 수는 {min_pages}~{max_pages} 사이여야 합니다",

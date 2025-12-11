@@ -3,9 +3,7 @@ import asyncio
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import (
-    Book, Page, Dialogue, DialogueTranslation, DialogueAudio, BookStatus
-)
+from .models import Book, Page, Dialogue, DialogueTranslation, DialogueAudio, BookStatus
 from .repository import BookRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
@@ -18,7 +16,9 @@ from .exceptions import (
     StoriesImagesMismatchException,
     AIGenerationFailedException,
     InvalidPageCountException,
+    BookQuotaExceededException,
 )
+
 
 class BookOrchestratorService:
     """
@@ -40,6 +40,25 @@ class BookOrchestratorService:
         self.ai_factory = ai_factory
         self.db_session = db_session
 
+    async def _check_book_quota(self, user_id: uuid.UUID) -> None:
+        """
+        사용자의 책 생성 할당량을 검사합니다.
+
+        Args:
+            user_id: 사용자 UUID
+
+        Raises:
+            BookQuotaExceededException: 할당량 초과 시
+        """
+        mybooks = await self.book_repo.get_user_books(user_id, skip=0, limit=100)
+        current_count = len(mybooks)
+        max_books = settings.max_books_per_user
+
+        if current_count >= max_books:
+            raise BookQuotaExceededException(
+                current_count=current_count, max_allowed=max_books, user_id=str(user_id)
+            )
+
     async def create_storybook(
         self,
         user_id: uuid.UUID,
@@ -51,9 +70,14 @@ class BookOrchestratorService:
         """
         동화책 생성 (스토리 -> 이미지 -> 오디오)
         """
+        # 할당량 검사
+        await self._check_book_quota(user_id)
+
         # 페이지 수 검증
-        if num_pages < 1 or num_pages > 20:
-            raise InvalidPageCountException(page_count=num_pages)
+        if num_pages < 1 or num_pages > settings.max_pages_per_book:
+            raise InvalidPageCountException(
+                page_count=num_pages, max_pages=settings.max_pages_per_book
+            )
 
         # 1. 스토리 생성
         story_provider = self.ai_factory.get_story_provider()
@@ -74,11 +98,11 @@ class BookOrchestratorService:
             generated_data = await story_provider.generate_story_with_images(
                 prompt=full_prompt,
                 num_images=num_pages,
-                context={"target_age": target_age, "theme": theme}
+                context={"target_age": target_age, "theme": theme},
             )
         except Exception as e:
             raise AIGenerationFailedException(stage="스토리", reason=str(e))
-        
+
         # 2. 책 엔티티 생성
         book = await self.book_repo.create(
             user_id=user_id,
@@ -89,13 +113,13 @@ class BookOrchestratorService:
             is_public=is_public,
             visibility=visibility,
         )
-        
+
         try:
             pages_data = generated_data.get("pages", [])
-            
+
             # 3. 페이지 및 이미지 생성 (병렬 처리 가능)
             image_provider = self.ai_factory.get_image_provider()
-            
+
             for i, page_data in enumerate(pages_data):
                 content = page_data.get("content", "")
                 image_prompt = page_data.get("image_prompt", "")
@@ -105,9 +129,7 @@ class BookOrchestratorService:
                 if image_prompt:
                     try:
                         image_bytes = await image_provider.generate_image(
-                            prompt=image_prompt,
-                            width=1024,
-                            height=1024
+                            prompt=image_prompt, width=1024, height=1024
                         )
                     except Exception as e:
                         raise AIGenerationFailedException(stage="이미지", reason=str(e))
@@ -116,26 +138,26 @@ class BookOrchestratorService:
                     try:
                         file_name = f"{book.base_path}/images/page_{i+1}.png"
                         image_url = await self.storage_service.save(
-                            image_bytes,
-                            file_name,
-                            content_type="image/png"
+                            image_bytes, file_name, content_type="image/png"
                         )
                         # storage_service.save()가 반환하는 URL 그대로 사용
                         # Local: /api/v1/files/...
                         # S3: Pre-signed URL
                     except Exception as e:
-                        raise ImageUploadFailedException(filename=file_name, reason=str(e))
-                
+                        raise ImageUploadFailedException(
+                            filename=file_name, reason=str(e)
+                        )
+
                 # 페이지 저장
                 page = await self.book_repo.add_page(
                     book_id=book.id,
                     page_data={
                         "sequence": i + 1,
                         "image_url": image_url,
-                        "image_prompt": image_prompt
-                    }
+                        "image_prompt": image_prompt,
+                    },
                 )
-                
+
                 # 4. (옵션) TTS 생성 - 대사가 있다면
                 # 현재 구조에서는 Page content 전체를 읽거나, 별도 Dialogue 파싱이 필요
                 # 여기서는 간단히 Page content 전체를 TTS로 변환하여 Page의 audio_url에 저장한다고 가정
@@ -150,12 +172,8 @@ class BookOrchestratorService:
                         speaker="Narrator",
                         sequence=1,
                         translations=[
-                            {
-                                "language_code": "en",
-                                "text": content,
-                                "is_primary": True
-                            }
-                        ]
+                            {"language_code": "en", "text": content, "is_primary": True}
+                        ],
                     )
 
                     # Generate and add audio
@@ -167,19 +185,23 @@ class BookOrchestratorService:
                     try:
                         audio_file_name = f"{book.base_path}/audios/page_{i+1}.mp3"
                         audio_url = await self.storage_service.save(
-                            audio_bytes,
-                            audio_file_name,
-                            content_type="audio/mpeg"
+                            audio_bytes, audio_file_name, content_type="audio/mpeg"
                         )
                         # storage_service.save()가 반환하는 URL 그대로 사용
                     except Exception as e:
-                        raise ImageUploadFailedException(filename=audio_file_name, reason=str(e))
+                        raise ImageUploadFailedException(
+                            filename=audio_file_name, reason=str(e)
+                        )
 
                     await self.book_repo.add_dialogue_audio(
                         dialogue_id=dialogue.id,
                         language_code="en",
-                        voice_id=settings.DEFAULT_VOICE_ID if hasattr(settings, 'DEFAULT_VOICE_ID') else "default",
-                        audio_url=audio_url
+                        voice_id=(
+                            settings.DEFAULT_VOICE_ID
+                            if hasattr(settings, "DEFAULT_VOICE_ID")
+                            else "default"
+                        ),
+                        audio_url=audio_url,
                     )
 
             # 상태 업데이트
@@ -214,43 +236,53 @@ class BookOrchestratorService:
         """
         이미지 기반 동화책 생성 (Image-to-Image)
         """
+        # 할당량 검사
+        await self._check_book_quota(user_id)
+
         # 스토리와 이미지 개수 검증
         if len(stories) != len(images):
             raise StoriesImagesMismatchException(
-                stories_count=len(stories),
-                images_count=len(images)
+                stories_count=len(stories), images_count=len(images)
             )
 
         # 페이지 수 검증
-        if len(stories) < 1 or len(stories) > 20:
-            raise InvalidPageCountException(page_count=len(stories))
+        if len(stories) < 1 or len(stories) > settings.max_pages_per_book:
+            raise InvalidPageCountException(
+                page_count=len(stories), max_pages=settings.max_pages_per_book
+            )
 
         # 1. 책 엔티티 생성 (기본값: is_public=False, visibility="private")
         book = await self.book_repo.create(
             user_id=user_id,
-            title=stories[0][:20] if stories else "Untitled Story", # 첫 문장을 제목으로 임시 사용
-            target_age="5-7", # 기본값
+            title=(
+                stories[0][:20] if stories else "Untitled Story"
+            ),  # 첫 문장을 제목으로 임시 사용
+            target_age="5-7",  # 기본값
             theme="custom",
             status=BookStatus.CREATING,
             is_public=False,  # 기본값
             visibility="private",  # 기본값
         )
-        
+
         try:
             image_provider = self.ai_factory.get_image_provider()
             tts_provider = self.ai_factory.get_tts_provider()
-            
-            for i, (story, image_bytes, content_type) in enumerate(zip(stories, images, image_content_types)):
+
+            for i, (story, image_bytes, content_type) in enumerate(
+                zip(stories, images, image_content_types)
+            ):
                 # 2. 이미지 생성 (Image-to-Image)
                 # 원본 이미지를 먼저 저장 (옵션)
                 # original_image_url = await self.storage_service.save(...)
 
                 # AI 이미지 생성
                 try:
-                    generated_image_bytes = await image_provider.generate_image_from_image(
-                        image_data=image_bytes,
-                        prompt=story, # 스토리를 프롬프트로 사용
-                        style="cartoon"
+                    generated_image_bytes = (
+                        await image_provider.generate_image_from_image(
+                            image_data=image_bytes,
+                            prompt=story,  # 스토리를 프롬프트로 사용
+                            style="cartoon",
+                        )
                     )
                 except Exception as e:
                     raise AIGenerationFailedException(stage="이미지", reason=str(e))
@@ -259,24 +291,22 @@ class BookOrchestratorService:
                 try:
                     file_name = f"{book.base_path}/images/page_{i+1}.png"
                     image_url = await self.storage_service.save(
-                        generated_image_bytes,
-                        file_name,
-                        content_type="image/png"
+                        generated_image_bytes, file_name, content_type="image/png"
                     )
                     # storage_service.save()가 반환하는 URL 그대로 사용
                 except Exception as e:
                     raise ImageUploadFailedException(filename=file_name, reason=str(e))
-                
+
                 # 3. 페이지 저장
                 page = await self.book_repo.add_page(
                     book_id=book.id,
                     page_data={
                         "sequence": i + 1,
                         "image_url": image_url,
-                        "image_prompt": story # 프롬프트로 사용된 스토리 저장
-                    }
+                        "image_prompt": story,  # 프롬프트로 사용된 스토리 저장
+                    },
                 )
-                
+
                 # 4. TTS 생성
                 if story:
                     # Create dialogue with translations
@@ -285,36 +315,39 @@ class BookOrchestratorService:
                         speaker="Narrator",
                         sequence=1,
                         translations=[
-                            {
-                                "language_code": "en",
-                                "text": story,
-                                "is_primary": True
-                            }
-                        ]
+                            {"language_code": "en", "text": story, "is_primary": True}
+                        ],
                     )
 
                     # Generate and add audio
                     try:
-                        audio_bytes = await tts_provider.text_to_speech(story, voice_id=voice_id)
+                        audio_bytes = await tts_provider.text_to_speech(
+                            story, voice_id=voice_id
+                        )
                     except Exception as e:
                         raise AIGenerationFailedException(stage="음성", reason=str(e))
 
                     try:
                         audio_file_name = f"{book.base_path}/audios/page_{i+1}.mp3"
                         audio_url = await self.storage_service.save(
-                            audio_bytes,
-                            audio_file_name,
-                            content_type="audio/mpeg"
+                            audio_bytes, audio_file_name, content_type="audio/mpeg"
                         )
                         # storage_service.save()가 반환하는 URL 그대로 사용
                     except Exception as e:
-                        raise ImageUploadFailedException(filename=audio_file_name, reason=str(e))
+                        raise ImageUploadFailedException(
+                            filename=audio_file_name, reason=str(e)
+                        )
 
                     await self.book_repo.add_dialogue_audio(
                         dialogue_id=dialogue.id,
                         language_code="en",
-                        voice_id=voice_id or (settings.DEFAULT_VOICE_ID if hasattr(settings, 'DEFAULT_VOICE_ID') else "default"),
-                        audio_url=audio_url
+                        voice_id=voice_id
+                        or (
+                            settings.DEFAULT_VOICE_ID
+                            if hasattr(settings, "DEFAULT_VOICE_ID")
+                            else "default"
+                        ),
+                        audio_url=audio_url,
                     )
 
             # 상태 업데이트
@@ -352,8 +385,7 @@ class BookOrchestratorService:
         # 권한 체크 (user_id가 제공된 경우)
         if user_id and book.user_id != user_id:
             raise StorybookUnauthorizedException(
-                storybook_id=str(book_id),
-                user_id=str(user_id)
+                storybook_id=str(book_id), user_id=str(user_id)
             )
 
         return book
@@ -368,14 +400,13 @@ class BookOrchestratorService:
 
         if book.user_id != user_id:
             raise StorybookUnauthorizedException(
-                storybook_id=str(book_id),
-                user_id=str(user_id)
+                storybook_id=str(book_id), user_id=str(user_id)
             )
 
         # 스토리지 파일 삭제 로직 추가 필요 (S3 비용 절감)
         # ...
 
-        result = await self.book_repo.delete(book_id)
+        result = await self.book_repo.soft_delete(book_id)
         if result:
             await self.db_session.commit()
         return result
