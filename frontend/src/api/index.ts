@@ -37,7 +37,7 @@ export const deleteBook = async (bookId: string) => {
 
 export const getWordTTS = async (word: string, book_id: string) => {
   const response = await apiClient.get(
-    `/tts/word/generate/${book_id}/${encodeURIComponent(word)}`
+    `/tts/words/${book_id}/${encodeURIComponent(word)}`
   );
   return response.data;
 };
