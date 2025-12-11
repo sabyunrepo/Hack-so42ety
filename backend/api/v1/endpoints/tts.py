@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, status, Form
+from fastapi import APIRouter, Depends, status, Form, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
+from uuid import UUID
 import logging
 
 from backend.core.database.session import get_db
@@ -19,8 +20,15 @@ from backend.features.tts.schemas import (
     AudioResponse,
     VoiceResponse,
     CreateVoiceCloneRequest,
+    WordTTSResponse,
 )
 from backend.features.tts.models import VoiceVisibility
+from backend.features.tts.exceptions import (
+    WordTooLongException,
+    WordInvalidException,
+    BookVoiceNotConfiguredException,
+)
+from backend.features.storybook.exceptions import StorybookNotFoundException
 from fastapi import UploadFile, File
 
 logger = logging.getLogger(__name__)
@@ -264,3 +272,100 @@ async def create_voice_clone(
         "status": voice.status.value,
         "is_custom": True,
     }
+
+
+@router.get(
+    "/words/{book_id}/{word}",
+    response_model=WordTTSResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Book별 단어 TTS 생성",
+    responses={
+        200: {"description": "TTS 생성 성공 (캐시 포함)"},
+        400: {"description": "유효하지 않은 단어"},
+        404: {"description": "Book을 찾을 수 없거나 voice_id가 설정되지 않음"},
+        500: {"description": "서버 오류 (ElevenLabs API 실패)"},
+    },
+)
+async def generate_word_tts(
+    book_id: UUID,
+    word: str,
+    service: TTSService = Depends(get_tts_service),
+):
+    """
+    Book별 단어 TTS 생성 (캐싱 지원)
+    
+    Book의 voice_id를 사용하여 단어를 음성으로 변환합니다.
+    이미 생성된 단어는 캐시를 재사용하여 빠르게 응답합니다.
+    
+    저장 경로: /data/shared/books/{book_id}/words/{word}.mp3
+    
+    Args:
+        book_id (UUID): Book 고유 ID
+        word (str): 변환할 단어 (최대 50자)
+        service: TTSService (의존성 주입)
+    
+    Returns:
+        WordTTSResponse: 생성된 파일 정보
+            - success: 성공 여부
+            - word: 변환된 단어
+            - file_path: 파일 시스템 경로
+            - audio_url: API 접근 URL
+            - cached: 캐시 사용 여부
+            - duration_ms: 생성 소요 시간 (밀리초)
+            - voice_id: 사용된 음성 ID
+    
+    Raises:
+        HTTPException 400: 유효하지 않은 단어 (길이 초과, 특수문자 포함)
+        HTTPException 404: Book을 찾을 수 없거나 voice_id가 설정되지 않음
+        HTTPException 500: TTS 생성 실패
+    
+    Note:
+        - Book에 voice_id가 설정되어 있어야 합니다
+        - 같은 Book의 같은 단어는 캐시를 재사용합니다
+        - 단어에는 경로 조작 문자(., /, \\)를 포함할 수 없습니다
+        - 단어 길이는 최대 50자입니다
+    
+    Example:
+        ```
+        GET /api/v1/tts/words/32e543c7-a845-4cfb-a93d-a0153dc9e063/hello
+        
+        Response:
+        {
+          "success": true,
+          "word": "hello",
+          "file_path": "/data/shared/books/32e543c7.../words/hello.mp3",
+          "audio_url": "/api/v1/files/shared/books/32e543c7.../words/hello.mp3",
+          "cached": false,
+          "duration_ms": 245,
+          "voice_id": "uzyfnLLlKo55AbgBU5uH"
+        }
+        ```
+    """
+    try:
+        result = await service.generate_word_tts(book_id=book_id, word=word)
+        return WordTTSResponse(**result)
+    
+    except StorybookNotFoundException as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Book을 찾을 수 없습니다: {book_id}"
+        )
+    
+    except BookVoiceNotConfiguredException as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"이 Book에는 음성이 설정되지 않았습니다: {book_id}"
+        )
+    
+    except (WordTooLongException, WordInvalidException) as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    
+    except Exception as e:
+        logger.error(f"Word TTS 생성 실패: book={book_id}, word={word}, error={e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"TTS 생성 중 오류가 발생했습니다: {str(e)}"
+        )

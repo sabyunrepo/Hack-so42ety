@@ -50,6 +50,9 @@ class Book(Base):
 
     # 상태 (draft, published)
     status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False)
+    
+    # TTS 음성 ID (ElevenLabs voice ID for word TTS)
+    voice_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # 기본 제공 책 여부 (공통 라이브러리)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
