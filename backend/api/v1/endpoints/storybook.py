@@ -12,6 +12,7 @@ from backend.features.storybook.service import BookOrchestratorService
 from backend.features.storybook.repository import BookRepository
 from backend.features.storybook.schemas import CreateBookRequest, BookResponse, BookListResponse
 from backend.features.storybook.models import Book
+from backend.features.tts.dependencies import get_tts_producer # Import Dependency
 
 router = APIRouter()
 
@@ -73,6 +74,7 @@ def get_book_service(
     db: AsyncSession = Depends(get_db),
     storage_service = Depends(get_storage_service),
     ai_factory = Depends(get_ai_factory),
+    tts_producer = Depends(get_tts_producer), # Inject Producer
 ) -> BookOrchestratorService:
     """BookOrchestratorService 의존성 주입"""
     book_repo = BookRepository(db)
@@ -81,6 +83,7 @@ def get_book_service(
         storage_service=storage_service,
         ai_factory=ai_factory,
         db_session=db,
+        tts_producer=tts_producer,
     )
 
 @router.post(
@@ -151,11 +154,9 @@ async def create_book(
         is_public=request.is_public,  # 기본값 False
         visibility=request.visibility,  # 기본값 "private"
     )
-    
-    # ✅ URL 변환: 경로 → API URL 또는 Pre-signed URL
-    book = convert_book_urls_to_api_format(book, storage_service)
-    
-    return book
+
+    # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
+    return BookResponse.from_orm_with_urls(book, storage_service)
 
 @router.post(
     "/create/with-images",
@@ -222,11 +223,9 @@ async def create_book_with_images(
         image_content_types=content_types,
         voice_id=voice_id
     )
-    
-    # ✅ URL 변환
-    book = convert_book_urls_to_api_format(book, storage_service)
-    
-    return book
+
+    # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
+    return BookResponse.from_orm_with_urls(book, storage_service)
 
 @router.get(
     "/books",
@@ -262,12 +261,9 @@ async def list_books(
         HTTPException 401: 인증 실패
     """
     books = await service.get_books(current_user.id)
-    
-    # ✅ URL 변환: 각 책에 대해 경로 → API URL 변환
-    for book in books:
-        book = convert_book_urls_to_api_format(book, storage_service)
-    
-    return books
+
+    # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
+    return [BookResponse.from_orm_with_urls(book, storage_service) for book in books]
 
 @router.get(
     "/books/{book_id}",
@@ -322,11 +318,9 @@ async def get_book(
             storybook_id=str(book_id),
             user_id=str(current_user.id)
         )
-    
-    # ✅ URL 변환
-    book = convert_book_urls_to_api_format(book, storage_service)
 
-    return book
+    # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
+    return BookResponse.from_orm_with_urls(book, storage_service)
 
 @router.delete(
     "/books/{book_id}",

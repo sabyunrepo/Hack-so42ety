@@ -298,6 +298,14 @@ class DialogueAudio(Base):
     # ElevenLabs 음성 ID (다양한 음성 지원)
     voice_id: Mapped[str] = mapped_column(String(100), nullable=False)
 
+    # 상태 (PENDING, PROCESSING, COMPLETED, FAILED)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="PENDING",
+        server_default="PENDING",
+        nullable=False
+    )
+
     # 오디오 파일 URL
     audio_url: Mapped[str] = mapped_column(String(1024), nullable=False)
 
