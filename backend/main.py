@@ -24,9 +24,11 @@ from .core.logging import configure_logging, get_logger
 
 # Sentry 초기화
 if settings.sentry_dsn:
+    sentry_sdk.init(
         dsn=settings.sentry_dsn,
         environment=settings.sentry_environment,
         traces_sample_rate=settings.sentry_traces_sample_rate,
+    )
 
 # 로깅 설정 초기화
 configure_logging()
