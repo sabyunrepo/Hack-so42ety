@@ -269,7 +269,8 @@ def upgrade() -> None:
 
     # ==================== Initial Data: System User ====================
     system_user_id = '00000000-0000-0000-0000-000000000001'
-    system_password_hash = '$2b$12$Otv/lV/GXJf7PqpQFtaIkOjOooVovCN9KAMgXU6RJjBkix.Pz2TdK'  # Password: 123123123
+    # Password: 123123123 (Argon2id hash)
+    system_password_hash = '$argon2id$v=19$m=65536,t=4,p=4$kdI6pxQi5JwTohRCCGHMeQ$6O4Jfwk+jrdhX7xGsNbBGaJICDU/DECYbQFTYIoCHRQ'
     
     op.execute(f"""
         INSERT INTO users (id, email, password_hash, is_active, created_at, updated_at)
