@@ -111,8 +111,16 @@ class Settings(BaseSettings):
     runware_api_url: str = Field(
         default="https://api.runware.ai/v1", env="RUNWARE_API_URL"
     )
+    # runware_video_model: str = Field(default="runware:100@1", env="RUNWARE_VIDEO_MODEL")
+    runware_video_model: str = Field(default="klingai:3@2", env="RUNWARE_VIDEO_MODEL")
     runware_video_mode: str = Field(default="std", env="RUNWARE_VIDEO_MODE")
     runware_video_duration: int = Field(default=5, env="RUNWARE_VIDEO_DURATION")
+
+    # Runware Image-to-Image Parameters
+    runware_img2img_strength: float = Field(default=0.7, env="RUNWARE_IMG2IMG_STRENGTH")
+    runware_img2img_cfg_scale: float = Field(default=7.0, env="RUNWARE_IMG2IMG_CFG_SCALE")
+    runware_img2img_steps: int = Field(default=30, env="RUNWARE_IMG2IMG_STEPS")
+    runware_img2img_model: str = Field(default="civitai:102438@133677", env="RUNWARE_IMG2IMG_MODEL")
 
     @property
     def kling_access_keys(self) -> List[str]:

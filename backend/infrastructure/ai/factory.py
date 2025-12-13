@@ -19,7 +19,7 @@ from .base import (
 from .providers.google_ai import GoogleAIProvider
 from .providers.elevenlabs_tts import ElevenLabsTTSProvider
 from .providers.kling import KlingVideoProvider
-from .providers.runware_video import RunwareVideoProvider
+from .providers.runware import RunwareProvider
 from .providers.custom_model import CustomModelProvider
 
 
@@ -46,6 +46,8 @@ class AIProviderFactory:
         
         if ptype == AIProviderType.GOOGLE:
             return GoogleAIProvider()
+        elif ptype == AIProviderType.RUNWARE:
+            return RunwareProvider()
         else:
             return GoogleAIProvider()
 
@@ -67,7 +69,7 @@ class AIProviderFactory:
         if ptype == VideoProviderType.KLING:
             return KlingVideoProvider()
         elif ptype == VideoProviderType.RUNWARE:
-            return RunwareVideoProvider()
+            return RunwareProvider()
         else:
             return KlingVideoProvider()
 

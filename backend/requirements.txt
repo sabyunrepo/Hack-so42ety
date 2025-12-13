@@ -35,6 +35,7 @@ redis[hiredis]==5.0.1  # Redis async client (replaces aioredis for Python 3.12 c
 google-generativeai==0.3.1  # Google Gemini
 openai==1.6.1               # OpenAI (GPT) - 추후 사용
 elevenlabs==0.2.26          # ElevenLabs TTS
+google-genai
 
 # ==================== File Processing ====================
 pillow==10.1.0              # Image processing

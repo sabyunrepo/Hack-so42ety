@@ -9,6 +9,7 @@ import httpx
 
 from ..base import StoryGenerationProvider, ImageGenerationProvider
 from ....core.config import settings
+from google import genai
 
 
 class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
@@ -27,6 +28,13 @@ class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
         self.api_key = api_key or settings.google_api_key
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
         self.timeout = httpx.Timeout(settings.http_timeout, read=settings.http_read_timeout)
+        self.client: genai.Client = None  # 초기에는 None
+        self._init_client()
+
+    def _init_client(self):
+        """google-genai 클라이언트 초기화"""
+        if not self.client:
+            self.client = genai.Client(api_key=self.api_key)
 
     async def generate_story(
         self,
@@ -50,24 +58,15 @@ class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
         # 컨텍스트를 프롬프트에 통합
         full_prompt = self._build_story_prompt(prompt, context)
 
-        # Gemini API 호출
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/models/gemini-pro:generateContent",
-                params={"key": self.api_key},
-                json={
-                    "contents": [{"parts": [{"text": full_prompt}]}],
-                    "generationConfig": {
-                        "temperature": temperature or 0.7,
-                        "maxOutputTokens": max_length or 2048,
-                    },
-                },
-            )
-            response.raise_for_status()
 
-        result = response.json()
-        story = result["candidates"][0]["content"]["parts"][0]["text"]
-        return story.strip()
+        # Gemini API 호출
+        response = self.client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=full_prompt,
+        )
+
+        result = response.text
+        return result
 
     async def generate_story_with_images(
         self,

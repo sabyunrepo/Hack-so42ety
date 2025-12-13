@@ -1,13 +1,14 @@
 import uuid
 import asyncio
+import logging
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from .models import Book, Page, Dialogue, DialogueTranslation, DialogueAudio, BookStatus
 from .repository import BookRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.core.config import settings
+from .tasks.runner import create_storybook_dag
 from .exceptions import (
     StorybookNotFoundException,
     StorybookUnauthorizedException,
@@ -18,6 +19,12 @@ from .exceptions import (
     InvalidPageCountException,
     BookQuotaExceededException,
 )
+
+#test
+from PIL import Image
+from io import BytesIO
+
+logger = logging.getLogger(__name__)
 
 
 class BookOrchestratorService:
@@ -39,6 +46,293 @@ class BookOrchestratorService:
         self.storage_service = storage_service
         self.ai_factory = ai_factory
         self.db_session = db_session
+
+    async def test_fun(
+        self,
+        mode: str = "image",
+        image_bytes: Optional[bytes] = None,
+        prompt: str = "a cute cat playing with a ball",
+        strength: float = 0.7,
+        cfg_scale: float = 7.0,
+        steps: int = 30,
+        video_duration: int = 5,
+        video_width: int = 1920,
+        video_height: int = 1080,
+    ) -> dict:
+        """
+        Runware 테스트 함수 (이미지 또는 비디오 생성)
+
+        Args:
+            mode: 생성 모드 ("image", "video")
+            image_bytes: 입력 이미지 바이너리 (None인 경우 Text-to-Image 모드)
+            prompt: 생성 프롬프트
+            strength: 이미지-to-이미지 변환 강도 (0.0-1.0)
+            cfg_scale: 프롬프트 가이드 강도
+            steps: 디노이징 스텝
+            video_duration: 비디오 길이 (초, video 모드일 때)
+            video_width: 비디오 너비 (video 모드일 때)
+            video_height: 비디오 높이 (video 모드일 때)
+
+        Returns:
+            dict: 생성 결과 정보
+        """
+        if mode == "video":
+            return await self._test_video_generation(
+                image_bytes=image_bytes,
+                prompt=prompt,
+                duration=video_duration,
+                width=video_width,
+                height=video_height,
+            )
+        else:
+            return await self._test_image_generation(
+                image_bytes=image_bytes,
+                prompt=prompt,
+                strength=strength,
+                cfg_scale=cfg_scale,
+                steps=steps,
+            )
+
+    async def _test_image_generation(
+        self,
+        image_bytes: Optional[bytes] = None,
+        prompt: str = "a cute cat playing with a ball",
+        strength: float = 0.7,
+        cfg_scale: float = 7.0,
+        steps: int = 30,
+    ) -> dict:
+        """이미지 생성 테스트 (내부 메서드)"""
+        import time
+        import os
+
+        print(f"[test_fun] Starting image generation test")
+        if image_bytes:
+            print(f"  Mode: image-to-image")
+            print(f"  Prompt: {prompt}")
+            print(f"  Strength: {strength}, CFGScale: {cfg_scale}, Steps: {steps}")
+        else:
+            print(f"  Mode: text-to-image")
+            print(f"  Prompt: {prompt}")
+
+        # Runware image provider 가져오기
+        image_provider = self.ai_factory.get_image_provider()
+
+        try:
+            # 이미지 생성 (text-to-image 또는 image-to-image)
+            if image_bytes:
+                # Image-to-Image 모드
+                generated_image_bytes = await image_provider.generate_image_from_image(
+                    image_data=image_bytes,
+                    prompt=prompt,
+                    width=1024,
+                    height=1024,
+                    strength=strength,
+                    cfg_scale=cfg_scale,
+                    steps=steps
+                )
+                gen_mode = "image-to-image"
+            else:
+                # Text-to-Image 모드
+                generated_image_bytes = await image_provider.generate_image(
+                    prompt=prompt,
+                    width=1024,
+                    height=1024
+                )
+                gen_mode = "text-to-image"
+
+            image_size = len(generated_image_bytes)
+            print(f"[test_fun] Image generated successfully. Size: {image_size} bytes")
+
+            # backend 폴더 안에 임시 저장
+            timestamp = int(time.time() * 1000)
+            temp_dir = os.path.join(os.path.dirname(__file__), "..", "..", "temp_images")
+            os.makedirs(temp_dir, exist_ok=True)
+
+            temp_file_path = os.path.join(temp_dir, f"runware_test_{gen_mode}_{timestamp}.png")
+            with open(temp_file_path, "wb") as f:
+                f.write(generated_image_bytes)
+
+            print(f"[test_fun] Image saved to: {temp_file_path}")
+
+            return {
+                "status": "success",
+                "image_size": image_size,
+                "image_path": temp_file_path,
+                "mode": gen_mode,
+                "parameters": {
+                    "prompt": prompt,
+                    "strength": strength if gen_mode == "image-to-image" else None,
+                    "cfg_scale": cfg_scale,
+                    "steps": steps
+                },
+                "message": f"Image generated ({gen_mode}) and saved! Size: {image_size} bytes ({image_size / 1024:.2f} KB)"
+            }
+
+        except Exception as e:
+            logger.error(f"[test_fun] Error during image generation: {str(e)}")
+            return {
+                "status": "error",
+                "image_size": 0,
+                "image_path": None,
+                "mode": "image-to-image" if image_bytes else "text-to-image",
+                "parameters": {
+                    "prompt": prompt,
+                    "strength": strength if image_bytes else None,
+                    "cfg_scale": cfg_scale,
+                    "steps": steps
+                },
+                "message": f"Image generation failed: {str(e)}"
+            }
+
+    async def _test_video_generation(
+        self,
+        image_bytes: Optional[bytes] = None,
+        prompt: str = "animate this scene with natural movement",
+        duration: int = 5,
+        width: int = 1920,
+        height: int = 1080,
+    ) -> dict:
+        """
+        비디오 생성 테스트 (내부 메서드)
+
+        이미지 기반 비디오 생성:
+        1. 이미지가 제공되지 않으면 먼저 이미지 생성
+        2. 생성된/제공된 이미지로 비디오 생성
+        3. Polling으로 완료 대기
+        4. 완료된 비디오 다운로드 및 로컬 저장
+        """
+        import time
+        import os
+        import asyncio
+        import traceback
+
+        print(f"[test_fun] Starting video generation test")
+        print(f"  Prompt: {prompt}")
+        print(f"  Duration: {duration}s, Size: {width}x{height}")
+
+        # Runware provider 가져오기 (video provider는 image provider와 동일)
+        video_provider = self.ai_factory.get_image_provider()
+
+        try:
+            # Step 1: 이미지 준비 (없으면 생성 - 선택사항)
+            if image_bytes is None:
+                print("[test_fun] No image provided - using text-to-video mode")
+                # Text-to-video 모드: 이미지 없이 텍스트만으로 비디오 생성
+            else:
+                print(f"[test_fun] Image provided. Size: {len(image_bytes)} bytes")
+                # Image-to-video 모드: 제공된 이미지로 비디오 생성
+
+            # Step 2: 비디오 생성 시작
+            print("[test_fun] Starting video generation...")
+            task_uuid = await video_provider.generate_video(
+                image_data=image_bytes,  # None이면 text-to-video, 있으면 image-to-video
+                prompt=prompt,
+                duration=duration,
+                width=width,
+                height=height,
+            )
+            print(f"[test_fun] Video generation started. task_uuid: {task_uuid}")
+
+            # Step 3: Polling으로 완료 대기 (최대 10분)
+            max_wait_time = 600  # 10분
+            poll_interval = 10   # 10초마다 체크
+            elapsed_time = 0
+
+            print(f"[test_fun] Polling for video completion (max {max_wait_time}s)...")
+
+            video_url = None
+            while elapsed_time < max_wait_time:
+                await asyncio.sleep(poll_interval)
+                elapsed_time += poll_interval
+
+                print(f"[test_fun] Checking video status (elapsed: {elapsed_time}s)...")
+                status_result = await video_provider.check_video_status(task_uuid)
+                print(f"[test_fun] Status result: {status_result}")
+
+                status = status_result.get("status")
+                progress = status_result.get("progress", 0)
+
+                print(f"[test_fun] Status: {status}, Progress: {progress}%, Elapsed: {elapsed_time}s")
+
+                if status == "completed":
+                    video_url = status_result.get("video_url")
+                    print(f"[test_fun] Video generation completed! URL: {video_url}")
+                    break
+                elif status == "failed":
+                    error_msg = status_result.get("error", "Unknown error")
+                    print(f"[test_fun] Video generation failed with error: {error_msg}")
+                    print(f"[test_fun] Full status result: {status_result}")
+                    raise Exception(f"Video generation failed: {error_msg}")
+
+            if video_url is None:
+                raise Exception(f"Video generation timed out after {max_wait_time}s")
+
+            # Step 4: 비디오 다운로드
+            print(f"[test_fun] Downloading video from: {video_url}")
+            video_bytes = await video_provider.download_video(video_url)
+            video_size = len(video_bytes)
+            print(f"[test_fun] Video downloaded. Size: {video_size} bytes ({video_size / 1024 / 1024:.2f} MB)")
+
+            # Step 5: 로컬 저장
+            timestamp = int(time.time() * 1000)
+            temp_dir = os.path.join(os.path.dirname(__file__), "..", "..", "temp_videos")
+            os.makedirs(temp_dir, exist_ok=True)
+
+            temp_file_path = os.path.join(temp_dir, f"runware_test_video_{timestamp}.mp4")
+            with open(temp_file_path, "wb") as f:
+                f.write(video_bytes)
+
+            print(f"[test_fun] Video saved to: {temp_file_path}")
+
+            return {
+                "status": "success",
+                "video_size": video_size,
+                "video_path": temp_file_path,
+                "video_url": video_url,
+                "mode": "image-to-video",
+                "parameters": {
+                    "prompt": prompt,
+                    "duration": duration,
+                    "width": width,
+                    "height": height,
+                },
+                "processing_time": elapsed_time,
+                "message": f"Video generated and saved! Size: {video_size} bytes ({video_size / 1024 / 1024:.2f} MB), Time: {elapsed_time}s"
+            }
+
+        except Exception as e:
+            # 상세한 에러 정보 출력
+            error_type = type(e).__name__
+            error_message = str(e)
+            error_traceback = traceback.format_exc()
+
+            print(f"\n{'='*80}")
+            print(f"[test_fun] ERROR DETAILS:")
+            print(f"  Error Type: {error_type}")
+            print(f"  Error Message: {error_message}")
+            print(f"  Error Repr: {repr(e)}")
+            print(f"\nFull Traceback:")
+            print(error_traceback)
+            print(f"{'='*80}\n")
+
+            logger.error(f"[test_fun] Error during video generation: {error_type}: {error_message}")
+            logger.error(f"Traceback: {error_traceback}")
+
+            return {
+                "status": "error",
+                "video_size": 0,
+                "video_path": None,
+                "mode": "image-to-video",
+                "parameters": {
+                    "prompt": prompt,
+                    "duration": duration,
+                    "width": width,
+                    "height": height,
+                },
+                "error_type": error_type,
+                "error_details": error_message,
+                "message": f"Video generation failed: {error_type}: {error_message}"
+            }
 
     async def _check_book_quota(self, user_id: uuid.UUID) -> None:
         """
@@ -66,6 +360,8 @@ class BookOrchestratorService:
         num_pages: int = 5,
         target_age: str = "5-7",
         theme: str = "adventure",
+        is_public: bool = False,
+        visibility: str = "private",
     ) -> Book:
         """
         동화책 생성 (스토리 -> 이미지 -> 오디오)
@@ -224,6 +520,97 @@ class BookOrchestratorService:
             book.status = BookStatus.FAILED
             await self.db_session.commit()
             raise StorybookCreationFailedException(reason=str(e))
+
+    async def create_storybook_async(
+        self,
+        user_id: uuid.UUID,
+        stories: List[str],
+        images: List[bytes],
+        voice_id: str,
+        level: int,
+
+    ) -> Book:
+        """
+        비동기 동화책 생성 (즉시 응답)
+
+        DAG-Task 패턴을 사용하여 백그라운드에서 동화책 생성 파이프라인 실행
+        - API 응답: <1초 (Book 레코드만 생성 후 즉시 반환)
+        - 전체 처리: ~55초 (백그라운드에서 병렬 실행)
+
+        진행 상황은 book.pipeline_stage, book.progress_percentage로 추적 가능
+
+        Args:
+            user_id: 사용자 UUID
+            prompt: 동화책 주제/프롬프트
+            num_pages: 페이지 수 (기본 5)
+            target_age: 대상 연령대 (기본 "5-7")
+            theme: 테마 (기본 "adventure")
+            is_public: 공개 여부 (기본 False)
+            visibility: 가시성 설정 (기본 "private")
+
+        Returns:
+            Book: status=CREATING, pipeline_stage="initializing", progress=0
+
+        Raises:
+            BookQuotaExceededException: 할당량 초과
+            InvalidPageCountException: 페이지 수 범위 초과
+        """
+
+        # 1. 할당량 검사
+        print(f"[BookService] user_id={user_id} 동화책 갯수 검사 시작")
+        await self._check_book_quota(user_id)
+
+        # 2. 페이지 수 검증
+        print(f"[BookService] user_id={user_id} 동화책 페이지 수 검사 시작")
+        story_page_count = len(stories)
+        if story_page_count < 1 or story_page_count > settings.max_pages_per_book:
+            raise InvalidPageCountException(
+                page_count=story_page_count, max_pages=settings.max_pages_per_book
+            )
+        
+        # 3. 페이지 수, 이미지 수 검증
+        print(f"[BookService] user_id={user_id} 동화책 페이지 수 및 이미지 수 검사 시작")
+        if story_page_count != len(images):
+            raise StoriesImagesMismatchException(
+                stories_count=story_page_count, images_count=len(images)
+            )
+
+
+        # 3. Book 레코드 즉시 생성 (모니터링용)
+        print(f"[BookService] user_id={user_id} 동화책 임시 생성")
+        book = await self.book_repo.create(
+            user_id=user_id,
+            title="생성중...",  # Story 생성 후 업데이트됨
+            status=BookStatus.CREATING,
+            pipeline_stage="init",
+        )
+        await self.db_session.commit()
+
+        print(
+            f"[BookService] Created book {book.id} for async processing, "
+            f"user_id={user_id}, num_pages={story_page_count}"
+        )
+
+        # 4. DAG 생성 및 백그라운드 실행
+        task_ids = await create_storybook_dag(
+            user_id=user_id,
+            book_id=book.id,
+            stories=stories,
+            images=images,
+            voice_id=voice_id,
+            level=level,
+        )
+
+        # 5. Task IDs를 Book 메타데이터에 저장
+        book.task_metadata = task_ids
+        await self.db_session.commit()
+
+        print(
+            f"[BookService] Started async DAG for book {book.id}, "
+            f"execution_id={task_ids.get('execution_id')}"
+        )
+
+        return book
 
     async def create_storybook_with_images(
         self,
@@ -410,3 +797,111 @@ class BookOrchestratorService:
         if result:
             await self.db_session.commit()
         return result
+
+
+    def resize_image_for_video(
+        image_data: bytes,
+        max_width: int = 1920,
+        max_height: int = 1080,
+        min_width: int = 512,
+        min_height: int = 512,
+    ) -> bytes:
+        """
+        비디오 생성을 위해 이미지를 리사이징합니다.
+        - aspect ratio 유지
+        - 최소/최대 width/height 제한
+        - 8의 배수로 조정 (video encoding 요구사항)
+        - Runware API 요구사항: width 300-2048 사이
+
+        Args:
+            image_data: 원본 이미지 바이너리 데이터
+            max_width: 최대 너비 (기본값: 1920)
+            max_height: 최대 높이 (기본값: 1080)
+            min_width: 최소 너비 (기본값: 512, Runware는 최소 300)
+            min_height: 최소 높이 (기본값: 512)
+
+        Returns:
+            bytes: 리사이징된 이미지 바이너리 데이터
+
+        사용할 때 'image_base64 = base64.b64encode(resized_image_data).decode('utf-8')'
+
+        이미지 사이즈 확인용 
+        img = Image.open(BytesIO(image_data))
+        width, height = img.size
+        """
+        # PIL Image로 로드
+        img = Image.open(BytesIO(image_data))
+        original_width, original_height = img.size
+
+        print(f"Original image size: {original_width}x{original_height}")
+
+        # Aspect ratio 계산
+        aspect_ratio = original_width / original_height
+
+        # 1단계: 이미지가 너무 작은 경우 키우기
+        if original_width < min_width or original_height < min_height:
+            if aspect_ratio > 1:
+                # 가로가 더 긴 경우
+                new_width = max(min_width, original_width)
+                new_height = int(new_width / aspect_ratio)
+                if new_height < min_height:
+                    new_height = min_height
+                    new_width = int(new_height * aspect_ratio)
+            else:
+                # 세로가 더 긴 경우
+                new_height = max(min_height, original_height)
+                new_width = int(new_height * aspect_ratio)
+                if new_width < min_width:
+                    new_width = min_width
+                    new_height = int(new_width / aspect_ratio)
+            print(f"Image too small, upscaling to: {new_width}x{new_height}")
+        # 2단계: 이미지가 너무 큰 경우 줄이기
+        elif original_width > max_width or original_height > max_height:
+            if aspect_ratio > max_width / max_height:
+                # 너비가 제한 요소
+                new_width = max_width
+                new_height = int(max_width / aspect_ratio)
+            else:
+                # 높이가 제한 요소
+                new_height = max_height
+                new_width = int(max_height * aspect_ratio)
+            print(f"Image too large, downscaling to: {new_width}x{new_height}")
+        else:
+            # 적절한 크기
+            new_width = original_width
+            new_height = original_height
+            print(f"Image size OK, keeping original size")
+
+        # 8의 배수로 조정 (video encoding 요구사항)
+        new_width = (new_width // 8) * 8
+        new_height = (new_height // 8) * 8
+
+        # 최소 크기 재확인 (8의 배수 조정 후에도 최소 크기 보장)
+        if new_width < 304:  # Runware 최소 300, 8의 배수면 304
+            new_width = 304
+        if new_height < 304:
+            new_height = 304
+
+        print(f"Resized image size: {new_width}x{new_height}")
+
+        # 리사이징
+        img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # BytesIO로 저장
+        output = BytesIO()
+
+        # 원본 포맷 유지 (RGBA면 RGB로 변환)
+        if img_resized.mode == 'RGBA':
+            # PNG로 저장
+            img_resized.save(output, format='PNG', optimize=True)
+        else:
+            # JPEG로 저장 (더 작은 크기)
+            if img_resized.mode != 'RGB':
+                img_resized = img_resized.convert('RGB')
+            img_resized.save(output, format='JPEG', quality=95, optimize=True)
+
+        resized_data = output.getvalue()
+        print(f"Image size reduced: {len(image_data)} -> {len(resized_data)} bytes "
+                f"({len(resized_data) / len(image_data) * 100:.1f}%)")
+
+        return resized_data
