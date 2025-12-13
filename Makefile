@@ -58,6 +58,9 @@ dev-build: ## 개발 모드 이미지 빌드
 	@echo "$(BLUE)Building development images...$(NC)"
 	$(DOCKER_COMPOSE_DEV) build
 
+auto-build: ## 🚀 버전을 자동으로 올리고 빌드 (v0.0.1 -> v0.0.2)
+	@./scripts/build_with_version.sh
+
 dev-logs: ## 개발 모드 로그 확인
 	$(DOCKER_COMPOSE_DEV) logs -f
 
