@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Mic, ArrowLeft } from "lucide-react";
+import { Mic, ArrowLeft, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createVoiceClone, getVoices } from "../api/index";
-import { AlertModal } from "../components/Modal";
+import { AlertModal, ScriptModal } from "../components/Modal";
 import type { VoiceResponse } from "./Creator";
 
 // 허용되는 오디오 파일 확장자
@@ -32,8 +32,8 @@ export default function Settings() {
     buttonText: "",
     redirectTo: "",
   });
+  const [showScriptModal, setShowScriptModal] = useState<boolean>(false);
   const navigate = useNavigate();
-
 
   useEffect(() => {
     // 생성된 목소리가 하나라도 있다면 true
@@ -42,13 +42,11 @@ export default function Settings() {
       return voices.some((voice) => voice.is_custom);
     };
 
-
     const runCheck = async () => {
       const result = await checkVoices();
 
-
-      if (result) {
-        setShowModal(true)
+      if (!result) {
+        setShowModal(true);
         setModalProps({
           title: "음성 생성 제한 안내",
           message: "더 이상 목소리를 생성하실 수 없습니다.",
@@ -185,6 +183,17 @@ export default function Settings() {
         <p className="text-sm text-gray-600 text-center mb-8">
           오디오 파일을 업로드하여 맞춤형 목소리를 생성합니다.
         </p>
+        {/* 녹음용 대본 보기 버튼 */}
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShowScriptModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-yellow-50 border-2 border-yellow-400 text-yellow-700 rounded-lg font-semibold hover:bg-yellow-100 transition-all"
+          >
+            <FileText className="w-5 h-5" />
+            📝 녹음용 대본 보기
+          </button>
+        </div>
 
         {/* 설정 폼 */}
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -286,7 +295,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* 모달 */}
+      {/* Alert 모달 */}
       <AlertModal
         isOpen={showModal}
         onClose={closeModal}
@@ -295,6 +304,12 @@ export default function Settings() {
         submessage={modalProps.submessage}
         buttonText={modalProps.buttonText}
         redirectTo={modalProps.redirectTo}
+      />
+
+      {/* Script 모달 */}
+      <ScriptModal
+        isOpen={showScriptModal}
+        onClose={() => setShowScriptModal(false)}
       />
     </div>
   );
