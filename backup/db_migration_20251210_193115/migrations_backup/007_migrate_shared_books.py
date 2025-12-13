@@ -196,7 +196,7 @@ def upgrade() -> None:
                 gen_random_uuid(),
                 '{dialogue['id']}'::uuid,
                 'en',
-                'uzyfnLLlKo55AbgBU5uH',
+                'SDF3xZmtvClcRUCSmgGWBU5uH',
                 '{dialogue['audio_url']}',
                 NOW(),
                 NOW()

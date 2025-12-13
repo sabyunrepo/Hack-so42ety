@@ -366,7 +366,7 @@ async def generate_word_tts(
           "audio_url": "/api/v1/files/shared/books/32e543c7.../words/hello.mp3",
           "cached": false,
           "duration_ms": 245,
-          "voice_id": "uzyfnLLlKo55AbgBU5uH"
+          "voice_id": "SDF3xZmtvClcRUCSmgGWBU5uH"
         }
         ```
     """
