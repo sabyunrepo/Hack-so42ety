@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .models import Audio, Voice, VoiceVisibility, VoiceStatus
 from .repository import AudioRepository, VoiceRepository
+from backend.core.utils.trace import log_process
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.core.cache.service import cache_result
@@ -54,6 +55,7 @@ class TTSService:
         self.event_bus = event_bus
         self.voice_queue = VoiceSyncQueue()  # Redis 작업 큐
 
+    @log_process(step="Generate Speech", desc="TTS 음성 생성 및 업로드")
     async def generate_speech(
         self,
         user_id: uuid.UUID,
@@ -119,6 +121,7 @@ class TTSService:
 
         return audio
 
+    @log_process(step="Create Voice Clone", desc="Voice Cloning 요청")
     async def create_voice_clone(
         self,
         user_id: uuid.UUID,
