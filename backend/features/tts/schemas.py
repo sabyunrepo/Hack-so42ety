@@ -118,7 +118,7 @@ class WordTTSResponse(BaseModel):
     audio_url: str = Field(..., description="API 접근 URL", example="/api/v1/files/shared/books/{book_id}/words/hello.mp3")
     cached: bool = Field(..., description="캐시 사용 여부", example=False)
     duration_ms: Optional[int] = Field(None, description="생성 소요 시간 (밀리초)", example=245)
-    voice_id: str = Field(..., description="사용된 음성 ID", example="uzyfnLLlKo55AbgBU5uH")
+    voice_id: str = Field(..., description="사용된 음성 ID", example="SDF3xZmtvClcRUCSmgGWBU5uH")
 
     class Config:
         json_schema_extra = {
@@ -129,6 +129,6 @@ class WordTTSResponse(BaseModel):
                 "audio_url": "/api/v1/files/shared/books/32e543c7-a845-4cfb-a93d-a0153dc9e063/words/hello.mp3",
                 "cached": False,
                 "duration_ms": 245,
-                "voice_id": "uzyfnLLlKo55AbgBU5uH"
+                "voice_id": "SDF3xZmtvClcRUCSmgGWBU5uH"
             }
         }

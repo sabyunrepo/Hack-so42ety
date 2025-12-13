@@ -286,7 +286,7 @@ def upgrade() -> None:
 
     # ==================== Initial Data: Shared Book 1 ====================
     book_1_id = '1c8e135a-8e4a-46fb-ac24-13baaacfd586'
-    default_voice_id = 'uzyfnLLlKo55AbgBU5uH'  # Default ElevenLabs voice for shared books
+    default_voice_id = 'SDF3xZmtvClcRUCSmgGWBU5uH'  # Default ElevenLabs voice for shared books
     
     op.execute(f"""
         INSERT INTO books (id, user_id, title, cover_image, status, voice_id, is_default, is_public, visibility, created_at, updated_at)
@@ -368,7 +368,7 @@ def upgrade() -> None:
                 gen_random_uuid(),
                 '{dialogue_id}'::uuid,
                 'en',
-                'uzyfnLLlKo55AbgBU5uH',
+                'SDF3xZmtvClcRUCSmgGWBU5uH',
                 '/shared/books/{book_1_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
                 NOW(),
                 NOW()
@@ -456,7 +456,7 @@ def upgrade() -> None:
                 gen_random_uuid(),
                 '{dialogue_id}'::uuid,
                 'en',
-                'uzyfnLLlKo55AbgBU5uH',
+                'SDF3xZmtvClcRUCSmgGWBU5uH',
                 '/shared/books/{book_2_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
                 NOW(),
                 NOW()
