@@ -6,7 +6,7 @@ Auth API Endpoints (v1)
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.database import get_db
+from backend.core.database.session import get_db_readonly, get_db_write
 from backend.core.auth import get_current_user
 from backend.core.auth.jwt_manager import JWTManager
 from backend.core.auth.providers.credentials import CredentialsAuthProvider
@@ -28,8 +28,8 @@ from backend.features.auth.repository import UserRepository
 router = APIRouter()
 
 
-def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
-    """AuthService 의존성 주입"""
+def get_auth_service_write(db: AsyncSession = Depends(get_db_write)) -> AuthService:
+    """AuthService 의존성 주입 (Write용 - 회원가입, 로그인 등)"""
     user_repo = UserRepository(db)
     credentials_provider = CredentialsAuthProvider()
     google_oauth_provider = GoogleOAuthProvider()
@@ -54,7 +54,7 @@ def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
 )
 async def register(
     request: UserRegisterRequest,
-    auth_service: AuthService = Depends(get_auth_service),
+    auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
     회원가입
@@ -95,7 +95,7 @@ async def register(
 )
 async def login(
     request: UserLoginRequest,
-    auth_service: AuthService = Depends(get_auth_service),
+    auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
     로그인
@@ -136,7 +136,7 @@ async def login(
 )
 async def google_oauth(
     request: GoogleOAuthRequest,
-    auth_service: AuthService = Depends(get_auth_service),
+    auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
     Google OAuth 로그인
@@ -176,7 +176,7 @@ async def google_oauth(
 )
 async def refresh(
     request: RefreshTokenRequest,
-    auth_service: AuthService = Depends(get_auth_service),
+    auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
     Access Token 갱신
@@ -210,7 +210,7 @@ async def refresh(
 )
 async def get_current_user_info(
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_readonly),
 ):
     """
     현재 인증된 사용자 정보 조회

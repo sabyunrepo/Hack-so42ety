@@ -4,10 +4,13 @@ FastAPI 통합 백엔드 서비스
 """
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
+from asgi_correlation_id import CorrelationIdMiddleware
+import sentry_sdk
 
 from .core.config import settings
 from .core.database import engine, Base
@@ -17,6 +20,19 @@ from .core.events.redis_streams_bus import RedisStreamsEventBus
 from .core.dependencies import set_event_bus
 from .core.cache.config import initialize_cache
 from .core.tasks.voice_sync import sync_voice_status_periodically
+from .core.logging import configure_logging, get_logger
+
+# Sentry 초기화
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.sentry_environment,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+    )
+
+# 로깅 설정 초기화
+configure_logging()
+logger = get_logger(__name__)
 
 
 
@@ -45,11 +61,11 @@ async def lifespan(app: FastAPI):
     global event_bus
     
     # Startup
-    print("=" * 60)
-    print(f"{settings.app_title} Starting...")
-    print(f"Version: {settings.app_version}")
-    print(f"Environment: {settings.app_env}")
-    print(f"Debug Mode: {settings.debug}")
+    logger.info("Application Starting", 
+        version=settings.app_version, 
+        env=settings.app_env, 
+        debug=settings.debug
+    )
     print("=" * 60)
 
     # 데이터베이스 연결 확인
@@ -274,7 +290,9 @@ AI 기반 맞춤형 동화책 생성 플랫폼 백엔드 API
 )
 
 
+
 # 미들웨어 설정
+app.add_middleware(CorrelationIdMiddleware) # Request ID 추적
 app.add_middleware(UserContextMiddleware)
 setup_cors(app)
 
@@ -355,6 +373,8 @@ async def root():
         "status": "running",
         "docs": "/docs" if settings.debug else None,
     }
+
+
 
 
 # ==================== Global Exception Handlers ====================

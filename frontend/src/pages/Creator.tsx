@@ -11,20 +11,18 @@ interface Page {
   story: string;
 }
 
-interface Voice {
-  voice_id: string;
-  voice_label: string;
-  state: string;
-  preview_url?: string;
-}
-
 // 백엔드 응답 형식
-interface VoiceResponse {
+
+export interface VoiceResponse {
   voice_id: string;
   name: string;
   language: string;
   gender: string;
-  preview_url?: string;
+  preview_url: string;
+  category: string;
+  visibility: string;
+  status: string;
+  is_custom: boolean;
 }
 
 export default function Creator() {
@@ -32,7 +30,7 @@ export default function Creator() {
     { id: 1, image: null, story: "" },
   ]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [voices, setVoices] = useState<Voice[]>([]);
+  const [voices, setVoices] = useState<VoiceResponse[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<string>("");
   const [showVoiceWarningModal, setShowVoiceWarningModal] = useState(false);
   const [showMaxPageModal, setShowMaxPageModal] = useState(false);
@@ -47,16 +45,7 @@ export default function Creator() {
     const fetchVoices = async () => {
       try {
         // 백엔드는 배열을 직접 반환
-        const data: VoiceResponse[] = await getVoices();
-        
-        // 백엔드 응답을 프론트엔드 형식으로 변환
-        const voiceList: Voice[] = (data || []).map((voice) => ({
-          voice_id: voice.voice_id,
-          voice_label: voice.name,
-          state: voice.preview_url ? "success" : "pending",
-          preview_url: voice.preview_url,
-        }));
-        
+        const voiceList: VoiceResponse[] = await getVoices();
         setVoices(voiceList);
         if (voiceList.length > 0) {
           setSelectedVoice(voiceList[0].voice_id);
@@ -73,12 +62,13 @@ export default function Creator() {
   }, []);
 
   const addPage = () => {
-    if (pages.length >= 6) {
+    if (pages.length >= 5) {
       setShowMaxPageModal(true);
       return;
     }
     const newPage: Page = { id: Date.now(), image: null, story: "" };
     setPages([...pages, newPage]);
+    console.log("voices 길이 : ", voices.length);
   };
 
   const removePage = (id: number) => {
@@ -167,40 +157,45 @@ export default function Creator() {
                     value={voice.voice_id}
                     // disabled={voice.state !== "success"}
                   >
-                    {voice.voice_label}
-                    {voice.state !== "success" && " - 프리뷰 없음"}
+                    {voice.name}
+                    {/* {voice.status !== "completed" && " - 프리뷰 생성중"} */}
                   </option>
                 ))}
               </select>
 
               {/* 미리듣기 버튼 */}
               {voices.find((v) => v.voice_id === selectedVoice) && (
-                <button
-                  onClick={() =>
-                    playPreview(
+                <div className="relative group">
+                  <button
+                    onClick={() =>
+                      playPreview(
+                        voices.find((v) => v.voice_id === selectedVoice)
+                          ?.preview_url
+                      )
+                    }
+                    disabled={
+                      !voices.find((v) => v.voice_id === selectedVoice)
+                        ?.preview_url
+                    }
+                    className={`border rounded-lg px-3 py-2 transition-colors ${
                       voices.find((v) => v.voice_id === selectedVoice)
                         ?.preview_url
-                    )
-                  }
-                  disabled={
-                    !voices.find((v) => v.voice_id === selectedVoice)
-                      ?.preview_url
-                  }
-                  className={`border rounded-lg px-3 py-2 transition-colors ${
-                    voices.find((v) => v.voice_id === selectedVoice)
-                      ?.preview_url
-                      ? "bg-white border-gray-300 hover:bg-gray-50 cursor-pointer"
-                      : "bg-gray-100 border-gray-200 cursor-not-allowed opacity-60"
-                  }`}
-                  title={
-                    voices.find((v) => v.voice_id === selectedVoice)
+                        ? "bg-white border-gray-300 hover:bg-gray-50 cursor-pointer"
+                        : "bg-gray-100 border-gray-200 cursor-not-allowed opacity-60"
+                    }`}
+                  >
+                    🔊
+                  </button>
+                  {/* 툴팁 */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-50 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                    {voices.find((v) => v.voice_id === selectedVoice)
                       ?.preview_url
                       ? "음성 미리듣기"
-                      : "프리뷰 음성이 만들어지지 않아서 들을 수 없지만 해당 보이스로 동화는 만들 수 있습니다"
-                  }
-                >
-                  🔊
-                </button>
+                      : "프리뷰 음성이 만들어지지 않았지만 동화 생성은 가능합니다"}
+                    {/* 툴팁 화살표 */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-800"></div>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -297,7 +292,7 @@ export default function Creator() {
         isOpen={showMaxPageModal}
         onClose={() => setShowMaxPageModal(false)}
         title="페이지 제한"
-        message="동화는 최대 6페이지까지 만들 수 있어요."
+        message="동화는 최대 5 페이지까지 만들 수 있어요."
         buttonText="확인"
       />
 

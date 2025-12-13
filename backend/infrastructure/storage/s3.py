@@ -45,21 +45,33 @@ class S3StorageService(AbstractStorageService):
     def _normalize_key(self, path: str) -> str:
         """
         경로를 S3 키로 정규화
-        
+
         Local Storage 형식의 경로(/api/v1/files/...)를 S3 경로로 변환
-        
+        ✅ HTTP(S) URL도 처리 가능 (중복 presigned URL 방지)
+
         Args:
-            path: 파일 경로 (예: "/api/v1/files/shared/books/{id}/videos/page_1.mp4" 또는 "shared/books/{id}/videos/page_1.mp4")
-        
+            path: 파일 경로
+                - 상대 경로: "shared/books/{id}/videos/page_1.mp4"
+                - API 경로: "/api/v1/files/shared/books/{id}/videos/page_1.mp4"
+                - HTTP URL: "https://bucket.s3.amazonaws.com/shared/books/{id}/videos/page_1.mp4?X-Amz-..."
+
         Returns:
             str: S3 키 (예: "shared/books/{id}/videos/page_1.mp4")
         """
+        # ✅ HTTP(S) URL 감지 및 경로만 추출
+        if path.startswith(('http://', 'https://')):
+            from urllib.parse import urlparse
+            parsed = urlparse(path)
+            # Pre-signed URL의 쿼리 파라미터 제거 후 경로만 추출
+            path = parsed.path.lstrip('/')
+            logger.warning(f"Detected HTTP URL in path, extracted key: {path}")
+
         key = path.lstrip("/")
-        
+
         # /api/v1/files/ 접두사 제거 (Local Storage 형식인 경우)
         if key.startswith("api/v1/files/"):
             key = key[len("api/v1/files/"):]
-        
+
         return key
 
     async def save(
