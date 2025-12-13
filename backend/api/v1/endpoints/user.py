@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.database.session import get_db
+from backend.core.database.session import get_db_write
 from backend.core.auth.dependencies import get_current_user_object as get_current_user
 from backend.core.auth.providers.credentials import CredentialsAuthProvider
 from backend.features.auth.models import User
@@ -14,7 +14,7 @@ router = APIRouter()
 
 
 def get_user_service(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_write),
 ) -> UserService:
     """UserService 의존성 주입"""
     user_repo = UserRepository(db)
