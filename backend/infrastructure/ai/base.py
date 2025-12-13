@@ -13,6 +13,7 @@ class AIProviderType(str, Enum):
 
     GOOGLE = "google"
     OPENAI = "openai"
+    RUNWARE = "runware"
     CUSTOM = "custom"
 
 
