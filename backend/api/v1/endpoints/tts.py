@@ -59,6 +59,7 @@ def get_tts_service_readonly(
         voice_repo=voice_repo,
         storage_service=storage_service,
         ai_factory=ai_factory,
+        db_session=db,
         cache_service=cache_service,
         event_bus=event_bus,
     )
