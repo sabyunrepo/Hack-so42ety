@@ -4,6 +4,7 @@ Database Session Management
 """
 
 from typing import AsyncGenerator
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -57,7 +58,7 @@ async def get_db_readonly() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocalReadOnly() as session:
         try:
             # PostgreSQL READ ONLY 트랜잭션 시작
-            await session.execute("SET TRANSACTION READ ONLY")
+            await session.execute(text("SET TRANSACTION READ ONLY"))
             yield session
             # ReadOnly 세션은 commit 불필요하지만 명시적으로 호출
             await session.commit()
