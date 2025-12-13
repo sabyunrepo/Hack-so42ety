@@ -7,7 +7,8 @@ import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 
 export default function Bookshelf() {
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
+  //   // [ ] 편집 모드 임시 주석처리
+  // const [isEditing, setIsEditing] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,9 +36,10 @@ export default function Bookshelf() {
 
   //책 클릭 핸들러
   const handleBookClick = (bookId: string) => {
-    if (!isEditing) {
-      navigate(`/book/${bookId}`);
-    }
+    // [ ] 편집 모드 임시 주석처리
+    // if (!isEditing) {
+    navigate(`/book/${bookId}`);
+    // }
   };
 
   //책 삭제 핸들러
@@ -58,10 +60,11 @@ export default function Bookshelf() {
     }
   };
 
+  // [ ] 편집 모드 임시 주석처리
   // 편집 모드 토글
-  const toggleEditMode = () => {
-    setIsEditing(!isEditing);
-  };
+  // const toggleEditMode = () => {
+  //   setIsEditing(!isEditing);
+  // };
 
   // 책과 생성 버튼을 포함해서 4개씩 그룹으로 나누는 함수
   const groupBooksIntoShelves = (books: Book[]): Book[][] => {
@@ -124,7 +127,8 @@ export default function Bookshelf() {
         <div>
           <p className="text-amber-700 mt-2">총 {books.length}권의 책</p>
         </div>
-        <button
+        {/*  [ ] 편집 모드 임시 주석처리 */}
+        {/* <button
           onClick={toggleEditMode}
           className={`px-6 py-3 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${
             isEditing
@@ -133,7 +137,7 @@ export default function Bookshelf() {
           }`}
         >
           {isEditing ? "✓ 편집 완료" : "✎ 편집"}
-        </button>
+        </button> */}
       </div>
 
       {/* 책장 영역 */}
@@ -146,7 +150,7 @@ export default function Bookshelf() {
                 <BookCard
                   key={book.id}
                   book={book}
-                  isEditing={isEditing}
+                  // isEditing={isEditing}
                   onDelete={() => handleDeleteBook(book.id)}
                   onClick={() => handleBookClick(book.id)}
                 />
