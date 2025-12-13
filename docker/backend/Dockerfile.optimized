@@ -36,10 +36,8 @@ RUN useradd -m -u 1000 appuser && \
     mkdir -p /app/data && \
     chown -R appuser:appuser /app
 
-# 애플리케이션 코드만 복사 (필요한 것만)
-COPY --chown=appuser:appuser backend/app /app/backend/app
-COPY --chown=appuser:appuser backend/alembic.ini /app/backend/
-COPY --chown=appuser:appuser backend/alembic /app/backend/alembic
+# 애플리케이션 코드 복사 (기존 구조에 맞춤)
+COPY --chown=appuser:appuser backend/ /app/backend/
 COPY --chown=appuser:appuser docker/backend/entrypoint.sh /app/entrypoint.sh
 
 # 불필요한 파일 제거로 이미지 크기 감소
