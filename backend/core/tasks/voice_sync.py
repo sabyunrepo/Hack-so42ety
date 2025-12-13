@@ -16,10 +16,12 @@ from backend.core.events.redis_streams_bus import RedisStreamsEventBus
 from backend.core.events.types import EventType
 from backend.core.tasks.voice_queue import VoiceSyncQueue
 from backend.core.database.session import get_db
+from backend.core.utils.trace import log_process
 
 logger = logging.getLogger(__name__)
 
 
+@log_process(step="Task Voice Sync", desc="Voice Cloning 상태 동기화 작업")
 async def sync_voice_status_periodically(
     event_bus: RedisStreamsEventBus,
     interval: int = 60,  # 1분마다 실행
