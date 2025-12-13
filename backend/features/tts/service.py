@@ -9,7 +9,7 @@ from .models import Audio, Voice, VoiceVisibility, VoiceStatus
 from .repository import AudioRepository, VoiceRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
-from backend.core.cache.service import cache_result
+from backend.core.cache.service import cache_result, invalidate_cache
 from backend.core.events.bus import EventBus
 from backend.core.events.types import EventType
 from backend.core.tasks.voice_queue import VoiceSyncQueue
@@ -119,6 +119,7 @@ class TTSService:
 
         return audio
 
+    @invalidate_cache("tts:voices:{user_id}")
     async def create_voice_clone(
         self,
         user_id: uuid.UUID,

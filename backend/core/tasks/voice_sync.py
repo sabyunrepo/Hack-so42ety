@@ -80,7 +80,7 @@ async def sync_voice_status_periodically(
                     for voice in voices:
                         try:
                             # 생성 후 경과 시간 확인
-                            age_minutes = (datetime.utcnow() - voice.created_at).total_seconds() / 60
+                            age_minutes = (datetime.now() - voice.created_at).total_seconds() / 60
                             if age_minutes > max_age_minutes:
                                 logger.warning(
                                     f"Voice {voice.id} exceeded max age ({age_minutes:.1f} minutes), "
@@ -89,6 +89,15 @@ async def sync_voice_status_periodically(
                                 await voice_repo.update_status(
                                     voice_id=voice.id,
                                     status=VoiceStatus.FAILED,
+                                )
+                                
+                                # 이벤트 발행 (캐시 무효화)
+                                await event_bus.publish(
+                                    EventType.VOICE_UPDATED,
+                                    {
+                                        "voice_id": str(voice.id),
+                                        "user_id": str(voice.user_id),
+                                    }
                                 )
                                 # 큐에서 제거
                                 await voice_queue.dequeue(voice.id)
@@ -130,6 +139,15 @@ async def sync_voice_status_periodically(
                                 await voice_repo.update_status(
                                     voice_id=voice.id,
                                     status=VoiceStatus.FAILED,
+                                )
+
+                                # 이벤트 발행 (캐시 무효화)
+                                await event_bus.publish(
+                                    EventType.VOICE_UPDATED,
+                                    {
+                                        "voice_id": str(voice.id),
+                                        "user_id": str(voice.user_id),
+                                    }
                                 )
                                 
                                 # 큐에서 제거
