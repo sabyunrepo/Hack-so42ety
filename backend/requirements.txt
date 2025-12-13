@@ -31,6 +31,11 @@ aiohttp==3.9.1
 aiocache==0.12.2  # Async caching library with Redis backend
 redis[hiredis]==5.0.1  # Redis async client (replaces aioredis for Python 3.12 compatibility)
 
+# ==================== Logging & Monitoring ====================
+structlog==24.1.0           # Structured logging
+asgi-correlation-id==4.3.0  # Request ID tracking
+sentry-sdk==1.40.0         # Sentry integration
+
 # ==================== AI Providers ====================
 google-generativeai==0.3.1  # Google Gemini
 openai==1.6.1               # OpenAI (GPT) - 추후 사용
