@@ -150,3 +150,43 @@ class VoiceSyncQueue:
             await self.redis.close()
             self.redis = None
 
+    async def mark_trigger_processed(self, voice_id: uuid.UUID) -> bool:
+        """
+        Voice Trigger TTS 요청 성공 기록
+        
+        Args:
+            voice_id: Voice UUID
+            
+        Returns:
+            bool: 성공 여부
+        """
+        await self.connect()
+        try:
+            key = f"voice:trigger:success:{voice_id}"
+            # 30분 TTL 설정 (전체 타임아웃과 동일)
+            await self.redis.set(key, "1", ex=self.ttl_seconds)
+            logger.info(f"Marked trigger processed for voice {voice_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to mark trigger processed for voice {voice_id}: {e}", exc_info=True)
+            return False
+
+    async def is_trigger_processed(self, voice_id: uuid.UUID) -> bool:
+        """
+        Voice Trigger TTS 요청 성공 여부 확인
+        
+        Args:
+            voice_id: Voice UUID
+            
+        Returns:
+            bool: 이미 성공적으로 요청했으면 True
+        """
+        await self.connect()
+        try:
+            key = f"voice:trigger:success:{voice_id}"
+            exists = await self.redis.exists(key)
+            return exists > 0
+        except Exception as e:
+            logger.error(f"Failed to check trigger status for voice {voice_id}: {e}", exc_info=True)
+            return False
+
