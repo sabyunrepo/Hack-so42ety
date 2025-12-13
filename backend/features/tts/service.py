@@ -231,14 +231,27 @@ class TTSService:
             include_default=True,
         )
         
-        # 기본 Voice (ElevenLabs premade) 추가
+        # 기본 Voice (ElevenLabs premade) 설정 및 필터링
+        # 허용된 Voice ID 및 표시 이름 매핑
+        allowed_voices_map = {
+            "IKne3meq5aSn9XLyUdCD": "Charlie(남자)",
+            "TX3LPaxmHKxFdv7VOQHJ": "Liam(남자)",
+            "XrExE9yKIg1WjnnlVkGX": "Matilda(여자)",
+            "cgSgspJ2msm6clMCkdW9": "Jessica(여자)",
+        }
+
         tts_provider = self.ai_factory.get_tts_provider()
+        premade_voices = []
         try:
-            premade_voices = await tts_provider.get_available_voices()
-            premade_voices = [
-                v for v in premade_voices 
-                if v.get("category") == "premade"
-            ]
+            available_voices = await tts_provider.get_available_voices()
+            for v in available_voices:
+                voice_id = v.get("voice_id")
+                if voice_id in allowed_voices_map:
+                    # 허용된 Voice인 경우 이름 변경 후 추가
+                    v["name"] = allowed_voices_map[voice_id]
+                    v["category"] = "premade" # 확실하게 설정
+                    premade_voices.append(v)
+                    
         except Exception as e:
             logger.warning(f"Failed to fetch premade voices: {e}")
             premade_voices = []
