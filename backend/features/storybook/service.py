@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import Book, Page, Dialogue, DialogueTranslation, DialogueAudio, BookStatus
 from .repository import BookRepository
+from backend.core.utils.trace import log_process
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.core.config import settings
@@ -62,6 +63,7 @@ class BookOrchestratorService:
                 current_count=current_count, max_allowed=max_books, user_id=str(user_id)
             )
 
+    @log_process(step="Create Storybook", desc="동화책 생성 전체 프로세스 (스토리+이미지+오디오)")
     async def create_storybook(
         self,
         user_id: uuid.UUID,
@@ -246,6 +248,7 @@ class BookOrchestratorService:
             await self.db_session.commit()
             raise StorybookCreationFailedException(reason=str(e))
 
+    @log_process(step="Create Storybook (Image Implemented)", desc="이미지 기반 동화책 생성")
     async def create_storybook_with_images(
         self,
         user_id: uuid.UUID,
