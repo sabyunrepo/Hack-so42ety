@@ -8,6 +8,7 @@ from .repository import BookRepository
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.core.config import settings
+from backend.features.tts.producer import TTSProducer
 from .exceptions import (
     StorybookNotFoundException,
     StorybookUnauthorizedException,
@@ -34,11 +35,13 @@ class BookOrchestratorService:
         storage_service: AbstractStorageService,
         ai_factory: AIProviderFactory,
         db_session: AsyncSession,
+        tts_producer: Optional[TTSProducer] = None, # Make it optional but we expect it injected
     ):
         self.book_repo = book_repo
         self.storage_service = storage_service
         self.ai_factory = ai_factory
         self.db_session = db_session
+        self.tts_producer = tts_producer
 
     async def _check_book_quota(self, user_id: uuid.UUID) -> None:
         """
@@ -66,6 +69,8 @@ class BookOrchestratorService:
         num_pages: int = 5,
         target_age: str = "5-7",
         theme: str = "adventure",
+        is_public: bool = False,
+        visibility: str = "private",
     ) -> Book:
         """
         동화책 생성 (스토리 -> 이미지 -> 오디오)
@@ -164,7 +169,8 @@ class BookOrchestratorService:
                 # 또는 Dialogue 모델을 사용
 
                 # TTS Provider
-                tts_provider = self.ai_factory.get_tts_provider()
+                # tts_provider = self.ai_factory.get_tts_provider() # No longer needed here
+                
                 if content:
                     # Create dialogue with translations
                     dialogue = await self.book_repo.add_dialogue_with_translation(
@@ -176,33 +182,48 @@ class BookOrchestratorService:
                         ],
                     )
 
-                    # Generate and add audio
+                    # TTS Background Generation (Concurrency Control)
                     try:
-                        audio_bytes = await tts_provider.text_to_speech(content)
-                    except Exception as e:
-                        raise AIGenerationFailedException(stage="음성", reason=str(e))
-
-                    try:
+                        # 1. Pre-calculate path (where worker should save)
+                        # We use relative path compatible with storage service
                         audio_file_name = f"{book.base_path}/audios/page_{i+1}.mp3"
-                        audio_url = await self.storage_service.save(
-                            audio_bytes, audio_file_name, content_type="audio/mpeg"
-                        )
-                        # storage_service.save()가 반환하는 URL 그대로 사용
-                    except Exception as e:
-                        raise ImageUploadFailedException(
-                            filename=audio_file_name, reason=str(e)
-                        )
-
-                    await self.book_repo.add_dialogue_audio(
-                        dialogue_id=dialogue.id,
-                        language_code="en",
-                        voice_id=(
+                        # For local storage, user likely configured correct base path.
+                        # We store the 'key' (relative path) in audio_url
+                        
+                        # 2. Add DB record with PENDING status
+                        voice_id = (
                             settings.DEFAULT_VOICE_ID
                             if hasattr(settings, "DEFAULT_VOICE_ID")
                             else "default"
-                        ),
-                        audio_url=audio_url,
-                    )
+                        )
+                        
+                        dialogue_audio = await self.book_repo.add_dialogue_audio(
+                            dialogue_id=dialogue.id,
+                            language_code="en",
+                            voice_id=voice_id,
+                            audio_url=audio_file_name,
+                            status="PENDING"
+                        )
+                        
+                        # 3. Enqueue Task
+                        if self.tts_producer:
+                            await self.tts_producer.enqueue_tts_task(
+                                dialogue_audio_id=dialogue_audio.id,
+                                text=content
+                            )
+                        else:
+                            # Fallback if producer not injected (shouldn't happen in prod)
+                            # Maybe log warning or raise?
+                            print("Warning: TTSProducer not injected, skipping TTS queueing.")
+                            
+                    except Exception as e:
+                        # TTS queueing failed, but Book creation should succeed? 
+                        # Or fail entire book? 
+                        # Ideally log and continue (partial success), but user might expect audio.
+                        # For now, we raise to signal failure early, or create FAILED record.
+                        # Let's catch and update status if record exists?
+                        # Simplest: Raise exception -> Book FAILED.
+                        raise AIGenerationFailedException(stage="음성 큐 등록", reason=str(e))
 
             # 상태 업데이트
             book.status = BookStatus.COMPLETED
@@ -319,36 +340,37 @@ class BookOrchestratorService:
                         ],
                     )
 
-                    # Generate and add audio
+                    # TTS Background Generation (Concurrency Control)
                     try:
-                        audio_bytes = await tts_provider.text_to_speech(
-                            story, voice_id=voice_id
-                        )
-                    except Exception as e:
-                        raise AIGenerationFailedException(stage="음성", reason=str(e))
-
-                    try:
+                        # 1. Pre-calculate path
                         audio_file_name = f"{book.base_path}/audios/page_{i+1}.mp3"
-                        audio_url = await self.storage_service.save(
-                            audio_bytes, audio_file_name, content_type="audio/mpeg"
-                        )
-                        # storage_service.save()가 반환하는 URL 그대로 사용
-                    except Exception as e:
-                        raise ImageUploadFailedException(
-                            filename=audio_file_name, reason=str(e)
-                        )
-
-                    await self.book_repo.add_dialogue_audio(
-                        dialogue_id=dialogue.id,
-                        language_code="en",
-                        voice_id=voice_id
-                        or (
+                        
+                        # 2. Add DB record PENDING
+                        target_voice_id = voice_id or (
                             settings.DEFAULT_VOICE_ID
                             if hasattr(settings, "DEFAULT_VOICE_ID")
                             else "default"
-                        ),
-                        audio_url=audio_url,
-                    )
+                        )
+                        
+                        dialogue_audio = await self.book_repo.add_dialogue_audio(
+                            dialogue_id=dialogue.id,
+                            language_code="en",
+                            voice_id=target_voice_id,
+                            audio_url=audio_file_name,
+                            status="PENDING"
+                        )
+                        
+                        # 3. Enqueue Task
+                        if self.tts_producer:
+                            await self.tts_producer.enqueue_tts_task(
+                                dialogue_audio_id=dialogue_audio.id,
+                                text=story
+                            )
+                        else:
+                             print("Warning: TTSProducer not injected in with-images.")
+
+                    except Exception as e:
+                        raise AIGenerationFailedException(stage="음성 큐 등록", reason=str(e))
 
             # 상태 업데이트
             book.status = BookStatus.COMPLETED
