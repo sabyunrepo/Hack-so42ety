@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     app_env: str = Field(default="dev", env="APP_ENV")
     debug: bool = Field(default=False, env="DEBUG")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_json_format: bool = Field(default=False, env="LOG_JSON_FORMAT")
+
+    # ==================== Sentry ====================
+    sentry_dsn: Optional[str] = Field(default=None, env="SENTRY_DSN")
+    sentry_environment: str = Field(default="dev", env="SENTRY_ENVIRONMENT")
+    sentry_traces_sample_rate: float = Field(default=0.0, env="SENTRY_TRACES_SAMPLE_RATE")
 
     # ==================== Server ====================
     backend_port: int = Field(default=8000, env="BACKEND_PORT")
