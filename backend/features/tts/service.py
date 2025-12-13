@@ -23,6 +23,7 @@ from .exceptions import (
     WordTooLongException,
     WordInvalidException,
     BookVoiceNotConfiguredException,
+    VoiceCloneLimitExceededException,
 )
 from backend.features.storybook.exceptions import StorybookNotFoundException
 
@@ -160,6 +161,16 @@ class TTSService:
         except Exception as e:
             raise TTSGenerationFailedException(
                 reason=f"TTS Provider 초기화 실패: {str(e)}"
+            )
+
+        # 0. Voice Clone 생성 한도 확인
+        from backend.core.config import settings
+        
+        current_count = await self.voice_repo.count_user_voices(user_id)
+        if current_count >= settings.max_voice_clones_per_user:
+            raise VoiceCloneLimitExceededException(
+                current_count=current_count,
+                max_limit=settings.max_voice_clones_per_user
             )
         
         # ElevenLabs API 호출 - Voice Clone 생성
