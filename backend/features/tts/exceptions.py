@@ -108,3 +108,14 @@ class BookVoiceNotConfiguredException(BusinessLogicException):
             message="이 책에는 음성이 설정되지 않았습니다",
             details={"book_id": book_id},
         )
+
+
+class VoiceCloneLimitExceededException(BusinessLogicException):
+    """Voice Clone 생성 한도 초과"""
+
+    def __init__(self, current_count: int, max_limit: int):
+        super().__init__(
+            error_code=ErrorCode.BIZ_TTS_VOICE_LIMIT_EXCEEDED,
+            message=f"생성할 수 있는 보이스 클론 수를 초과했습니다 (최대 {max_limit}개)",
+            details={"current_count": current_count, "max_limit": max_limit},
+        )

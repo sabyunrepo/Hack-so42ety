@@ -174,6 +174,7 @@ class Settings(BaseSettings):
     # ==================== Business Logic ====================
     max_books_per_user: int = Field(default=3, env="MAX_BOOKS_PER_USER")
     max_pages_per_book: int = Field(default=5, env="MAX_PAGES_PER_BOOK")
+    max_voice_clones_per_user: int = Field(default=1, env="MAX_VOICE_CLONES_PER_USER")
 
     # ==================== Feature Flags ====================
     use_template_mode: bool = Field(default=False, env="USE_TEMPLATE_MODE")
