@@ -1,17 +1,15 @@
 from fastapi import APIRouter, Depends, status, File, Form, UploadFile
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import List
 from uuid import UUID
 
-from backend.core.database.session import get_db
 from backend.core.auth.dependencies import get_current_user_object as get_current_user
-from backend.core.dependencies import get_storage_service, get_ai_factory
+from backend.core.dependencies import get_storage_service
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.features.auth.models import User
 from backend.features.storybook.service import BookOrchestratorService
-from backend.features.storybook.repository import BookRepository
 from backend.features.storybook.schemas import CreateBookRequest, BookResponse, BookListResponse
 from backend.features.storybook.models import Book
+from backend.features.storybook.dependencies import get_book_service_readonly, get_book_service_write
 
 router = APIRouter()
 
@@ -68,20 +66,6 @@ def convert_book_urls_to_api_format(book: Book, storage_service: AbstractStorage
     
     return book
 
-
-def get_book_service(
-    db: AsyncSession = Depends(get_db),
-    storage_service = Depends(get_storage_service),
-    ai_factory = Depends(get_ai_factory),
-) -> BookOrchestratorService:
-    """BookOrchestratorService 의존성 주입"""
-    book_repo = BookRepository(db)
-    return BookOrchestratorService(
-        book_repo=book_repo,
-        storage_service=storage_service,
-        ai_factory=ai_factory,
-        db_session=db,
-    )
 
 @router.post(
     "/test",
@@ -231,7 +215,7 @@ async def test_endpoint(
 async def create_book(
     request: CreateBookRequest,
     current_user: User = Depends(get_current_user),
-    service: BookOrchestratorService = Depends(get_book_service),
+    service: BookOrchestratorService = Depends(get_book_service_write),
     storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
@@ -285,11 +269,9 @@ async def create_book(
         is_public=request.is_public,  # 기본값 False
         visibility=request.visibility,  # 기본값 "private"
     )
-    
-    # ✅ URL 변환: 경로 → API URL 또는 Pre-signed URL
-    book = convert_book_urls_to_api_format(book, storage_service)
-    
-    return book
+
+    # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
+    return BookResponse.from_orm_with_urls(book, storage_service)
 
 @router.post(
     "/create-async",
@@ -312,7 +294,7 @@ async def create_book_async(
     voice_id: Optional[str] = Form(default=None, description="TTS 음성 ID"),
     level: Optional[int] = Form(default=1, description="난이도 레벨"),
     current_user: User = Depends(get_current_user),
-    service: BookOrchestratorService = Depends(get_book_service),
+    service: BookOrchestratorService = Depends(get_book_service_write),
     storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
@@ -381,7 +363,6 @@ async def create_book_async(
 
     # URL 변환
     # book = convert_book_urls_to_api_format(book, storage_service)
-
     return book
 
 @router.get(
@@ -569,7 +550,7 @@ async def get_book_progress(
 )
 async def list_books(
     current_user: User = Depends(get_current_user),
-    service: BookOrchestratorService = Depends(get_book_service),
+    service: BookOrchestratorService = Depends(get_book_service_readonly),
     storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
@@ -592,12 +573,9 @@ async def list_books(
         HTTPException 401: 인증 실패
     """
     books = await service.get_books(current_user.id)
-    
-    # ✅ URL 변환: 각 책에 대해 경로 → API URL 변환
-    for book in books:
-        book = convert_book_urls_to_api_format(book, storage_service)
-    
-    return books
+
+    # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
+    return [BookResponse.from_orm_with_urls(book, storage_service) for book in books]
 
 @router.get(
     "/books/{book_id}",
@@ -613,7 +591,7 @@ async def list_books(
 async def get_book(
     book_id: UUID,
     current_user: User = Depends(get_current_user),
-    service: BookOrchestratorService = Depends(get_book_service),
+    service: BookOrchestratorService = Depends(get_book_service_readonly),
     storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
@@ -652,11 +630,9 @@ async def get_book(
             storybook_id=str(book_id),
             user_id=str(current_user.id)
         )
-    
-    # ✅ URL 변환
-    book = convert_book_urls_to_api_format(book, storage_service)
 
-    return book
+    # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
+    return BookResponse.from_orm_with_urls(book, storage_service)
 
 @router.delete(
     "/books/{book_id}",
@@ -671,7 +647,7 @@ async def get_book(
 async def delete_book(
     book_id: UUID,
     current_user: User = Depends(get_current_user),
-    service: BookOrchestratorService = Depends(get_book_service),
+    service: BookOrchestratorService = Depends(get_book_service_write),
 ):
     """
     동화책 삭제

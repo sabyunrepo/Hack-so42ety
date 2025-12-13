@@ -17,9 +17,9 @@ NC := \033[0m  # No Color
 
 # ==================== Variables ====================
 PROJECT_NAME := MoriAI Storybook Service
-DOCKER_COMPOSE := docker-compose
-DOCKER_COMPOSE_DEV := docker-compose -f docker-compose.yml
-DOCKER_COMPOSE_PROD := docker-compose -f docker-compose.prod.yml
+DOCKER_COMPOSE := docker compose
+DOCKER_COMPOSE_DEV := docker compose -f docker-compose.yml
+DOCKER_COMPOSE_PROD := docker compose -f docker-compose.prod.yml
 
 # ==================== Help ====================
 help: ## 사용 가능한 명령어 목록 표시

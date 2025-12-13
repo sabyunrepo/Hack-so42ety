@@ -4,7 +4,7 @@ TTS 오디오 및 Voice 데이터 접근 계층
 """
 import uuid
 from typing import List, Optional
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import Audio, Voice, VoiceVisibility, VoiceStatus
@@ -78,6 +78,30 @@ class VoiceRepository(AbstractRepository[Voice]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
     
+    async def count_user_voices(self, user_id: uuid.UUID) -> int:
+        """
+        사용자의 Voice Clone 개수 조회 (삭제된 것 제외, 기본/공개 보이스 제외)
+        
+        Args:
+            user_id: 사용자 UUID
+        
+        Returns:
+            int: 사용자가 생성한 Voice 개수
+        """
+        query = (
+            select(func.count())
+            .select_from(Voice)
+            .where(
+                and_(
+                    Voice.user_id == user_id,
+                    Voice.visibility == VoiceVisibility.PRIVATE,  # 사용자가 생성한 것만
+                    Voice.status != VoiceStatus.FAILED,  # 실패한 것은 제외 (재시도 가능하게)
+                )
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one()
+
     async def get_by_status(self, status: VoiceStatus) -> List[Voice]:
         """
         상태별 Voice 조회

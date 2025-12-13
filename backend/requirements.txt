@@ -11,8 +11,8 @@ psycopg2-binary==2.9.9   # PostgreSQL sync driver (for Alembic)
 
 # ==================== Authentication ====================
 python-jose[cryptography]==3.3.0  # JWT
-passlib[bcrypt]==1.7.4            # Password hashing (pinned for stability)
-bcrypt==4.1.1                     # Bcrypt backend (pinned for passlib compatibility)
+argon2-cffi==23.1.0               # Argon2 (Python 3.12 호환, OWASP 권장)
+passlib[argon2]==1.7.4            # Password hashing (Argon2 전용)
 google-auth==2.25.2               # Google OAuth
 google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.2.0
@@ -30,6 +30,11 @@ aiohttp==3.9.1
 # ==================== Caching ====================
 aiocache==0.12.2  # Async caching library with Redis backend
 redis[hiredis]==5.0.1  # Redis async client (replaces aioredis for Python 3.12 compatibility)
+
+# ==================== Logging & Monitoring ====================
+structlog==24.1.0           # Structured logging
+asgi-correlation-id==4.3.0  # Request ID tracking
+sentry-sdk==1.40.0         # Sentry integration
 
 # ==================== AI Providers ====================
 google-generativeai==0.3.1  # Google Gemini

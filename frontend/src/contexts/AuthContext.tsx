@@ -1,6 +1,17 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react";
 import apiClient from "../api/client";
-import type { User, LoginRequest, RegisterRequest, AuthResponse } from "../types/auth";
+import type {
+  User,
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
+} from "../types/auth";
 
 interface AuthContextType {
   user: User | null;
@@ -50,7 +61,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const googleLogin = async (token: string) => {
-    const response = await apiClient.post<AuthResponse>("/auth/google", { token });
+    const response = await apiClient.post<AuthResponse>("/auth/google", {
+      token,
+    });
     const { user, access_token, refresh_token } = response.data;
 
     localStorage.setItem("access_token", access_token);

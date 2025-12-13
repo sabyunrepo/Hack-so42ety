@@ -1,8 +1,12 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, TYPE_CHECKING
 from uuid import UUID
 from datetime import datetime
 from backend.core.config import settings
+
+if TYPE_CHECKING:
+    from backend.features.storybook.models import Book, Page, Dialogue, DialogueTranslation, DialogueAudio
+    from backend.infrastructure.storage.base import AbstractStorageService
 
 class CreateBookRequest(BaseModel):
     prompt: str = Field(
@@ -75,6 +79,15 @@ class DialogueTranslationResponse(BaseModel):
             }
         }
 
+    @classmethod
+    def from_orm_model(cls, translation: "DialogueTranslation") -> "DialogueTranslationResponse":
+        """ORM 모델 → DTO 변환 (URL 변환 불필요)"""
+        return cls(
+            language_code=translation.language_code,
+            text=translation.text,
+            is_primary=translation.is_primary
+        )
+
 class DialogueAudioResponse(BaseModel):
     """대화문 오디오 응답"""
     language_code: str = Field(..., description="언어 코드 (ISO 639-1)", example="en")
@@ -92,6 +105,16 @@ class DialogueAudioResponse(BaseModel):
                 "duration": 3.5
             }
         }
+
+    @classmethod
+    def from_orm_with_url(cls, audio: "DialogueAudio", storage_service: "AbstractStorageService") -> "DialogueAudioResponse":
+        """ORM 모델 → DTO 변환 + URL 변환"""
+        return cls(
+            language_code=audio.language_code,
+            voice_id=audio.voice_id,
+            audio_url=storage_service.get_url(audio.audio_url) if audio.audio_url else "",
+            duration=audio.duration
+        )
 
 class DialogueResponse(BaseModel):
     """대화문 응답 (다국어 지원)"""
@@ -137,6 +160,23 @@ class DialogueResponse(BaseModel):
             }
         }
 
+    @classmethod
+    def from_orm_with_urls(cls, dialogue: "Dialogue", storage_service: "AbstractStorageService") -> "DialogueResponse":
+        """ORM 모델 → DTO 변환 + URL 변환"""
+        return cls(
+            id=dialogue.id,
+            sequence=dialogue.sequence,
+            speaker=dialogue.speaker,
+            translations=[
+                DialogueTranslationResponse.from_orm_model(t)
+                for t in dialogue.translations
+            ],
+            audios=[
+                DialogueAudioResponse.from_orm_with_url(a, storage_service)
+                for a in dialogue.audios
+            ]
+        )
+
 class PageResponse(BaseModel):
     id: UUID = Field(..., description="페이지 고유 ID")
     sequence: int = Field(..., description="페이지 순서", example=1)
@@ -164,6 +204,20 @@ class PageResponse(BaseModel):
                 ]
             }
         }
+
+    @classmethod
+    def from_orm_with_urls(cls, page: "Page", storage_service: "AbstractStorageService") -> "PageResponse":
+        """ORM 모델 → DTO 변환 + URL 변환"""
+        return cls(
+            id=page.id,
+            sequence=page.sequence,
+            image_url=storage_service.get_url(page.image_url) if page.image_url else None,
+            image_prompt=page.image_prompt,
+            dialogues=[
+                DialogueResponse.from_orm_with_urls(d, storage_service)
+                for d in page.dialogues
+            ]
+        )
 
 class BookResponse(BaseModel):
     id: UUID = Field(..., description="동화책 고유 ID")
@@ -202,6 +256,33 @@ class BookResponse(BaseModel):
                 ]
             }
         }
+
+    @classmethod
+    def from_orm_with_urls(cls, book: "Book", storage_service: "AbstractStorageService") -> "BookResponse":
+        """
+        ORM 모델 → DTO 변환 + URL 변환
+
+        ✅ ORM 객체를 직접 수정하지 않고 DTO로 변환
+        ✅ URL 변환 로직을 Schema 레이어에 위임
+
+        Args:
+            book: Book ORM 모델
+            storage_service: Storage Service (URL 변환용)
+
+        Returns:
+            BookResponse: URL이 변환된 DTO 객체
+        """
+        return cls(
+            id=book.id,
+            title=book.title,
+            cover_image=storage_service.get_url(book.cover_image) if book.cover_image else None,
+            status=book.status,
+            created_at=book.created_at,
+            pages=[
+                PageResponse.from_orm_with_urls(page, storage_service)
+                for page in book.pages
+            ]
+        )
 
 class BookListResponse(BaseModel):
     books: List[BookResponse]

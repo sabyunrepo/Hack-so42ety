@@ -33,7 +33,7 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
         console.log(`API 호출: ${cleanWord}`);
         // TTS API 호출
         const response = await getWordTTS(cleanWord, book_id);
-        filePath = response.audio_url;  // file_path 대신 audio_url 사용
+        filePath = response.audio_url; // file_path 대신 audio_url 사용
         // 캐시에 저장
         setAudioCache((prev) => ({
           ...prev,
@@ -50,6 +50,7 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
       };
     } catch (error) {
       setPlayingWord(null);
+      console.error(error);
     }
   };
 

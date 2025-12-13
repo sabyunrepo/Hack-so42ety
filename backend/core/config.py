@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     app_env: str = Field(default="dev", env="APP_ENV")
     debug: bool = Field(default=False, env="DEBUG")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_json_format: bool = Field(default=False, env="LOG_JSON_FORMAT")
+
+    # ==================== Sentry ====================
+    sentry_dsn: Optional[str] = Field(default=None, env="SENTRY_DSN")
+    sentry_environment: str = Field(default="dev", env="SENTRY_ENVIRONMENT")
+    sentry_traces_sample_rate: float = Field(default=0.0, env="SENTRY_TRACES_SAMPLE_RATE")
 
     # ==================== Server ====================
     backend_port: int = Field(default=8000, env="BACKEND_PORT")
@@ -184,6 +190,7 @@ class Settings(BaseSettings):
     # ==================== Business Logic ====================
     max_books_per_user: int = Field(default=3, env="MAX_BOOKS_PER_USER")
     max_pages_per_book: int = Field(default=5, env="MAX_PAGES_PER_BOOK")
+    max_voice_clones_per_user: int = Field(default=1, env="MAX_VOICE_CLONES_PER_USER")
 
     # ==================== Feature Flags ====================
     use_template_mode: bool = Field(default=False, env="USE_TEMPLATE_MODE")
