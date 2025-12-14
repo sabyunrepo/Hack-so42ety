@@ -52,6 +52,10 @@ dev: ## 개발 모드 실행 (Hot Reload)
 	@echo "$(GREEN)✓ Development services started$(NC)"
 	@echo "$(BLUE)Backend API: http://localhost:8000$(NC)"
 	@echo "$(BLUE)API Docs: http://localhost:8000/docs$(NC)"
+	$(DOCKER_COMPOSE_DEV) up -d frontend 
+	@echo "$(GREEN)✓ frontend & nginx services started$(NC)"
+	@echo "$(BLUE) frontend : cd frontend && npm run dev$(NC)"
+	@echo "$(BLUE) nginx : port 80 $(NC)"
 
 dev-build: ## 개발 모드 이미지 빌드
 	@echo "$(BLUE)Building development images...$(NC)"

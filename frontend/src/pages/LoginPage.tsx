@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 // import { GoogleLogin } from "@react-oauth/google";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 
@@ -197,7 +197,8 @@ const handleSubmit = async (e: React.FormEvent) => {
             </button>
           </div>
           <div className="text-center pt-4">
-            <p className="text-sm text-amber-700">
+            {/* [ ] 회원가입 주석처리 */}
+            {/* <p className="text-sm text-amber-700">
               아직 계정이 없으신가요?{" "}
               <Link
                 className="font-bold text-amber-600 hover:text-amber-800 underline decoration-2 decoration-amber-300 hover:decoration-amber-500 transition-colors"
@@ -205,7 +206,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               >
                 회원가입
               </Link>
-            </p>
+            </p> */}
           </div>
           {/* [ ] 소셜로그인 추후 개선 */}
           {/*
