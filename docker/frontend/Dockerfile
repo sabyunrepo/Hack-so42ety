@@ -40,7 +40,7 @@ ARG APP_ENV=prod
 RUN rm /etc/nginx/conf.d/default.conf /etc/nginx/nginx.conf
 
 # Copy environment-specific nginx configuration
-COPY docker/frontend/nginx/nginx.${APP_ENV}.conf /etc/nginx/nginx.conf
+COPY docker/frontend/nginx/conf.d/nginx.${APP_ENV}.conf /etc/nginx/nginx.conf
 
 # Create cache directory and set permissions
 RUN mkdir -p /var/cache/nginx && \
