@@ -373,7 +373,7 @@ async def generate_tts_task(
 
                     logger.info(f"[TTS Task] Enqueuing TTS for dialogue {dialogue.id}, audio_id={audio.id}")
                     logger.info(f"[TTS Task] Text: {primary_translation.text}")
-                    tts_producer.enqueue_tts_task(
+                    await tts_producer.enqueue_tts_task(
                         dialogue_audio_id=audio.id,
                         text=primary_translation.text,
                     )

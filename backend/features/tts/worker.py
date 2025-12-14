@@ -11,12 +11,13 @@ from backend.core.events.types import EventType
 from backend.core.database.session import AsyncSessionLocal
 from backend.features.storybook.models import DialogueAudio
 from backend.infrastructure.ai.factory import AIProviderFactory
+from backend.core.logging import configure_logging, get_logger
 from backend.core.dependencies import get_storage_service
 from backend.infrastructure.storage.base import AbstractStorageService
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.INFO) # Removed in favor of structlog
+logger = get_logger(__name__)
 
 class TTSWorker:
     """
@@ -85,7 +86,7 @@ class TTSWorker:
                     # 3. Process Messages
                     for stream, msgs in messages:
                         for msg_id, data in msgs:
-                            logger.info(f"Received message: {msg_id}")
+                            logger.info(f"Received message: {msg_id}", extra={"stream": stream, "data": data})
                             
                             # Fire and forget (bg task) - Semaphore is held!
                             task = asyncio.create_task(self.process_message_wrapper(msg_id, data))
@@ -219,6 +220,7 @@ class TTSWorker:
             await asyncio.gather(*self.active_tasks, return_exceptions=True)
 
 if __name__ == "__main__":
+    configure_logging() # 로깅 설정 초기화
     worker = TTSWorker()
     loop = asyncio.get_event_loop()
     try:
