@@ -187,7 +187,7 @@ class Settings(BaseSettings):
 
     # ==================== Resource Limits ====================
     video_generation_limit: int = Field(
-        default=1,
+        default=20,
         env="VIDEO_GENERATION_LIMIT",
         description="Maximum concurrent video generation requests (server-wide)"
     )
