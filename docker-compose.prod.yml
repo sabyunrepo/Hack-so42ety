@@ -208,6 +208,25 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ==================== Watchtower (Auto-Updater) ====================
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.docker/config.json:/config.json
+    environment:
+      - DOCKER_API_VERSION=1.44
+    command: --interval 300 --cleanup moriai-backend-prod moriai-frontend-prod
+    networks:
+      - moriai-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 # ==================== Networks ====================
 networks:
   moriai-network:
