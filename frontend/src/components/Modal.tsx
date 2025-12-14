@@ -1,7 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-import { RECORDING_SECTIONS_PROCESSED } from "../types/script";
+import {
+  ENGLISH_SCRIPT_EXTENDED,
+  KOREAN_SCRIPT_EXTENDED,
+  type ScriptSection,
+} from "../types/script";
 
 interface ModalProps {
   isOpen: boolean;
@@ -149,20 +153,28 @@ export function AlertModal({
 }
 
 // 녹음용 대본 섹션별 데이터
+type LanguageKey = "korean" | "english";
 
 export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
   const [copied, setCopied] = useState(false);
+  // 'english' 또는 'korean'으로 상태를 설정합니다.
+  const [language, setLanguage] = useState<LanguageKey>("english");
+
+  const currentScriptData: ScriptSection[] =
+    language === "korean" ? KOREAN_SCRIPT_EXTENDED : ENGLISH_SCRIPT_EXTENDED;
 
   const handleCopy = async () => {
     try {
-      // 전체 대본을 플레인 텍스트로 변환
-      const fullScript = RECORDING_SECTIONS_PROCESSED.map((section) =>
-        section.lines
-          .map(
-            (line) => `${line.korean}\n${line.english}\n${line.pronunciation}`
-          )
-          .join("\n\n")
-      ).join("\n\n---\n\n");
+      // 복사 로직은 currentScriptData를 사용하여 텍스트 필드를 복사
+      const fullScript = currentScriptData
+        .map((section) =>
+          section.lines
+            .map((line) => {
+              `${line.text}\n${line.pronunciation || ""}`.trim();
+            })
+            .join("\n\n")
+        )
+        .join("\n\n---\n\n");
 
       await navigator.clipboard.writeText(fullScript);
       setCopied(true);
@@ -170,6 +182,10 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
     } catch (err) {
       console.error("복사 실패:", err);
     }
+  };
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    // select 요소의 value를 LanguageKey 타입으로 변환하여 상태를 업데이트합니다.
+    setLanguage(e.target.value as LanguageKey);
   };
 
   if (!isOpen) return null;
@@ -221,9 +237,9 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
                   <strong className="text-blue-600">길이 제한 준수 :</strong>{" "}
                   녹음 길이가{" "}
                   <strong className="text-red-700">2분 30초 미만</strong>일 경우
-                  TTS 생성이 불가합니다. (권장 녹음 시간은 {" "}
-                  <strong className="text-red-700">2분 30초 초과 ~
-                  3분</strong>입니다.)
+                  TTS 생성이 불가합니다. (권장 녹음 시간은{" "}
+                  <strong className="text-red-700">2분 30초 초과 ~ 3분</strong>
+                  입니다.)
                 </li>
 
                 <li>
@@ -244,7 +260,7 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
           {/* 대본 내용 - 스크롤 가능 */}
           <div className="flex-1  px-4 sm:px-5 md:px-6 py-3 sm:py-4">
             <div className="space-y-4 sm:space-y-5 md:space-y-6">
-              {RECORDING_SECTIONS_PROCESSED.map((section, sectionIdx) => (
+              {currentScriptData.map((section, sectionIdx) => (
                 <div
                   key={sectionIdx}
                   className="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-5 shadow-sm hover:shadow-md transition-shadow"
@@ -270,19 +286,17 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
                             {line.emotion}
                           </span>
                         </div>
-                        {/* 한글 원문 */}
+                        {/*  원문 */}
                         <p className="text-sm sm:text-base font-medium text-gray-900 mb-2 leading-relaxed">
-                          {line.korean}
-                        </p>
-                        {/* 영어 원문 */}
-                        <p className="text-sm sm:text-base font-medium text-gray-900 mb-2 leading-relaxed">
-                          {line.english}
+                          {line.text}
                         </p>
 
-                        {/* 한글 발음 */}
-                        <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-                          🔊 {line.pronunciation}
-                        </p>
+                        {/* 발음 */}
+                        {language === "english" && (
+                          <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                            {line.pronunciation}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -293,10 +307,10 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
         </div>
 
         {/* 하단 버튼 */}
-        <div className="p-4 sm:p-5 md:p-6 border-t border-gray-200 bg-gray-50 flex gap-2 sm:gap-3 rounded-b-2xl">
+        <div className="justify-between items-center p-4 sm:p-5 md:p-6 border-t border-gray-200 bg-gray-50 flex gap-2 sm:gap-3 rounded-b-2xl">
           <button
             onClick={handleCopy}
-            className={`flex-1 py-2.5 sm:py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 shadow-sm text-sm sm:text-base ${
+            className={` py-2.5 sm:py-3 px-5 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 shadow-sm text-sm sm:text-base ${
               copied
                 ? "bg-green-500 text-white"
                 : "bg-yellow-400 text-white hover:bg-yellow-500 hover:shadow-md"
@@ -314,12 +328,26 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
               </>
             )}
           </button>
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 sm:py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-100 transition-all shadow-sm text-sm sm:text-base"
-          >
-            닫기
-          </button>
+          <div className="">
+            {/* 언어 선택 드롭다운 */}
+            <div className="flex items-center gap-3 w-full sm:w-auto sm:flex-none">
+              <label
+                htmlFor="script-language-select"
+                className="text-sm font-semibold text-gray-700 whitespace-nowrap"
+              >
+                대본 언어 선택:
+              </label>
+              <select
+                id="script-language-select"
+                value={language}
+                onChange={handleLanguageChange}
+                className="py-2 px-3 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-colors text-sm sm:text-base w-full sm:w-28"
+              >
+                <option value="english">English</option>
+                <option value="korean">한국어</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
     </div>
