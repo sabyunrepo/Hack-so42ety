@@ -21,6 +21,8 @@ from .core.dependencies import set_event_bus
 from .core.cache.config import initialize_cache
 from .core.tasks.voice_sync import sync_voice_status_periodically
 from .core.logging import configure_logging, get_logger
+from backend.features.tts.producer import TTSProducer
+from backend.features.storybook.dependencies import set_tts_producer
 
 # Sentry 초기화
 if settings.sentry_dsn:
@@ -97,6 +99,14 @@ async def lifespan(app: FastAPI):
         print("✓ Event Bus started")
     except Exception as e:
         print(f"⚠ Event Bus failed to start: {e}")
+
+    # TTS Producer 초기화 (싱글톤)
+    try:
+        tts_producer = TTSProducer(event_bus=event_bus)
+        set_tts_producer(tts_producer)
+        print("✓ TTS Producer initialized")
+    except Exception as e:
+        print(f"⚠ TTS Producer initialization failed: {e}")
 
     # Voice 동기화 작업 시작
     try:
