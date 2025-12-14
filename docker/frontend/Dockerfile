@@ -32,8 +32,8 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Production 빌드
 ENV NODE_ENV=production
+# 빌드 결과물 검증
 RUN npm run build && \
-    # 빌드 결과물 검증
     ls -lah /app/dist
 
 # ==================== Stage 3: Production (Nginx Serving) ====================

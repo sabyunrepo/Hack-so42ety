@@ -93,7 +93,7 @@ services:
       # 프로덕션: 데이터만 마운트 (소스 코드는 이미지에 포함)
       - app-data:/app/data
     environment:
-      - APP_ENV=prod
+      - APP_ENV=${APP_ENV:-prod}
       - DEBUG=false
       - LOG_LEVEL=INFO
       # Database
@@ -193,6 +193,8 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
   # ==================== Cloudflare Tunnel ====================
   cloudflared:
@@ -220,7 +222,7 @@ services:
       - ${HOME}/.docker/config.json:/config.json
     environment:
       - DOCKER_API_VERSION=1.44
-    command: --interval 300 --cleanup moriai-backend-prod moriai-frontend-prod
+    command: --interval 300 --cleanup --label-enable
     networks:
       - moriai-network
     logging:
