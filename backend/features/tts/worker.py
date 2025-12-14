@@ -2,8 +2,6 @@ import asyncio
 import json
 import logging
 import uuid
-import os
-import aiofiles
 from typing import Set, Optional
 import redis.asyncio as aioredis
 from sqlalchemy import select
@@ -13,6 +11,8 @@ from backend.core.events.types import EventType
 from backend.core.database.session import AsyncSessionLocal
 from backend.features.storybook.models import DialogueAudio
 from backend.infrastructure.ai.factory import AIProviderFactory
+from backend.core.dependencies import get_storage_service
+from backend.infrastructure.storage.base import AbstractStorageService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,19 +25,22 @@ class TTSWorker:
     Semaphore(3)을 사용하여 동시 요청 수를 제한합니다 (총 5개 중 2개는 실시간 Word TTS용으로 확보).
     """
 
-    def __init__(self):
+    def __init__(self, storage_service: Optional[AbstractStorageService] = None):
         self.redis_url = settings.redis_url
         self.stream_name = f"events:{EventType.TTS_CREATION.value}"
         self.group_name = "tts_workers"
         # Consumer name includes UUID to identify instances
         self.consumer_name = f"worker-{str(uuid.uuid4())[:8]}"
-        
+
         # Concurrency Control: Max 3 concurrent tasks
         self.semaphore = asyncio.Semaphore(3)
         self.active_tasks: Set[asyncio.Task] = set()
         self.running = False
-        
+
         self.ai_factory = AIProviderFactory()
+
+        # StorageService 주입 (없으면 자동 생성)
+        self.storage_service = storage_service or get_storage_service()
 
     async def start(self):
         """워커 시작"""
@@ -176,18 +179,19 @@ class TTSWorker:
                     await session.commit()
                     return
 
-                # 3. Save to File
-                # record.audio_url stores the relative path e.g., "shared/books/..."
-                target_path = record.audio_url.strip("/")
-                full_path = os.path.join(settings.storage_base_path, target_path)
-                
-                # Ensure directory exists
-                os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                
-                async with aiofiles.open(full_path, "wb") as f:
-                    await f.write(audio_bytes)
-                
-                logger.info(f"File saved: {full_path}")
+                # 3. Save via StorageService (환경 독립적: Local/S3 자동 분기)
+                try:
+                    file_path = await self.storage_service.save(
+                        file_data=audio_bytes,
+                        path=record.audio_url.strip("/"),
+                        content_type="audio/mpeg"
+                    )
+                    logger.info(f"TTS audio saved via StorageService: {file_path}")
+                except Exception as storage_error:
+                    logger.error(f"Storage Error: {storage_error}")
+                    record.status = "FAILED"
+                    await session.commit()
+                    return
 
                 # 4. Update Status: COMPLETED
                 record.status = "COMPLETED"
