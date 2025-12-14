@@ -177,6 +177,21 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] sm:max-h-[85vh] flex flex-col shadow-2xl">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between p-4 sm:p-5 md:p-6 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-t-2xl">
+          <div>
+            <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">
+              {" "}
+              녹음용 대본
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl sm:text-3xl font-bold leading-none transition-colors"
+          >
+            ×
+          </button>
+        </div>
         <div className="overflow-y-auto">
           {/* 안내 메시지 */}
           <div className="px-4 sm:px-5 md:px-6 pt-3 sm:pt-4 pb-2">
@@ -190,17 +205,15 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
 
                 <li>
                   <p className="mt-1">
-                    <strong className="text-blue-600">
-                      언어 선택 (권장) :
-                    </strong>
-                    <strong className="text-red-700">
+                    <strong className="text-blue-600">언어 선택 :</strong>
+                    {/* <strong className="text-red-700">
                       {" "}
                       영어 대본으로 녹음 시 음성 생성 퀄리티가 가장 높습니다.
                       {" "}
                     </strong>
-                    {/* <br /> */}
                     (한국어 녹음도 가능하지만, 최종 음성 품질을 위해 영어 녹음을
-                    강력히 권장합니다.)
+                    강력히 권장합니다.) */}{" "}
+                    한국어, 영어 상관없이 편한 언어로 녹음을 진행해 주세요.
                   </p>
                 </li>
 
@@ -208,20 +221,21 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
                   <strong className="text-blue-600">길이 제한 준수 :</strong>{" "}
                   녹음 길이가{" "}
                   <strong className="text-red-700">2분 30초 미만</strong>일 경우
-                  TTS 생성이 불가합니다. (권장 녹음 시간은 2분 30초 초과 ~ 약
-                  3분 입니다)
+                  TTS 생성이 불가합니다. (권장 녹음 시간은 {" "}
+                  <strong className="text-red-700">2분 30초 초과 ~
+                  3분</strong>입니다.)
                 </li>
 
                 <li>
-                  <strong className="text-blue-600">재녹음/이어읽기 :</strong>{" "}
+                  <strong className="text-blue-600">재녹음/이어 읽기 :</strong>{" "}
                   대본을 모두 읽었는데도 2분 30초가 되지 않으면, 대본 처음부터
                   다시 읽어 이어서 녹음하셔도 괜찮습니다.
                 </li>
 
                 <li>
-                  <strong className="text-blue-600">무음 구간 :</strong> 녹음 중
-                  발생하는 무음 구간은 자동으로 삭제되므로, 여유 있게 진행하셔도
-                  좋습니다.
+                  <strong className="text-blue-600">무음 구간 :</strong> 녹음
+                  중에 발생하는 무음 구간은 자동으로 삭제되므로, 여유 있게
+                  진행하시는 게 좋습니다.
                 </li>
               </ul>
             </div>
