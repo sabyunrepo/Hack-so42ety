@@ -13,13 +13,13 @@ import RequireAuth from "./components/RequireAuth";
 function App() {
   return (
     <AuthProvider>
-      <div className="flex flex-col w-full h-screen bg-orange-50 overflow-auto min-w-[900px]">
+      <div className="flex flex-col w-full h-screen bg-orange-50 overflow-auto">
         <Header />
         <div className="flex-1 max-w-7xl mx-auto w-full ">
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            
+
             <Route
               path="/"
               element={
