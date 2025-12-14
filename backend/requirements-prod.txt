@@ -2,8 +2,8 @@
 # 프로덕션 환경에 필요한 최소 의존성만 포함
 
 # ==================== Core Framework ====================
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi==0.115.6  # Updated for anyio 4.x compatibility
+uvicorn[standard]==0.32.1  # Updated with fastapi
 python-multipart==0.0.6
 asgi-correlation-id==4.3.0  # Request ID tracking
 
@@ -22,13 +22,13 @@ google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.2.0
 
 # ==================== Validation & Settings ====================
-pydantic==2.5.2
+pydantic==2.12.5  # Updated for google-genai compatibility (>=2.9.0)
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
 email-validator==2.1.0
 
 # ==================== HTTP Client ====================
-httpx==0.25.2
+httpx==0.28.1  # Updated for google-genai compatibility
 aiohttp==3.9.1
 
 # ==================== Caching ====================
@@ -39,6 +39,7 @@ redis[hiredis]==5.0.1
 google-generativeai==0.3.1
 openai==1.6.1
 elevenlabs==0.2.26
+google-genai==1.55.0        # Google Gemini SDK (newer API)
 
 # ==================== File Processing ====================
 pillow==10.1.0
