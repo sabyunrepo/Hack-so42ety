@@ -12,8 +12,7 @@ from pydantic import BaseModel
 from ..base import StoryGenerationProvider, ImageGenerationProvider
 from ....core.config import settings
 from google import genai
-import google.genai.types as genai_types
-# from google.genai import types
+from google.genai import types as genai_types
 
 
 class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):

@@ -18,7 +18,9 @@ from backend.core.tasks.voice_queue import VoiceSyncQueue
 from backend.core.database.session import get_db
 from backend.core.utils.trace import log_process
 
-logger = logging.getLogger(__name__)
+from backend.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @log_process(step="Task Voice Sync", desc="Voice Cloning 상태 동기화 작업")
@@ -43,14 +45,17 @@ async def sync_voice_status_periodically(
         try:
             await asyncio.sleep(interval)
             
+            
             # Redis 큐에서 대기 중인 작업 조회
             queued_voice_ids = await voice_queue.get_all()
             
+            logger.debug("Voice sync heartbeat", extra={"queued_count": len(queued_voice_ids)})
+
             if not queued_voice_ids:
-                logger.debug("No voices in sync queue, skipping")
+                # logger.debug("No voices in sync queue, skipping") # 너무 빈번하면 시끄러우므로 debug 유지
                 continue
             
-            logger.info(f"Found {len(queued_voice_ids)} voices in sync queue")
+            logger.info(f"Found {len(queued_voice_ids)} voices in sync queue", extra={"voice_ids": list(queued_voice_ids)})
             
             # DB 세션 생성
             async for db_session in get_db():
