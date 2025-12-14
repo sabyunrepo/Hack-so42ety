@@ -82,7 +82,12 @@ export const createStorybook = async ({
     formData.append("voice_id", voice_id);
   }
 
-  const response = await apiClient.post("/storybook/create/with-images", formData);
+  const response = await apiClient.post("/storybook/create/with-images", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  }
+  );
   return response.data;
 };
 
