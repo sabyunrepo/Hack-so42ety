@@ -58,6 +58,9 @@ dev-build: ## 개발 모드 이미지 빌드
 	@echo "$(BLUE)Building development images...$(NC)"
 	$(DOCKER_COMPOSE_DEV) build
 
+auto-build: ## 🚀 버전을 자동으로 올리고 빌드 (v0.0.1 -> v0.0.2)
+	@./scripts/build_with_version.sh
+
 dev-logs: ## 개발 모드 로그 확인
 	$(DOCKER_COMPOSE_DEV) logs -f
 
@@ -149,7 +152,7 @@ prod-deploy: ## 🚀 프로덕션 초기 배포 (환경 설정 + 빌드 + 실행
 	@echo ""
 	@echo "$(YELLOW)Step 5/5: Running database migrations...$(NC)"
 	@sleep 10
-	$(DOCKER_COMPOSE_PROD) exec -T backend alembic upgrade head
+	$(DOCKER_COMPOSE_PROD) exec -T backend sh -c "cd backend && alembic upgrade head"
 	@echo "$(GREEN)✓ Migrations completed$(NC)"
 	@echo ""
 	@echo "$(GREEN)========================================$(NC)"
