@@ -88,7 +88,7 @@ const LoginPage = () => {
             로그인
           </h2>
           <p className="text-amber-700 mt-2 text-sm">
-            동화책1123123 세상으로 들어가보세요!
+            동화책 세상으로 들어가보세요!
           </p>
         </div>
 
