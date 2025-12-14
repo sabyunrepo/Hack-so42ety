@@ -185,6 +185,13 @@ class Settings(BaseSettings):
     http_read_timeout: float = Field(default=300.0, env="HTTP_READ_TIMEOUT")
     http_max_connections: int = Field(default=10, env="HTTP_MAX_CONNECTIONS")
 
+    # ==================== Resource Limits ====================
+    video_generation_limit: int = Field(
+        default=1,
+        env="VIDEO_GENERATION_LIMIT",
+        description="Maximum concurrent video generation requests (server-wide)"
+    )
+
     # ==================== Pydantic Config ====================
     model_config = SettingsConfigDict(
         env_file=".env",

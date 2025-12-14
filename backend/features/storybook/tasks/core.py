@@ -18,6 +18,7 @@ from backend.features.storybook.prompts.generate_story_prompt import GenerateSto
 from backend.features.storybook.prompts.generate_tts_expression_prompt import EnhanceAudioPrompt
 from backend.features.storybook.prompts.generate_image_prompt import GenerateImagePrompt
 from backend.core.config import settings
+from backend.core.limiters import get_limiters
 from backend.features.tts.exceptions import BookVoiceNotConfiguredException
 from backend.features.tts.producer import TTSProducer
 # from backend.features.storybook.dependencies import get_tts_producer
@@ -91,7 +92,7 @@ async def generate_story_task(
 
         except Exception as e:
             last_error = e
-            logger.warning(
+            logger.info(
                 f"[Story Task] Attempt {attempt} failed: {e}"
             )
 
@@ -135,7 +136,7 @@ async def generate_story_task(
             for page_idx, page_dialogues in enumerate(dialogues):
                 page = next((p for p in pages if p.sequence == page_idx + 1), None)
                 if not page:
-                    logger.warning(f"[Story Task] Page {page_idx + 1} not found, skipping dialogues")
+                    logger.info(f"[Story Task] Page {page_idx + 1} not found, skipping dialogues")
                     continue
                 for dialogue_idx, dialogue_text in enumerate(page_dialogues):
                     await repo.add_dialogue_with_translation(
@@ -277,7 +278,7 @@ async def generate_image_task(
             if not updated:
                 raise ValueError(f"Book {book_id} not found for update")
             await session.commit()
-            logger.debug(f"[Image Task] Updated book with cover image: {file_name}")
+            logger.info(f"[Image Task] Updated book with cover image: {file_name}")
             logger.info("####################################################################")
             logger.info(f"[Image Task] Image COMPLETED!!!!!!!!!!!!!!!!")
             return TaskResult(
@@ -344,14 +345,14 @@ async def generate_tts_task(
                         None
                     )
                     if not primary_translation:
-                        logger.warning(
+                        logger.info(
                             f"[TTS Task] No primary translation for dialogue {dialogue.id}, skipping"
                         )
                         continue
 
                     # Skip empty text
                     if not primary_translation.text.strip():
-                        logger.warning(
+                        logger.info(
                             f"[TTS Task] Empty text for dialogue {dialogue.id}, skipping"
                         )
                         continue
@@ -450,7 +451,7 @@ async def generate_video_task(
     Returns:
         TaskResult: 성공 시 video_url 반환 (실패해도 치명적이지 않음)
     """
-    logger.info(f"[Video Task] Starting for book_id={book_id}")
+    logger.info(f"[Video Task] [Book: {book_id}] Starting video generation")
     ai_factory = get_ai_factory()
     video_provider = ai_factory.get_video_provider()
 
@@ -462,23 +463,32 @@ async def generate_video_task(
     for dialogue in dialogues:
         prompt = " ".join(dialogue)
         prompts.append(prompt)
-    logger.info(f"[Video Task] prompts: {prompts}")
+    logger.info(f"[Video Task] [Book: {book_id}] Generated prompts: {prompts}")
 
     image_key = f"images:{book_id}"
     image_data = await task_store.get(image_key)
     image_uuids = [img_info['imageUUID'] for img_info in image_data.get("images", [])] if image_data else []
 
-    tasks = [
-        video_provider.generate_video(image_uuid=img_uuid, prompt=prompt)
-        for img_uuid, prompt in zip(image_uuids, prompts)
-    ]
+    # 글로벌 세마포어로 비디오 생성 동시성 제어
+    limiters = get_limiters()
+    tasks = []
 
-    # asyncio.gather로 병렬 실행
+    for img_uuid, prompt in zip(image_uuids, prompts):
+        async def generate_with_limit(uuid=img_uuid, p=prompt):
+            """세마포어로 동시 생성 제어"""
+            async with limiters.video_generation:
+                logger.info(f"[Video Task] [Book: {book_id}] Acquiring semaphore for image {uuid[:8]}...")
+                return await video_provider.generate_video(image_uuid=uuid, prompt=p)
+
+        tasks.append(generate_with_limit())
+
+    # asyncio.gather로 병렬 실행 (세마포어 내에서 동시성 제어)
+    logger.info(f"[Video Task] [Book: {book_id}] Starting {len(tasks)} video requests (server limit: {settings.video_generation_limit})")
     task_uuids = await asyncio.gather(*tasks)  # generate_video()는 task_uuid 문자열을 직접 반환
 
     # task_uuid → page_idx 매핑 생성 (순서 보장을 위해)
     task_to_page_idx = {task_uuid: idx for idx, task_uuid in enumerate(task_uuids)}
-    logger.debug(f"[Video Task] Created task mapping for {len(task_uuids)} pages")
+    logger.info(f"[Video Task] [Book: {book_id}] Created task mapping for {len(task_uuids)} pages")
 
     max_wait_time = 600  # 10분
     poll_interval = 10   # 10초마다 체크
@@ -491,13 +501,14 @@ async def generate_video_task(
                 continue  # 이미 완료된 작업
 
             status_response = await video_provider.check_video_status(task_uuid)
+            logger.info(f"[Video Task] [Book: {book_id}] Checked status for task {task_uuid[:8]}...: {status_response['status']}")
             if status_response["status"] == "completed":
                 completed_videos[task_uuid] = status_response["video_url"]
                 page_idx = task_to_page_idx[task_uuid]
-                logger.debug(f"[Video Task] Page {page_idx + 1} (task {task_uuid[:8]}...) completed")
+                logger.info(f"[Video Task] [Book: {book_id}] Page {page_idx + 1} (task {task_uuid[:8]}...) completed")
             elif status_response["status"] == "failed":
                 page_idx = task_to_page_idx[task_uuid]
-                logger.warning(f"[Video Task] Page {page_idx + 1} (task {task_uuid[:8]}...) failed")
+                logger.info(f"[Video Task] [Book: {book_id}] Page {page_idx + 1} (task {task_uuid[:8]}...) failed")
 
         if len(completed_videos) < len(task_uuids):
             await asyncio.sleep(poll_interval)
@@ -506,9 +517,9 @@ async def generate_video_task(
     # 완료되지 않은 작업 확인
     if len(completed_videos) < len(task_uuids):
         failed_tasks = set(task_uuids) - set(completed_videos.keys())
-        logger.warning(f"[Video Task] {len(failed_tasks)} videos failed or timed out")
+        logger.info(f"[Video Task] [Book: {book_id}] {len(failed_tasks)} videos failed or timed out")
 
-    logger.info(f"[Video Task] Completed {len(completed_videos)}/{len(task_uuids)} videos")
+    logger.info(f"[Video Task] [Book: {book_id}] Completed {len(completed_videos)}/{len(task_uuids)} videos")
 
     # === Phase: Get user_id for S3 path (minimal DB access) ===
     async with AsyncSessionLocal() as temp_session:
@@ -527,7 +538,7 @@ async def generate_video_task(
     for page_idx, task_uuid in enumerate(task_uuids):
         if task_uuid not in completed_videos:
             # 실패하거나 타임아웃된 경우
-            logger.warning(f"[Video Task] Page {page_idx + 1}: Video not completed, skipping")
+            logger.info(f"[Video Task] [Book: {book_id}] Page {page_idx + 1}: Video not completed, skipping")
             s3_video_urls.append(None)  # 순서 유지를 위해 None 추가
             continue
 
@@ -541,7 +552,7 @@ async def generate_video_task(
             file_name,
             content_type="video/mp4"
         )
-        logger.debug(f"[Video Task] Page {page_idx + 1}: Uploaded to {storage_url} (size: {video_size} bytes)")
+        logger.info(f"[Video Task] [Book: {book_id}] Page {page_idx + 1}: Uploaded to {storage_url} (size: {video_size} bytes)")
         s3_video_urls.append(file_name)
 
     # === Phase: DB 작업만 세션 안에서 실행 ===
@@ -556,12 +567,12 @@ async def generate_video_task(
             for page_idx, video_url in enumerate(s3_video_urls):
                 if video_url is None:
                     # 실패한 비디오는 건너뛰기
-                    logger.warning(f"[Video Task] Page {page_idx + 1}: Skipping DB update (video failed)")
+                    logger.info(f"[Video Task] [Book: {book_id}] Page {page_idx + 1}: Skipping DB update (video failed)")
                     continue
 
                 page = next((p for p in pages if p.sequence == page_idx + 1), None)
                 if not page:
-                    logger.warning(f"[Video Task] Page {page_idx + 1} not found in DB, skipping video")
+                    logger.info(f"[Video Task] [Book: {book_id}] Page {page_idx + 1} not found in DB, skipping video")
                     continue
                 page.image_url = video_url  # 또는 video_url용 컬럼이 있으면 그것
                 session.add(page)  # ORM 세션에 반영
@@ -588,7 +599,7 @@ async def generate_video_task(
             )
 
         except Exception as e:
-            logger.error(f"[Video Task] Failed for book_id={book_id}: {e}", exc_info=True)
+            logger.error(f"[Video Task] [Book: {book_id}] Video generation failed: {e}", exc_info=True)
             return TaskResult(
                 status=TaskStatus.FAILED,
                 result={"skipped": True, "reason": f"Video generation failed: {str(e)}"}
@@ -640,7 +651,7 @@ async def finalize_book_task(
                 raise ValueError(f"Book {book_id} not found for update")
 
             await session.commit()
-            logger.debug(f"[Finalize Task] Updated book status to COMPLETED")
+            logger.info(f"[Finalize Task] Updated book status to COMPLETED")
 
         except Exception as e:
             logger.error(f"[Finalize Task] Failed for book_id={book_id}: {e}", exc_info=True)
@@ -665,9 +676,9 @@ async def finalize_book_task(
     # === Phase 3: Redis Cleanup - 세션 밖에서 실행 (비동기, 에러 무시) ===
     try:
         cleanup_count = await task_store.cleanup_book_tasks(book_id)
-        logger.debug(f"[Finalize Task] Cleaned up {cleanup_count} Redis keys")
+        logger.info(f"[Finalize Task] Cleaned up {cleanup_count} Redis keys")
     except Exception as cleanup_error:
-        logger.warning(f"[Finalize Task] Redis cleanup failed: {cleanup_error}")
+        logger.info(f"[Finalize Task] Redis cleanup failed: {cleanup_error}")
 
     logger.info(f"[Finalize Task] Completed for book_id={book_id}")
 
