@@ -59,8 +59,13 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=sha
+            # 'latest' tag for main branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            # 'prod' tag for main branch (for frontend consistency)
+            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/main' }}
+            # 'dev' tag for dev branch
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
