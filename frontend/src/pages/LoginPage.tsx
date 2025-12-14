@@ -59,8 +59,10 @@ const LoginPage = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ✅ 폼 제출 시 이전 에러를 초기화 (필수)
     setError("");
 
     // 폼 제출 시 전체 검증
@@ -71,17 +73,21 @@ const LoginPage = () => {
       return;
     }
 
+
     try {
       await login({ email, password });
       navigate("/");
     } catch (err) {
+
+
       setError(getUserFriendlyErrorMessage(err));
+
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 via-amber-50/50 to-orange-50">
-      <div className="w-full max-w-md rounded-2xl bg-white/80 backdrop-blur-sm p-8 shadow-2xl border border-amber-100">
+    <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-orange-50 via-amber-50/50 to-orange-50 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md rounded-2xl bg-white/80 backdrop-blur-sm p-6 sm:p-8 shadow-2xl border border-amber-100">
         <div className="text-center mb-8">
           {/* <div className="text-5xl mb-4">📚</div> */}
           <h2 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
@@ -92,15 +98,30 @@ const LoginPage = () => {
           </p>
         </div>
 
-        {error && (
+        {/* {error && (
           <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 shadow-sm">
             <div className="flex items-center gap-2">
               <span className="text-lg">⚠️</span>
               <span>{error}</span>
             </div>
           </div>
-        )}
+        )} */}
 
+{error && (
+  <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 shadow-sm">
+    <div className="flex items-start gap-2">
+      <span className="text-lg flex-shrink-0">⚠️</span>
+      <span className="flex-1 text-sm leading-snug">{error}</span>
+      <button
+        onClick={() => setError("")}
+        className="ml-4 p-0.5 text-red-700 hover:text-red-900 transition-colors flex-shrink-0"
+        aria-label="닫기"
+      >
+        &times;
+      </button>
+    </div>
+  </div>
+)}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label
