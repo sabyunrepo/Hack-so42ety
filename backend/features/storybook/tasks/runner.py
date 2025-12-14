@@ -8,6 +8,7 @@ import logging
 import uuid
 from typing import Dict, List, Callable, Awaitable, Optional, Any
 from dataclasses import dataclass
+from backend.features.tts.producer import TTSProducer
 
 from .schemas import TaskResult, TaskContext, TaskStatus
 from .store import TaskStore
@@ -298,6 +299,7 @@ async def create_storybook_dag(
     book_id: uuid.UUID,
     stories: List[str],
     images: List[bytes],
+    tts_producer: TTSProducer,
     voice_id: str,
     level: int,
 ) -> Dict[str, Any]:
@@ -374,7 +376,7 @@ async def create_storybook_dag(
     t_tts = await runner.submit_task(
         name="generate_tts_batch",
         func=generate_tts_task,
-        args=(str(book_id), context),
+        args=(str(book_id), tts_producer, context),
         depends_on=[t_story],  # 실행 순서만 보장, dialogues는 Redis 조회
     )
 

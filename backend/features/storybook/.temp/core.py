@@ -18,9 +18,10 @@ from backend.features.storybook.prompts.generate_story_prompt import GenerateSto
 from backend.features.storybook.prompts.generate_tts_expression_prompt import EnhanceAudioPrompt
 from backend.features.storybook.prompts.generate_image_prompt import GenerateImagePrompt
 from backend.core.config import settings
+from backend.features.tts.service import TTSService
+from backend.features.tts.repository import AudioRepository, VoiceRepository
 from backend.features.tts.exceptions import BookVoiceNotConfiguredException
-from backend.features.tts.producer import TTSProducer
-# from backend.features.storybook.dependencies import get_tts_producer
+from backend.features.storybook.dependencies import get_tts_producer
 
 
 from .schemas import TaskResult, TaskContext, TaskStatus
@@ -55,72 +56,38 @@ async def generate_story_task(
     """
     logger.info(f"[Story Task] Starting for book_id={book_id}")
     logger.info(f"[Story Task] stories={stories}, level={level}, num_pages={num_pages}")
-    ai_factory = get_ai_factory()
-    story_provider = ai_factory.get_story_provider()
-
-    MAX_RETRIES = 3
-
-    max_dialogues_per_page = 3  # 임시 고정값, 추후 조정 가능
-
-
-    response_schema = create_stories_response_schema(
-        max_pages=num_pages,
-        max_dialogues_per_page=max_dialogues_per_page,
-        max_chars_per_dialogue=85,
-        max_title_length=20,
-    )
-    prompt = GenerateStoryPrompt(diary_entries=stories).render()
-
-    last_error = None
-
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            generated_data = await story_provider.generate_story(
-                prompt=prompt,
-                response_schema=response_schema,
-            )
-
-            logger.info(
-                f"[Story Task] Attempt {attempt} generated_data={generated_data}"
-            )
-
-            book_title, dialogues = validate_generated_story(generated_data)
-
-            # ✅ 성공
-            break
-
-        except Exception as e:
-            last_error = e
-            logger.warning(
-                f"[Story Task] Attempt {attempt} failed: {e}"
-            )
-
-    else:
-        # ❌ 모든 시도 실패
-        logger.error(
-            f"[Story Task] All retries failed. Last error: {last_error}"
-        )
-        raise RuntimeError(
-            f"Failed to generate valid story after {MAX_RETRIES} retries"
-        )
 
     async with AsyncSessionLocal() as session:
         try:
             repo = BookRepository(session)
             task_store = TaskStore()
+            ai_factory = get_ai_factory()
 
             # 1. Update pipeline stage
             book_uuid = uuid.UUID(book_id)
 
             # 2. Generate story (AI call)
-
+            max_dialogues_per_page = 3  # 임시 고정값, 추후 조정 가능
+            story_provider = ai_factory.get_story_provider()
+            response_schema = create_stories_response_schema(
+                max_pages=num_pages,
+                max_dialogues_per_page=max_dialogues_per_page,
+                max_chars_per_dialogue=85,
+                max_title_length=20,
+            )
+            prompt = GenerateStoryPrompt(diary_entries=stories).render()
+            generated_data = await story_provider.generate_story(
+                prompt=prompt,
+                response_schema=response_schema,
+            )
+            book_title = generated_data.title
+            dialogues = generated_data.stories
 
             emotion_prefixed_prompt = EnhanceAudioPrompt(stories=dialogues, title=book_title).render()
             response_with_emotion = await story_provider.generate_story(
                 prompt=emotion_prefixed_prompt,
                 response_schema=TTSExpressionResponse,
             )
-            logger.info(f"[Story Task] Generating story with emotions: {response_with_emotion}")
             dialogues_with_emotions = response_with_emotion.stories
 
             # 3. Store in Redis
@@ -280,8 +247,6 @@ async def generate_image_task(
                 raise ValueError(f"Book {book_id} not found for update")
             await session.commit()
             logger.debug(f"[Image Task] Updated book with cover image: {file_name}")
-            logger.info("####################################################################")
-            logger.info(f"[Image Task] Image COMPLETED!!!!!!!!!!!!!!!!")
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={
@@ -300,7 +265,6 @@ async def generate_image_task(
 
 async def generate_tts_task(
     book_id: str,
-    tts_producer: TTSProducer,
     context: TaskContext,
 ) -> TaskResult:
     """
@@ -358,123 +322,124 @@ async def generate_tts_task(
                         )
                         continue
 
-                    file_name = f"users/{book.user_id}/audios/standalone/{uuid.uuid4()}.mp3"
-                    audio = await repo.add_dialogue_audio(
-                        dialogue_id=dialogue.id,
-                        language_code=primary_translation.language_code,
-                        voice_id=book.voice_id,
-                        audio_url=file_name,
-                        status="PENDING",
-                    )
-                    if not audio:
-                        logger.error(
-                            f"[TTS Task] Failed to create DialogueAudio record for dialogue {dialogue.id}, skipping"
-                        )
-                        continue
 
-                    logger.info(f"[TTS Task] Enqueuing TTS for dialogue {dialogue.id}, audio_id={audio.id}")
-                    logger.info(f"[TTS Task] Text: {primary_translation.text}")
-                    tts_producer.enqueue_tts_task(
-                        dialogue_audio_id=audio.id,
-                        text=primary_translation.text,
-                    )
+                    tasks_to_generate.append({
+                        "dialogue_id": dialogue.id,
+                        "text": primary_translation.text,
+                        "language_code": primary_translation.language_code,
+                        "page_seq": page.sequence,
+                        "dialogue_seq": dialogue.sequence,
+                    })
 
+            if not tasks_to_generate:
+                raise ValueError("No dialogues found for TTS generation")
 
-                    # tasks_to_generate.append({
-                    #     "dialogue_id": dialogue.id,
-                    #     "text": primary_translation.text,
-                    #     "language_code": primary_translation.language_code,
-                    #     "page_seq": page.sequence,
-                    #     "dialogue_seq": dialogue.sequence,
-                    # })
-
-            # if not tasks_to_generate:
-            #     raise ValueError("No dialogues found for TTS generation")
-
-            # logger.info(f"[TTS Task] Generating TTS for {len(tasks_to_generate)} dialogues")
+            logger.info(f"[TTS Task] Generating TTS for {len(tasks_to_generate)} dialogues")
 
             # === Phase 3: TTS Service Setup & Parallel Generation ===
             # Initialize TTSService manually for background tasks
-            # async def generate_single_tts(task_info):
-            #     """Generate TTS for a single dialogue (TTS only, no DB)"""
-            #     try:
-            #         logger.info(f"[TTS Task] Generating TTS for dialogue {task_info['dialogue_id']}")
-            #         # 1. Generate TTS using TTSService (saves to standalone path)
+            audio_repo = AudioRepository(session)
+            voice_repo = VoiceRepository(session)
+            storage_service = get_storage_service()
+            ai_factory = get_ai_factory()
+            event_bus = get_event_bus()
+            cache_service = get_cache_service(event_bus=event_bus)
 
-            #         logger.info(f"[TTS Task] Successfully generated TTS for dialogue {task_info['dialogue_id']}")
-            #         return {
-            #             "success": True,
-            #             "dialogue_id": task_info["dialogue_id"],
-            #             "language_code": task_info["language_code"],
-            #             "audio_url": audio.file_path,
-            #             "duration": None,
-            #         }
+            tts_service = TTSService(
+                audio_repo=audio_repo,
+                voice_repo=voice_repo,
+                storage_service=storage_service,
+                ai_factory=ai_factory,
+                db_session=session,
+                cache_service=cache_service,
+                event_bus=event_bus,
+            )
 
-            #     except Exception as e:
-            #         logger.error(
-            #             f"[TTS Task] Failed to generate TTS for dialogue {task_info['dialogue_id']}: {e}",
-            #             exc_info=True
-            #         )
-            #         return {
-            #             "success": False,
-            #             "dialogue_id": task_info["dialogue_id"],
-            #             "language_code": task_info.get("language_code", "en"),
-            #             "error": str(e),
-            #         }
+            async def generate_single_tts(task_info):
+                """Generate TTS for a single dialogue (TTS only, no DB)"""
+                try:
+                    logger.info(f"[TTS Task] Generating TTS for dialogue {task_info['dialogue_id']}")
+                    # 1. Generate TTS using TTSService (saves to standalone path)
+                    audio = await tts_service.generate_speech(
+                        user_id=book.user_id,
+                        text=task_info["text"],
+                        voice_id=book.voice_id,
+                    )
 
-            # # === Phase 4: Batch Processing (5 at a time to avoid ElevenLabs concurrency limit) ===
-            # BATCH_SIZE = 5
-            # all_results = []
-            # success_count = 0
-            # failed_count = 0
+                    logger.info(f"[TTS Task] Successfully generated TTS for dialogue {task_info['dialogue_id']}")
+                    return {
+                        "success": True,
+                        "dialogue_id": task_info["dialogue_id"],
+                        "language_code": task_info["language_code"],
+                        "audio_url": audio.file_path,
+                        "duration": None,
+                    }
 
-            # logger.info(f"[TTS Task] Processing {len(tasks_to_generate)} tasks in batches of {BATCH_SIZE}")
-            # for i in range(0, len(tasks_to_generate), BATCH_SIZE):
-            #     batch = tasks_to_generate[i:i+BATCH_SIZE]
-            #     batch_num = (i // BATCH_SIZE) + 1
-            #     total_batches = (len(tasks_to_generate) + BATCH_SIZE - 1) // BATCH_SIZE
-            #     logger.info(f"[TTS Task] Processing batch {batch_num}/{total_batches} ({len(batch)} items)")
+                except Exception as e:
+                    logger.error(
+                        f"[TTS Task] Failed to generate TTS for dialogue {task_info['dialogue_id']}: {e}",
+                        exc_info=True
+                    )
+                    return {
+                        "success": False,
+                        "dialogue_id": task_info["dialogue_id"],
+                        "language_code": task_info.get("language_code", "en"),
+                        "error": str(e),
+                    }
 
-            #     # Execute batch in parallel
-            #     batch_tasks = [generate_single_tts(task_info) for task_info in batch]
-            #     batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+            # === Phase 4: Batch Processing (5 at a time to avoid ElevenLabs concurrency limit) ===
+            BATCH_SIZE = 5
+            all_results = []
+            success_count = 0
+            failed_count = 0
 
-            #     # Process batch results and save to DB sequentially
-            #     for result in batch_results:
-            #         if isinstance(result, Exception):
-            #             failed_count += 1
-            #             logger.error(f"[TTS Task] Task raised exception: {result}")
-            #             continue
+            logger.info(f"[TTS Task] Processing {len(tasks_to_generate)} tasks in batches of {BATCH_SIZE}")
+            for i in range(0, len(tasks_to_generate), BATCH_SIZE):
+                batch = tasks_to_generate[i:i+BATCH_SIZE]
+                batch_num = (i // BATCH_SIZE) + 1
+                total_batches = (len(tasks_to_generate) + BATCH_SIZE - 1) // BATCH_SIZE
+                logger.info(f"[TTS Task] Processing batch {batch_num}/{total_batches} ({len(batch)} items)")
 
-            #         if not result["success"]:
-            #             failed_count += 1
-            #             # Create failed DialogueAudio record
-            #             await repo.add_dialogue_audio(
-            #                 dialogue_id=result["dialogue_id"],
-            #                 language_code=result.get("language_code", "en"),
-            #                 voice_id=book.voice_id,
-            #                 audio_url="",
-            #                 duration=None,
-            #                 status="FAILED",
-            #             )
-            #             continue
+                # Execute batch in parallel
+                batch_tasks = [generate_single_tts(task_info) for task_info in batch]
+                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
 
-            #         # Create successful DialogueAudio record
-            #         await repo.add_dialogue_audio(
-            #             dialogue_id=result["dialogue_id"],
-            #             language_code=result["language_code"],
-            #             voice_id=book.voice_id,
-            #             audio_url=result["audio_url"],
-            #             duration=result.get("duration"),
-            #             status="COMPLETED",
-            #         )
-            #         success_count += 1
+                # Process batch results and save to DB sequentially
+                for result in batch_results:
+                    if isinstance(result, Exception):
+                        failed_count += 1
+                        logger.error(f"[TTS Task] Task raised exception: {result}")
+                        continue
 
-            #     # Commit batch to DB
-            #     await session.commit()
-            #     logger.info(f"[TTS Task] Batch {batch_num}/{total_batches} completed and committed to DB")
+                    if not result["success"]:
+                        failed_count += 1
+                        # Create failed DialogueAudio record
+                        await repo.add_dialogue_audio(
+                            dialogue_id=result["dialogue_id"],
+                            language_code=result.get("language_code", "en"),
+                            voice_id=book.voice_id,
+                            audio_url="",
+                            duration=None,
+                            status="FAILED",
+                        )
+                        continue
 
-            #     all_results.extend(batch_results)
+                    # Create successful DialogueAudio record
+                    await repo.add_dialogue_audio(
+                        dialogue_id=result["dialogue_id"],
+                        language_code=result["language_code"],
+                        voice_id=book.voice_id,
+                        audio_url=result["audio_url"],
+                        duration=result.get("duration"),
+                        status="COMPLETED",
+                    )
+                    success_count += 1
+
+                # Commit batch to DB
+                await session.commit()
+                logger.info(f"[TTS Task] Batch {batch_num}/{total_batches} completed and committed to DB")
+
+                all_results.extend(batch_results)
 
             # === Phase 5: Update Progress ===
             await repo.update(
@@ -485,16 +450,16 @@ async def generate_tts_task(
             )
             await session.commit()
 
-            # logger.info(
-            #     f"[TTS Task] Completed for book_id={book_id}: "
-            #     f"{success_count} succeeded, {failed_count} failed"
-            # )
+            logger.info(
+                f"[TTS Task] Completed for book_id={book_id}: "
+                f"{success_count} succeeded, {failed_count} failed"
+            )
 
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={
-                    # "success_count": success_count,
-                    # "failed_count": failed_count,
+                    "success_count": success_count,
+                    "failed_count": failed_count,
                     "total_count": len(tasks_to_generate),
                 },
             )
@@ -750,27 +715,3 @@ async def finalize_book_task(
                 logger.error(f"[Finalize Task] Failed to update error in DB: {db_error}")
 
             return TaskResult(status=TaskStatus.FAILED, error=str(e))
-
-
-def validate_generated_story(data) -> tuple[str, list]:
-    """
-    generated_data 검증
-    Returns: (title, dialogues)
-    Raises: ValueError
-    """
-    if data is None:
-        raise ValueError("generated_data is None")
-
-    title = getattr(data, "title", None)
-    stories = getattr(data, "stories", None)
-
-    if not title or not isinstance(title, str):
-        raise ValueError("Missing or invalid title")
-
-    if not stories or not isinstance(stories, list):
-        raise ValueError("Missing or invalid stories")
-
-    if len(title) > 20:
-        raise ValueError("Title too long")
-
-    return title, stories
