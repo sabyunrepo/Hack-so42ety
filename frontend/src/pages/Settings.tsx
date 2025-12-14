@@ -60,7 +60,7 @@ export default function Settings() {
 
     runCheck(); // 정의된 runCheck 함수 실행
   }, []);
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
@@ -81,8 +81,53 @@ export default function Settings() {
       return;
     }
 
+    // 오디오 길이 체크
+    try {
+      const duration = await getAudioDuration(selectedFile);
+      if (duration < 150) { // 2분 30초 = 150초
+        setShowModal(true);
+        setModalProps({
+          title: "오디오 길이 부족",
+          message: "업로드한 오디오 파일이 너무 짧습니다.",
+          submessage: `현재 오디오 길이: ${Math.floor(duration / 60)}분 ${Math.floor(duration % 60)}초. 최소 2분 30초 이상의 오디오가 필요합니다.`,
+          buttonText: "확인",
+          redirectTo: "",
+        });
+        setFile(null);
+        // 파일 input 초기화
+        const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+        if (fileInput) fileInput.value = "";
+        return;
+      }
+    } catch (err) {
+      console.error("오디오 길이 확인 중 오류:", err);
+      setError("오디오 파일 정보를 읽는 중 오류가 발생했습니다.");
+      setFile(null);
+      return;
+    }
+
     setFile(selectedFile);
     setError("");
+  };
+
+  // 오디오 파일의 길이를 가져오는 헬퍼 함수
+  const getAudioDuration = (file: File): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const audio = new Audio();
+      const objectUrl = URL.createObjectURL(file);
+
+      audio.addEventListener("loadedmetadata", () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(audio.duration);
+      });
+
+      audio.addEventListener("error", () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("오디오 파일을 로드할 수 없습니다."));
+      });
+
+      audio.src = objectUrl;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -153,6 +198,10 @@ export default function Settings() {
 
   const closeModal = () => {
     setShowModal(false);
+    // redirectTo가 빈 문자열이 아닌 경우에만 리다이렉트
+    if (modalProps.redirectTo) {
+      navigate(modalProps.redirectTo);
+    }
   };
 
   return (
@@ -191,7 +240,7 @@ export default function Settings() {
             className="flex items-center gap-2 px-4 sm:px-5 md:px-6 py-2.5 sm:py-3 bg-yellow-50 border-2 border-yellow-400 text-yellow-700 rounded-lg font-semibold hover:bg-yellow-100 transition-all text-sm sm:text-base"
           >
             <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-             녹음용 대본 보기
+            녹음용 대본 보기
           </button>
         </div>
 
@@ -239,6 +288,9 @@ export default function Settings() {
               <br />
               • 최대 크기: 30MB
               <br />• 오디오 길이: 2분 30초 ~ 3분 (3분 초과 시 자동 트리밍)
+              <p>
+                • 오디오 길이 : 2분 30초 이상 ~ 3분 (3분 초과 시 자동으로 잘림)
+              </p>
             </div>
           </div>
 
@@ -282,7 +334,9 @@ export default function Settings() {
 
         {/* 안내 사항 */}
         <div className="mt-6 sm:mt-8 p-4 sm:p-5 bg-yellow-50 border border-yellow-300 rounded-lg">
-          <h3 className="text-sm sm:text-base font-semibold text-black mb-2 sm:mb-3">안내사항</h3>
+          <h3 className="text-sm sm:text-base font-semibold text-black mb-2 sm:mb-3">
+            안내사항
+          </h3>
           <ul className="m-0 pl-4 sm:pl-5 text-xs text-gray-800 leading-loose space-y-1">
             <li>🟡 목소리 생성 완료까지 약 3분 소요됩니다.</li>
             <li>🟡 2분 30초 미만의 오디오는 거부됩니다.</li>
