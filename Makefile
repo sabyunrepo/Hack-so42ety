@@ -1,11 +1,11 @@
 .PHONY: help setup dev prod test clean migrate backup down \
-	dev-build dev-logs dev-logs-backend dev-logs-nginx dev-stop dev-down dev-restart \
-	prod-build prod-logs prod-logs-backend prod-logs-nginx prod-logs-cloudflared prod-stop prod-down prod-restart \
+	dev-build dev-logs dev-logs-backend dev-stop dev-down dev-restart \
+	prod-build prod-logs prod-logs-backend prod-logs-cloudflared prod-stop prod-down prod-restart \
 	prod-deploy prod-update prod-health prod-status prod-pull \
 	db-shell db-shell-prod db-migrate db-migrate-prod db-rollback db-rollback-prod db-reset db-backup db-backup-prod \
 	test-unit test-integration test-e2e test-coverage lint format format-check \
 	frontend-dev frontend-build frontend-test \
-	clean-all clean-all-prod logs logs-prod logs-backend logs-postgres logs-nginx \
+	clean-all clean-all-prod logs logs-prod logs-backend logs-postgres \
 	shell-backend shell-backend-prod shell-postgres shell-postgres-prod ps ps-prod restart ci-test
 
 # ==================== Colors ====================
@@ -48,11 +48,10 @@ dev: ## 개발 모드 실행 (Hot Reload)
 	$(DOCKER_COMPOSE_DEV) up -d postgres
 	@echo "$(YELLOW)Waiting for PostgreSQL...$(NC)"
 	@sleep 5
-	$(DOCKER_COMPOSE_DEV) up -d backend nginx
+	$(DOCKER_COMPOSE_DEV) up -d backend 
 	@echo "$(GREEN)✓ Development services started$(NC)"
 	@echo "$(BLUE)Backend API: http://localhost:8000$(NC)"
 	@echo "$(BLUE)API Docs: http://localhost:8000/docs$(NC)"
-	@echo "$(BLUE)Nginx: http://localhost$(NC)"
 
 dev-build: ## 개발 모드 이미지 빌드
 	@echo "$(BLUE)Building development images...$(NC)"
@@ -66,9 +65,6 @@ dev-logs: ## 개발 모드 로그 확인
 
 dev-logs-backend: ## 개발 모드 백엔드 로그 확인
 	$(DOCKER_COMPOSE_DEV) logs -f backend
-
-dev-logs-nginx: ## 개발 모드 Nginx 로그 확인
-	$(DOCKER_COMPOSE_DEV) logs -f nginx
 
 dev-stop: ## 개발 모드 중지
 	@echo "$(BLUE)Stopping development environment...$(NC)"
@@ -104,9 +100,6 @@ prod-logs: ## 프로덕션 모드 로그 확인
 
 prod-logs-backend: ## 프로덕션 모드 백엔드 로그 확인
 	$(DOCKER_COMPOSE_PROD) logs -f backend
-
-prod-logs-nginx: ## 프로덕션 모드 Nginx 로그 확인
-	$(DOCKER_COMPOSE_PROD) logs -f nginx
 
 prod-logs-cloudflared: ## 프로덕션 모드 Cloudflare Tunnel 로그 확인
 	$(DOCKER_COMPOSE_PROD) logs -f cloudflared
@@ -232,9 +225,6 @@ prod-health: ## 🏥 프로덕션 서비스 헬스체크
 	@echo ""
 	@echo "$(YELLOW)Backend API:$(NC)"
 	@curl -f http://localhost/api/health 2>/dev/null && echo " $(GREEN)✓ OK$(NC)" || echo " $(RED)✗ Failed$(NC)"
-	@echo ""
-	@echo "$(YELLOW)Nginx:$(NC)"
-	@curl -f http://localhost 2>/dev/null > /dev/null && echo " $(GREEN)✓ OK$(NC)" || echo " $(RED)✗ Failed$(NC)"
 	@echo ""
 	@echo "$(YELLOW)PostgreSQL:$(NC)"
 	@$(DOCKER_COMPOSE_PROD) exec -T postgres pg_isready -U moriai_user 2>/dev/null && echo " $(GREEN)✓ OK$(NC)" || echo " $(RED)✗ Failed$(NC)"
@@ -412,9 +402,6 @@ logs-backend: ## 백엔드 로그 확인 (개발 환경)
 
 logs-postgres: ## PostgreSQL 로그 확인 (개발 환경)
 	$(DOCKER_COMPOSE_DEV) logs -f postgres
-
-logs-nginx: ## Nginx 로그 확인 (개발 환경)
-	$(DOCKER_COMPOSE_DEV) logs -f nginx
 
 # ==================== Utilities ====================
 shell-backend: ## 백엔드 컨테이너 셸 접속 (개발 환경)
