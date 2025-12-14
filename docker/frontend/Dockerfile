@@ -24,6 +24,12 @@ COPY --from=dependencies /app/node_modules ./node_modules
 # 소스 코드 복사
 COPY frontend/ .
 
+# Environment variables for build
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # Production 빌드
 ENV NODE_ENV=production
 RUN npm run build && \
