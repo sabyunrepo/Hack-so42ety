@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/build
+**/.git
+**/.DS_Store
+**/.env
+**/.env.*
+!**/.env.example
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/venv
+.idea
+.vscode
+coverage
