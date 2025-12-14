@@ -22,13 +22,9 @@ from .core import (
 
 logger = logging.getLogger(__name__)
 
-# Global Semaphores for Production Safety
+# Global Semaphore for Production Safety
 # 동시 실행 제어 (리소스 폭주 방지)
-GLOBAL_DAG_LIMIT = asyncio.Semaphore(3)  # 동시 DAG 실행 3개 제한
 GLOBAL_TASK_LIMIT = asyncio.Semaphore(10)  # 동시 AI 호출 10개 제한
-
-# Active Task Tracking (for graceful shutdown)
-ACTIVE_DAG_TASKS: set = set()  # asyncio.Task objects
 
 
 @dataclass
@@ -403,64 +399,10 @@ async def create_storybook_dag(
         f"[create_storybook_dag] Submitting {len(all_task_ids)} tasks to background"
     )
 
-    # Redis에 실행 상태 저장 (재시작 시 추적 가능)
-    task_store = TaskStore()
-    await task_store.set(
-        f"execution:{execution_id}",
-        {
-            "status": "RUNNING",
-            "book_id": str(book_id),
-            "started_at": str(uuid.uuid4()),  # timestamp placeholder
-            "task_count": len(all_task_ids),
-        },
-        ttl=7200,  # 2시간
-    )
-
-    # 백그라운드 실행 (에러 핸들링 + 상태 추적)
-    async def run_dag_with_tracking():
-        """DAG 실행 래퍼: 동시성 제어 + 상태 추적"""
-        current_task = asyncio.current_task()
-        ACTIVE_DAG_TASKS.add(current_task)
-
-        try:
-            # Global DAG semaphore (동시 실행 DAG 개수 제한)
-            async with GLOBAL_DAG_LIMIT:
-                print(f"[DAG] Starting execution: {execution_id}")
-                await runner.execute_dag(all_task_ids)
-                print(f"[DAG] Completed execution: {execution_id}")
-
-            # 성공 시 상태 업데이트
-            await task_store.set(
-                f"execution:{execution_id}",
-                {"status": "COMPLETED", "book_id": str(book_id)},
-                ttl=3600,
-            )
-
-        except asyncio.CancelledError:
-            logger.warning(f"[DAG] Cancelled (shutdown): {execution_id}")
-            await task_store.set(
-                f"execution:{execution_id}",
-                {"status": "CANCELLED", "book_id": str(book_id), "reason": "Server shutdown"},
-                ttl=3600,
-            )
-            raise
-
-        except Exception as e:
-            logger.error(f"[DAG] Failed: {execution_id}, error={e}", exc_info=True)
-            await task_store.set(
-                f"execution:{execution_id}",
-                {"status": "FAILED", "book_id": str(book_id), "error": str(e)},
-                ttl=3600,
-            )
-
-        finally:
-            # 완료/실패/취소 시 추적 목록에서 제거
-            ACTIVE_DAG_TASKS.discard(current_task)
-
-    # 백그라운드 태스크 생성
-    dag_task = asyncio.create_task(
-        run_dag_with_tracking(),
-        name=f"storybook_dag_{book_id}",
+    # 백그라운드 실행
+    asyncio.create_task(
+        runner.execute_dag(all_task_ids),
+        name=f"storybook_dag_{book_id}"
     )
 
     # Task IDs 반환
@@ -473,61 +415,3 @@ async def create_storybook_dag(
         "finalize_task": t_finalize,
         "all_tasks": all_task_ids,
     }
-
-
-async def shutdown_all_dags(timeout: float = 10.0) -> Dict[str, Any]:
-    """
-    Graceful shutdown: 모든 실행 중인 DAG 취소
-
-    FastAPI lifespan shutdown 시 호출:
-        @app.on_event("shutdown")
-        async def shutdown():
-            await shutdown_all_dags(timeout=30.0)
-
-    Args:
-        timeout: 취소 대기 시간 (초)
-
-    Returns:
-        Dict: 취소 통계 {"cancelled": int, "completed": int, "timeout": int}
-    """
-    if not ACTIVE_DAG_TASKS:
-        print("[Shutdown] No active DAG tasks to cancel")
-        return {"cancelled": 0, "completed": 0, "timeout": 0}
-
-    print(f"[Shutdown] Cancelling {len(ACTIVE_DAG_TASKS)} active DAG tasks...")
-
-    # 모든 태스크 취소 요청
-    for task in ACTIVE_DAG_TASKS:
-        task.cancel()
-
-    # 취소 완료 대기 (timeout 적용)
-    try:
-        results = await asyncio.wait_for(
-            asyncio.gather(*ACTIVE_DAG_TASKS, return_exceptions=True),
-            timeout=timeout
-        )
-
-        cancelled = sum(1 for r in results if isinstance(r, asyncio.CancelledError))
-        completed = sum(1 for r in results if not isinstance(r, Exception))
-        errors = sum(1 for r in results if isinstance(r, Exception) and not isinstance(r, asyncio.CancelledError))
-
-        logger.info(
-            f"[Shutdown] DAG cleanup: cancelled={cancelled}, "
-            f"completed={completed}, errors={errors}"
-        )
-
-        return {"cancelled": cancelled, "completed": completed, "timeout": 0}
-
-    except asyncio.TimeoutError:
-        logger.warning(f"[Shutdown] Timeout after {timeout}s, some tasks may still be running")
-        return {"cancelled": 0, "completed": 0, "timeout": len(ACTIVE_DAG_TASKS)}
-
-
-def get_active_dag_count() -> int:
-    """
-    현재 실행 중인 DAG 개수 조회 (모니터링용)
-
-    Returns:
-        int: 실행 중인 DAG 개수
-    """
-    return len(ACTIVE_DAG_TASKS)

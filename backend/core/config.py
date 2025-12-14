@@ -92,17 +92,17 @@ class Settings(BaseSettings):
     tts_default_language: str = Field(default="en", env="TTS_DEFAULT_LANGUAGE")
 
     # Image Generation
-    ai_image_provider: str = Field(default="google", env="AI_IMAGE_PROVIDER")
+    ai_image_provider: str = Field(default="runware", env="AI_IMAGE_PROVIDER")
 
     # Video Generation
-    ai_video_provider: str = Field(default="kling", env="AI_VIDEO_PROVIDER")
+    ai_video_provider: str = Field(default="runware", env="AI_VIDEO_PROVIDER")
     # Runware Video Generation
     runware_api_key: Optional[str] = Field(default=None, env="RUNWARE_API_KEY")
     runware_api_url: str = Field(
         default="https://api.runware.ai/v1", env="RUNWARE_API_URL"
     )
     # runware_video_model: str = Field(default="runware:100@1", env="RUNWARE_VIDEO_MODEL")
-    runware_video_model: str = Field(default="klingai:3@2", env="RUNWARE_VIDEO_MODEL")
+    runware_video_model: str = Field(default="klingai:6@0", env="RUNWARE_VIDEO_MODEL")
     runware_video_mode: str = Field(default="std", env="RUNWARE_VIDEO_MODE")
     runware_video_duration: int = Field(default=5, env="RUNWARE_VIDEO_DURATION")
 

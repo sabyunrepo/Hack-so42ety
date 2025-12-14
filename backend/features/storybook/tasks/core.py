@@ -104,36 +104,34 @@ async def generate_story_task(
             f"Failed to generate valid story after {MAX_RETRIES} retries"
         )
 
+    # === Phase 2: AI 호출 (Emotion 추가) - 세션 밖에서 실행 ===
+    emotion_prefixed_prompt = EnhanceAudioPrompt(stories=dialogues, title=book_title).render()
+    response_with_emotion = await story_provider.generate_story(
+        prompt=emotion_prefixed_prompt,
+        response_schema=TTSExpressionResponse,
+    )
+    logger.info(f"[Story Task] Generating story with emotions: {response_with_emotion}")
+    dialogues_with_emotions = response_with_emotion.stories
+
+    # === Phase 3: Redis 저장 - 세션 밖에서 실행 ===
+    task_store = TaskStore()
+    story_key = f"story:{book_id}"
+    await task_store.set(story_key, {"dialogues": dialogues_with_emotions, "title": book_title}, ttl=3600)
+
+    # === Phase 4: DB 작업만 세션 안에서 실행 ===
     async with AsyncSessionLocal() as session:
         try:
             repo = BookRepository(session)
-            task_store = TaskStore()
-
-            # 1. Update pipeline stage
             book_uuid = uuid.UUID(book_id)
 
-            # 2. Generate story (AI call)
-
-
-            emotion_prefixed_prompt = EnhanceAudioPrompt(stories=dialogues, title=book_title).render()
-            response_with_emotion = await story_provider.generate_story(
-                prompt=emotion_prefixed_prompt,
-                response_schema=TTSExpressionResponse,
-            )
-            logger.info(f"[Story Task] Generating story with emotions: {response_with_emotion}")
-            dialogues_with_emotions = response_with_emotion.stories
-
-            # 3. Store in Redis
-            story_key = f"story:{book_id}"
-            await task_store.set(story_key, {"dialogues": dialogues_with_emotions, "title": book_title}, ttl=3600)
-
-            # 4. Create Dialogue + DialogueTranslation for each page
+            # Get book with pages
             book = await repo.get_with_pages(book_uuid)
             if not book or not book.pages:
                 raise ValueError(f"Book {book_id} has no pages for dialogues creation")
 
             pages = book.pages
-            
+
+            # Create Dialogue + DialogueTranslation for each page
             for page_idx, page_dialogues in enumerate(dialogues):
                 page = next((p for p in pages if p.sequence == page_idx + 1), None)
                 if not page:
@@ -149,7 +147,7 @@ async def generate_story_task(
                         ],
                     )
 
-            # 5. Update DB with title
+            # Update DB with title and progress
             updated = await repo.update(
                     book_uuid,
                     pipeline_stage="story",
@@ -379,104 +377,6 @@ async def generate_tts_task(
                         text=primary_translation.text,
                     )
 
-
-                    # tasks_to_generate.append({
-                    #     "dialogue_id": dialogue.id,
-                    #     "text": primary_translation.text,
-                    #     "language_code": primary_translation.language_code,
-                    #     "page_seq": page.sequence,
-                    #     "dialogue_seq": dialogue.sequence,
-                    # })
-
-            # if not tasks_to_generate:
-            #     raise ValueError("No dialogues found for TTS generation")
-
-            # logger.info(f"[TTS Task] Generating TTS for {len(tasks_to_generate)} dialogues")
-
-            # === Phase 3: TTS Service Setup & Parallel Generation ===
-            # Initialize TTSService manually for background tasks
-            # async def generate_single_tts(task_info):
-            #     """Generate TTS for a single dialogue (TTS only, no DB)"""
-            #     try:
-            #         logger.info(f"[TTS Task] Generating TTS for dialogue {task_info['dialogue_id']}")
-            #         # 1. Generate TTS using TTSService (saves to standalone path)
-
-            #         logger.info(f"[TTS Task] Successfully generated TTS for dialogue {task_info['dialogue_id']}")
-            #         return {
-            #             "success": True,
-            #             "dialogue_id": task_info["dialogue_id"],
-            #             "language_code": task_info["language_code"],
-            #             "audio_url": audio.file_path,
-            #             "duration": None,
-            #         }
-
-            #     except Exception as e:
-            #         logger.error(
-            #             f"[TTS Task] Failed to generate TTS for dialogue {task_info['dialogue_id']}: {e}",
-            #             exc_info=True
-            #         )
-            #         return {
-            #             "success": False,
-            #             "dialogue_id": task_info["dialogue_id"],
-            #             "language_code": task_info.get("language_code", "en"),
-            #             "error": str(e),
-            #         }
-
-            # # === Phase 4: Batch Processing (5 at a time to avoid ElevenLabs concurrency limit) ===
-            # BATCH_SIZE = 5
-            # all_results = []
-            # success_count = 0
-            # failed_count = 0
-
-            # logger.info(f"[TTS Task] Processing {len(tasks_to_generate)} tasks in batches of {BATCH_SIZE}")
-            # for i in range(0, len(tasks_to_generate), BATCH_SIZE):
-            #     batch = tasks_to_generate[i:i+BATCH_SIZE]
-            #     batch_num = (i // BATCH_SIZE) + 1
-            #     total_batches = (len(tasks_to_generate) + BATCH_SIZE - 1) // BATCH_SIZE
-            #     logger.info(f"[TTS Task] Processing batch {batch_num}/{total_batches} ({len(batch)} items)")
-
-            #     # Execute batch in parallel
-            #     batch_tasks = [generate_single_tts(task_info) for task_info in batch]
-            #     batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-
-            #     # Process batch results and save to DB sequentially
-            #     for result in batch_results:
-            #         if isinstance(result, Exception):
-            #             failed_count += 1
-            #             logger.error(f"[TTS Task] Task raised exception: {result}")
-            #             continue
-
-            #         if not result["success"]:
-            #             failed_count += 1
-            #             # Create failed DialogueAudio record
-            #             await repo.add_dialogue_audio(
-            #                 dialogue_id=result["dialogue_id"],
-            #                 language_code=result.get("language_code", "en"),
-            #                 voice_id=book.voice_id,
-            #                 audio_url="",
-            #                 duration=None,
-            #                 status="FAILED",
-            #             )
-            #             continue
-
-            #         # Create successful DialogueAudio record
-            #         await repo.add_dialogue_audio(
-            #             dialogue_id=result["dialogue_id"],
-            #             language_code=result["language_code"],
-            #             voice_id=book.voice_id,
-            #             audio_url=result["audio_url"],
-            #             duration=result.get("duration"),
-            #             status="COMPLETED",
-            #         )
-            #         success_count += 1
-
-            #     # Commit batch to DB
-            #     await session.commit()
-            #     logger.info(f"[TTS Task] Batch {batch_num}/{total_batches} completed and committed to DB")
-
-            #     all_results.extend(batch_results)
-
-            # === Phase 5: Update Progress ===
             await repo.update(
                 book_uuid,
                 pipeline_stage="tts",
@@ -484,17 +384,9 @@ async def generate_tts_task(
                 error_message=None,
             )
             await session.commit()
-
-            # logger.info(
-            #     f"[TTS Task] Completed for book_id={book_id}: "
-            #     f"{success_count} succeeded, {failed_count} failed"
-            # )
-
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={
-                    # "success_count": success_count,
-                    # "failed_count": failed_count,
                     "total_count": len(tasks_to_generate),
                 },
             )
@@ -570,6 +462,7 @@ async def generate_video_task(
     for dialogue in dialogues:
         prompt = " ".join(dialogue)
         prompts.append(prompt)
+    logger.info(f"[Video Task] prompts: {prompts}")
 
     image_key = f"images:{book_id}"
     image_data = await task_store.get(image_key)
@@ -581,68 +474,99 @@ async def generate_video_task(
     ]
 
     # asyncio.gather로 병렬 실행
-    results = await asyncio.gather(*tasks)
+    task_uuids = await asyncio.gather(*tasks)  # generate_video()는 task_uuid 문자열을 직접 반환
+
+    # task_uuid → page_idx 매핑 생성 (순서 보장을 위해)
+    task_to_page_idx = {task_uuid: idx for idx, task_uuid in enumerate(task_uuids)}
+    logger.debug(f"[Video Task] Created task mapping for {len(task_uuids)} pages")
 
     max_wait_time = 600  # 10분
     poll_interval = 10   # 10초마다 체크
     elapsed_time = 0
-    completed_videos = []
-    task_uuids = results  # generate_video()는 task_uuid 문자열을 직접 반환
+    completed_videos = {}  # task_uuid → video_url 매핑 (딕셔너리로 변경)
 
     while elapsed_time < max_wait_time and len(completed_videos) < len(task_uuids):
         for task_uuid in task_uuids:
-            if task_uuid in [v["task_uuid"] for v in completed_videos]:
+            if task_uuid in completed_videos:  # O(1) 딕셔너리 탐색
                 continue  # 이미 완료된 작업
 
             status_response = await video_provider.check_video_status(task_uuid)
             if status_response["status"] == "completed":
-                completed_videos.append({
-                    "task_uuid": task_uuid,
-                    "video_url": status_response["video_url"]
-                })
-                logger.debug(f"[Video Task] Video task {task_uuid} completed")
+                completed_videos[task_uuid] = status_response["video_url"]
+                page_idx = task_to_page_idx[task_uuid]
+                logger.debug(f"[Video Task] Page {page_idx + 1} (task {task_uuid[:8]}...) completed")
             elif status_response["status"] == "failed":
-                logger.warning(f"[Video Task] Video task {task_uuid} failed")
+                page_idx = task_to_page_idx[task_uuid]
+                logger.warning(f"[Video Task] Page {page_idx + 1} (task {task_uuid[:8]}...) failed")
 
         if len(completed_videos) < len(task_uuids):
             await asyncio.sleep(poll_interval)
             elapsed_time += poll_interval
-    # 결과 확인
-    logger.info(f"[Video Task] All task results: {completed_videos}")
 
+    # 완료되지 않은 작업 확인
+    if len(completed_videos) < len(task_uuids):
+        failed_tasks = set(task_uuids) - set(completed_videos.keys())
+        logger.warning(f"[Video Task] {len(failed_tasks)} videos failed or timed out")
+
+    logger.info(f"[Video Task] Completed {len(completed_videos)}/{len(task_uuids)} videos")
+
+    # === Phase: Get user_id for S3 path (minimal DB access) ===
+    async with AsyncSessionLocal() as temp_session:
+        temp_repo = BookRepository(temp_session)
+        book_uuid = uuid.UUID(book_id)
+        book = await temp_repo.get(book_uuid)
+        if not book:
+            raise ValueError(f"Book {book_id} not found")
+        user_id = book.user_id
+
+    # === Phase: HTTP 다운로드 + S3 업로드 - 세션 밖에서 실행 ===
+    # task_uuids 순서대로 정렬하여 video_urls 추출 (페이지 순서 보장)
+    storage_service = get_storage_service()
+    s3_video_urls = []
+
+    for page_idx, task_uuid in enumerate(task_uuids):
+        if task_uuid not in completed_videos:
+            # 실패하거나 타임아웃된 경우
+            logger.warning(f"[Video Task] Page {page_idx + 1}: Video not completed, skipping")
+            s3_video_urls.append(None)  # 순서 유지를 위해 None 추가
+            continue
+
+        video_url = completed_videos[task_uuid]
+        video_bytes = await video_provider.download_video(video_url)
+        video_size = len(video_bytes)
+
+        file_name = f"users/{user_id}/books/{book_id}/videos/book_video_{page_idx}.mp4"
+        storage_url = await storage_service.save(
+            video_bytes,
+            file_name,
+            content_type="video/mp4"
+        )
+        logger.debug(f"[Video Task] Page {page_idx + 1}: Uploaded to {storage_url} (size: {video_size} bytes)")
+        s3_video_urls.append(file_name)
+
+    # === Phase: DB 작업만 세션 안에서 실행 ===
     async with AsyncSessionLocal() as session:
         try:
             repo = BookRepository(session)
-            storage_service = get_storage_service()
             book_uuid = uuid.UUID(book_id)
-            s3_video_urls = []
-            book = await repo.get_with_pages(book_uuid)  # ✅ eager loading            
+            book = await repo.get_with_pages(book_uuid)  # ✅ eager loading
             pages = book.pages
-            user_id = book.user_id
 
-            completed_videos_urls = [v["video_url"] for v in completed_videos]
-            for idx, url in enumerate(completed_videos_urls):
-                video_bytes = await video_provider.download_video(url)
-                video_size = len(video_bytes)
-                
-                file_name = f"users/{user_id}/books/{book_id}/videos/book_video_{idx}.mp4"
-                storage_url = await storage_service.save(
-                    video_bytes,
-                    file_name,
-                    content_type="video/mp4"
-                )
-                logger.debug(f"[Video Task] Uploaded video to storage: {storage_url} (size: {video_size} bytes)")
-                s3_video_urls.append(file_name)
-
+            # Update pages with video URLs
             for page_idx, video_url in enumerate(s3_video_urls):
+                if video_url is None:
+                    # 실패한 비디오는 건너뛰기
+                    logger.warning(f"[Video Task] Page {page_idx + 1}: Skipping DB update (video failed)")
+                    continue
+
                 page = next((p for p in pages if p.sequence == page_idx + 1), None)
                 if not page:
-                    logger.warning(f"[Story Task] Page {page_idx + 1} not found, skipping dialogues")
+                    logger.warning(f"[Video Task] Page {page_idx + 1} not found in DB, skipping video")
                     continue
                 page.image_url = video_url  # 또는 video_url용 컬럼이 있으면 그것
                 session.add(page)  # ORM 세션에 반영
-            await session.commit()
 
+            # Update book progress
             updated = await repo.update(
                     book_uuid,
                     pipeline_stage="video",
@@ -651,6 +575,7 @@ async def generate_video_task(
                 )
             if not updated:
                 raise ValueError(f"Book {book_id} not found for update")
+
             await session.commit()
 
             # 4. Get video provider
@@ -689,15 +614,19 @@ async def finalize_book_task(
         TaskResult: 성공 시 book_id 반환
     """
     logger.info(f"[Finalize Task] Starting for book_id={book_id}")
+
+    # === Phase 1: Redis 조회 - 세션 밖에서 실행 ===
+    task_store = TaskStore()
+    story_key = f"story:{book_id}"
+    story_data = await task_store.get(story_key)
+    book_title = story_data.get("title", "Untitled Story") if story_data else "Untitled Story"
+    num_pages = len(story_data.get("dialogues", [])) if story_data else 0
+
+    # === Phase 2: DB 작업만 세션 안에서 실행 ===
     async with AsyncSessionLocal() as session:
         try:
             repo = BookRepository(session)
             book_uuid = uuid.UUID(book_id)
-            task_store = TaskStore()
-            story_key = f"story:{book_id}"
-            story_data = await task_store.get(story_key)
-            book_title = story_data.get("title", "Untitled Story") if story_data else "Untitled Story"
-            num_pages = len(story_data.get("dialogues", [])) if story_data else 0
 
             updated = await repo.update(
                 book_uuid,
@@ -712,24 +641,6 @@ async def finalize_book_task(
 
             await session.commit()
             logger.debug(f"[Finalize Task] Updated book status to COMPLETED")
-
-            # 3. Cleanup Redis (비동기 실행, 에러 무시)
-            try:
-                cleanup_count = await task_store.cleanup_book_tasks(book_id)
-                logger.debug(f"[Finalize Task] Cleaned up {cleanup_count} Redis keys")
-            except Exception as cleanup_error:
-                logger.warning(f"[Finalize Task] Redis cleanup failed: {cleanup_error}")
-
-            logger.info(f"[Finalize Task] Completed for book_id={book_id}")
-
-            return TaskResult(
-                status=TaskStatus.COMPLETED,
-                result={
-                    "book_id": book_id,
-                    "title": book_title,
-                    "num_pages": num_pages,
-                },
-            )
 
         except Exception as e:
             logger.error(f"[Finalize Task] Failed for book_id={book_id}: {e}", exc_info=True)
@@ -750,6 +661,24 @@ async def finalize_book_task(
                 logger.error(f"[Finalize Task] Failed to update error in DB: {db_error}")
 
             return TaskResult(status=TaskStatus.FAILED, error=str(e))
+
+    # === Phase 3: Redis Cleanup - 세션 밖에서 실행 (비동기, 에러 무시) ===
+    try:
+        cleanup_count = await task_store.cleanup_book_tasks(book_id)
+        logger.debug(f"[Finalize Task] Cleaned up {cleanup_count} Redis keys")
+    except Exception as cleanup_error:
+        logger.warning(f"[Finalize Task] Redis cleanup failed: {cleanup_error}")
+
+    logger.info(f"[Finalize Task] Completed for book_id={book_id}")
+
+    return TaskResult(
+        status=TaskStatus.COMPLETED,
+        result={
+            "book_id": book_id,
+            "title": book_title,
+            "num_pages": num_pages,
+        },
+    )
 
 
 def validate_generated_story(data) -> tuple[str, list]:
