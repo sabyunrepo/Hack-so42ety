@@ -45,7 +45,7 @@ export default function Settings() {
     const runCheck = async () => {
       const result = await checkVoices();
 
-      if (!result) {
+      if (result) {
         setShowModal(true);
         setModalProps({
           title: "음성 생성 제한 안내",
@@ -156,50 +156,50 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen py-10 px-5 font-sans">
+    <div className="min-h-screen py-6 sm:py-8 md:py-10 px-3 sm:px-4 md:px-5 font-sans">
       {/* 헤더 - 뒤로가기 버튼 */}
-      <div className="relative flex items-center justify-center w-full mb-3">
+      <div className="relative flex items-center justify-center w-full mb-2 sm:mb-3">
         <button
           onClick={() => navigate("/")}
-          className="absolute left-8 bg-white rounded-full p-3.5 shadow-xl hover:scale-110 hover:bg-yellow-400 hover:text-white transition-all"
+          className="absolute left-2 sm:left-4 md:left-8 bg-white rounded-full p-2.5 sm:p-3 md:p-3.5 shadow-xl hover:scale-110 hover:bg-yellow-400 hover:text-white transition-all"
         >
-          <ArrowLeft className="w-8 h-8" />
+          <ArrowLeft className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
         </button>
       </div>
 
       {/* 메인 카드 */}
-      <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-10">
+      <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-6 sm:p-8 md:p-10">
         {/* 아이콘 */}
-        <div className="flex justify-center items-center mb-4">
-          <div className="w-20 h-20 rounded-full bg-yellow-100 flex justify-center items-center shadow-md">
-            <Mic className="w-12 h-12 text-yellow-400" />
+        <div className="flex justify-center items-center mb-3 sm:mb-4">
+          <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 rounded-full bg-yellow-100 flex justify-center items-center shadow-md">
+            <Mic className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 text-yellow-400" />
           </div>
         </div>
 
         {/* 제목 */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
+        <h1 className="text-2xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 text-center">
           목소리 설정
         </h1>
-        <p className="text-sm text-gray-600 text-center mb-8">
+        <p className="text-xs sm:text-sm text-gray-600 text-center mb-6 sm:mb-8 px-2">
           오디오 파일을 업로드하여 맞춤형 목소리를 생성합니다.
         </p>
         {/* 녹음용 대본 보기 버튼 */}
-        <div className="flex justify-center">
+        <div className="flex justify-center mb-4 sm:mb-0">
           <button
             type="button"
             onClick={() => setShowScriptModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-yellow-50 border-2 border-yellow-400 text-yellow-700 rounded-lg font-semibold hover:bg-yellow-100 transition-all"
+            className="flex items-center gap-2 px-4 sm:px-5 md:px-6 py-2.5 sm:py-3 bg-yellow-50 border-2 border-yellow-400 text-yellow-700 rounded-lg font-semibold hover:bg-yellow-100 transition-all text-sm sm:text-base"
           >
-            <FileText className="w-5 h-5" />
-            📝 녹음용 대본 보기
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+             녹음용 대본 보기
           </button>
         </div>
 
         {/* 설정 폼 */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
           {/* 이름 입력 */}
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">
+            <label className="text-xs sm:text-sm font-semibold text-gray-700">
               목소리 이름 <span className="text-red-600">*</span>
             </label>
             <input
@@ -207,14 +207,14 @@ export default function Settings() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="예: 엄마 목소리, 아빠 목소리"
-              className="w-full p-3 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all disabled:opacity-60"
+              className="w-full p-2.5 sm:p-3 text-sm sm:text-base border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all disabled:opacity-60"
               disabled={loading}
             />
           </div>
 
           {/* 오디오 파일 업로드 */}
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">
+            <label className="text-xs sm:text-sm font-semibold text-gray-700">
               오디오 파일 <span className="text-red-600">*</span>
             </label>
             <input
@@ -222,13 +222,13 @@ export default function Settings() {
               type="file"
               accept=".mp3,.wav,.m4a,.flac,.ogg"
               onChange={handleFileChange}
-              className="w-full p-2 text-sm border border-gray-300 rounded-lg cursor-pointer focus:ring-2 focus:ring-yellow-400 focus:border-transparent disabled:opacity-60"
+              className="w-full p-2 sm:p-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg cursor-pointer focus:ring-2 focus:ring-yellow-400 focus:border-transparent disabled:opacity-60"
               disabled={loading}
             />
 
             {/* 선택된 파일 정보 */}
             {file && (
-              <div className="p-2 bg-gray-100 border border-gray-200 rounded-lg text-xs text-gray-700">
+              <div className="p-2 sm:p-2.5 bg-gray-100 border border-gray-200 rounded-lg text-xs text-gray-700">
                 📎 {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
               </div>
             )}
@@ -243,10 +243,10 @@ export default function Settings() {
           </div>
 
           {/* 버튼 그룹 */}
-          <div className="flex gap-3 mt-6">
+          <div className="flex gap-2 sm:gap-3 mt-5 sm:mt-6">
             <button
               type="submit"
-              className={`flex-1 py-3.5 text-sm font-semibold border-none rounded-lg transition-all ${
+              className={`flex-1 py-3 sm:py-3.5 text-sm sm:text-base font-semibold border-none rounded-lg transition-all ${
                 loading
                   ? "bg-yellow-300 text-white opacity-60 cursor-not-allowed"
                   : "bg-yellow-400 text-white hover:bg-yellow-500"
@@ -258,7 +258,7 @@ export default function Settings() {
             <button
               type="button"
               onClick={handleReset}
-              className="flex-1 py-3.5 text-sm font-semibold bg-gray-200 text-gray-700 border-none rounded-lg hover:bg-gray-300 transition-all disabled:opacity-60"
+              className="flex-1 py-3 sm:py-3.5 text-sm sm:text-base font-semibold bg-gray-200 text-gray-700 border-none rounded-lg hover:bg-gray-300 transition-all disabled:opacity-60"
               disabled={loading}
             >
               초기화
@@ -268,22 +268,22 @@ export default function Settings() {
 
         {/* 성공 메시지 */}
         {message && (
-          <div className="mt-5 p-4 bg-green-100 border border-green-300 rounded-lg text-green-800 text-sm leading-relaxed">
+          <div className="mt-4 sm:mt-5 p-3 sm:p-4 bg-green-100 border border-green-300 rounded-lg text-green-800 text-xs sm:text-sm leading-relaxed">
             {message}
           </div>
         )}
 
         {/* 에러 메시지 */}
         {error && (
-          <div className="mt-5 p-4 bg-red-100 border border-red-300 rounded-lg text-red-800 text-sm leading-relaxed">
+          <div className="mt-4 sm:mt-5 p-3 sm:p-4 bg-red-100 border border-red-300 rounded-lg text-red-800 text-xs sm:text-sm leading-relaxed">
             {error}
           </div>
         )}
 
         {/* 안내 사항 */}
-        <div className="mt-8 p-5 bg-yellow-50 border border-yellow-300 rounded-lg">
-          <h3 className="text-base font-semibold text-black mb-3">안내사항</h3>
-          <ul className="m-0 pl-5 text-xs text-gray-800 leading-loose space-y-1">
+        <div className="mt-6 sm:mt-8 p-4 sm:p-5 bg-yellow-50 border border-yellow-300 rounded-lg">
+          <h3 className="text-sm sm:text-base font-semibold text-black mb-2 sm:mb-3">안내사항</h3>
+          <ul className="m-0 pl-4 sm:pl-5 text-xs text-gray-800 leading-loose space-y-1">
             <li>🟡 목소리 생성 완료까지 약 3분 소요됩니다.</li>
             <li>🟡 2분 30초 미만의 오디오는 거부됩니다.</li>
             <li>🟡 3분 이상의 오디오는 자동으로 2분 59초로 트리밍됩니다.</li>

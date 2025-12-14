@@ -35,6 +35,11 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem("refresh_token");
 
+      const isAuthEndpoint = originalRequest?.url?.includes("/auth/");
+
+      if (isAuthEndpoint) {
+        return Promise.reject(error);
+      }
       if (refreshToken) {
         try {
           const response = await axios.post(

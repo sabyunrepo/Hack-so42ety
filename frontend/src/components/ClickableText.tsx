@@ -58,7 +58,7 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
   const words = text.split(/(\s+)/); // 공백 유지
 
   return (
-    <p className="text-2xl p-6 leading-relaxed">
+    <p className="text-base sm:text-lg md:text-xl lg:text-2xl sm:p-2  leading-relaxed">
       {words.map((word, index) => {
         const cleanWord = word
           .trim()
