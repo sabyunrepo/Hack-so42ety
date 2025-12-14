@@ -5,7 +5,6 @@ on:
     branches:
       - main
       - dev
-      - infra/git_action_develop
     tags:
       - 'v*'
 
@@ -60,10 +59,10 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=sha
-            # 'latest' tag for main branch (and infra testing)
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/infra/git_action_develop' }}
+            # 'latest' tag for main branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             # 'prod' tag for main branch (for frontend consistency)
-            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/infra/git_action_develop' }}
+            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/main' }}
             # 'dev' tag for dev branch
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
 
@@ -94,4 +93,4 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-             APP_ENV=${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/infra/git_action_develop' || startsWith(github.ref, 'refs/tags/')) && 'prod' || 'dev' }}
+             APP_ENV=${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/')) && 'prod' || 'dev' }}
