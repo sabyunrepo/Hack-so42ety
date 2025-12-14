@@ -100,10 +100,10 @@ const Viewer: React.FC = () => {
     // 또는 URL 객체로 파싱하여 pathname 확인이 더 정확함
     try {
       const urlObj = new URL(url);
-      return urlObj.pathname.toLowerCase().endsWith('.mp4');
+      return urlObj.pathname.toLowerCase().endsWith(".mp4");
     } catch {
       // URL 파싱 실패 시 단순 문자열 체크
-      return url.toLowerCase().includes('.mp4');
+      return url.toLowerCase().includes(".mp4");
     }
   };
 
@@ -118,7 +118,9 @@ const Viewer: React.FC = () => {
             <div className="animate-spin rounded-full h-20 w-20 border-4 border-amber-200 border-t-amber-500"></div>
             <div className="absolute inset-0 animate-ping rounded-full h-20 w-20 border-2 border-amber-400/40"></div>
           </div>
-          <div className="text-2xl font-bold text-amber-900 tracking-wide">책을 불러오는 중...</div>
+          <div className="text-2xl font-bold text-amber-900 tracking-wide">
+            책을 불러오는 중...
+          </div>
         </div>
       </div>
     );
@@ -126,14 +128,14 @@ const Viewer: React.FC = () => {
 
   if (errorMessage) {
     return (
-      <div className="p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md text-center border-2 border-red-200">
-          <div className="text-6xl mb-4 animate-pulse">⚠️</div>
-          <div className="text-2xl font-bold text-red-600 mb-2">오류가 발생했습니다</div>
-          <p className="text-gray-600 mb-6">{errorMessage}</p>
+      <div className="p-4 sm:p-6 md:p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4 text-center border-2 border-red-200">
+          <div className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4 animate-pulse">⚠️</div>
+          <div className="text-xl sm:text-2xl font-bold text-red-600 mb-2">오류가 발생했습니다</div>
+          <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">{errorMessage}</p>
           <button
             onClick={() => navigate("/")}
-            className="px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+            className="px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
           >
             책장으로 돌아가기
           </button>
@@ -144,13 +146,17 @@ const Viewer: React.FC = () => {
 
   if (!book) {
     return (
-      <div className="p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md text-center">
-          <div className="text-6xl mb-4">📚</div>
-          <div className="text-2xl font-bold text-amber-900 mb-2">책을 찾을 수 없습니다</div>
+      <div className="p-4 sm:p-6 md:p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4 text-center">
+          <div className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4">
+            📚
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-amber-900 mb-2">
+            책을 찾을 수 없습니다
+          </div>
           <button
             onClick={() => navigate("/")}
-            className="mt-4 px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+            className="mt-3 sm:mt-4 px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
           >
             책장으로 돌아가기
           </button>
@@ -163,7 +169,9 @@ const Viewer: React.FC = () => {
     <div className=" p-7 flex flex-col justify-center items-center bg-gradient-to-br from-orange-50 via-amber-50/50 to-orange-50 min-h-full">
       {/* Header with title and close button */}
       <div className="relative flex items-center justify-center w-full mb-6">
-        <h1 className="text-4xl font-bold text-amber-900 tracking-tight drop-shadow-sm">{book.title || "제목 없음"}</h1>
+        <h1 className="text-4xl font-bold text-amber-900 tracking-tight drop-shadow-sm">
+          {book.title || "제목 없음"}
+        </h1>
         <button
           onClick={() => navigate("/")}
           className="absolute right-8 bg-white rounded-full p-3.5 shadow-xl hover:scale-110 hover:bg-gradient-to-br hover:from-amber-400 hover:to-amber-500 hover:text-white transition-all duration-300 border-2 border-amber-200/50"
@@ -186,7 +194,7 @@ const Viewer: React.FC = () => {
         clickEventForward={false}
         size="fixed"
         onFlip={(e: number | { data: number }) => {
-          const pageNum = typeof e === 'object' ? e.data : e;
+          const pageNum = typeof e === "object" ? e.data : e;
           setCurrentPage(pageNum);
         }}
       >
@@ -258,13 +266,20 @@ const Viewer: React.FC = () => {
             {pageData.dialogues.map((dialogue: Dialogue) => (
               <div
                 key={dialogue.id}
-                className="relative"
+                className=" w-full h-full flex items-center"
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
                 onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                 onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
               >
-                <ClickableText text={getDialogueText(dialogue, "en")} book_id={bookId!} />
-                <AudioPlayer src={getDialogueAudioUrl(dialogue, "en") || ""} />
+                <div className="relative">
+                  <ClickableText
+                    text={getDialogueText(dialogue, "en")}
+                    book_id={bookId!}
+                  />
+                  <AudioPlayer
+                    src={getDialogueAudioUrl(dialogue, "en") || ""}
+                  />
+                </div>
               </div>
             ))}
           </Page>,
@@ -272,7 +287,7 @@ const Viewer: React.FC = () => {
 
         {/* 마지막 페이지: 뒷면 커버 */}
         <Page
-          className="demoPage border bg-[#f2bf27] relative w-full min-h-[200px] shadow-2xl/30"
+          className="demoPage bg-[#f2bf27] relative w-full min-h-[200px] shadow-2xl/30"
           data-density="hard"
         >
           <img

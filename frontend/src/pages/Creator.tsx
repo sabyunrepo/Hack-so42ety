@@ -129,17 +129,17 @@ export default function Creator() {
   };
 
   return (
-    <div className="p-8 font-sans relative">
-      <div className="max-w-3xl mx-auto ">
+    <div className="p-4 sm:p-6 md:p-8 font-sans relative">
+      <div className="max-w-3xl mx-auto">
         <BackButton />
         {/* 상단 컨트롤 */}
-        <div className="flex items-center justify-between gap-4 pt-24">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pt-16 sm:pt-20 md:pt-24">
           {/* 음성 선택 */}
           {voices.length > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1 sm:flex-initial">
               <label
                 htmlFor="voice-select"
-                className="text-gray-700 font-medium"
+                className="text-gray-700 font-medium text-sm sm:text-base whitespace-nowrap"
               >
                 음성:
               </label>
@@ -149,7 +149,7 @@ export default function Creator() {
                 onChange={(e) => {
                   setSelectedVoice(e.target.value);
                 }}
-                className="bg-white border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                className="bg-white border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-amber-300 flex-1 sm:flex-initial"
               >
                 {voices.map((voice) => (
                   <option
@@ -177,7 +177,7 @@ export default function Creator() {
                       !voices.find((v) => v.voice_id === selectedVoice)
                         ?.preview_url
                     }
-                    className={`border rounded-lg px-3 py-2 transition-colors ${
+                    className={`border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base transition-colors ${
                       voices.find((v) => v.voice_id === selectedVoice)
                         ?.preview_url
                         ? "bg-white border-gray-300 hover:bg-gray-50 cursor-pointer"
@@ -187,7 +187,7 @@ export default function Creator() {
                     🔊
                   </button>
                   {/* 툴팁 */}
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-50 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800 text-white text-xs sm:text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-50 transition-opacity pointer-events-none whitespace-nowrap z-10">
                     {voices.find((v) => v.voice_id === selectedVoice)
                       ?.preview_url
                       ? "음성 미리듣기"
@@ -204,22 +204,22 @@ export default function Creator() {
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="bg-amber-300 text-gray-800 font-semibold px-5 py-2 rounded-full shadow-sm hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-amber-300 text-gray-800 font-semibold px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-base rounded-full shadow-sm hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
           >
             {isSubmitting ? "만드는 중..." : "생성 완료"}
           </button>
         </div>
 
         {/* 페이지 리스트 */}
-        <div className="mt-16 space-y-8">
+        <div className="mt-8 sm:mt-12 md:mt-16 space-y-6 sm:space-y-8">
           {pages.map((page, index) => (
             <div
               key={page.id}
-              className="flex gap-4 items-start justify-center h-44"
+              className="flex gap-3 sm:gap-4 items-start justify-center min-h-[10rem] sm:min-h-[11rem] md:min-h-[11rem]"
             >
               {/* 페이지 번호 배지 */}
-              <div className="pt-2 h-full flex items-center">
-                <div className="flex items-center justify-center bg-[#F2BF27] w-8 h-8 rounded-full shadow-md font-bold text-white text-lg">
+              <div className="pt-2 h-full flex items-center flex-shrink-0">
+                <div className="flex items-center justify-center bg-[#F2BF27] w-7 h-7 sm:w-8 sm:h-8 rounded-full shadow-md font-bold text-white text-base sm:text-lg">
                   {index + 1}
                 </div>
               </div>
@@ -231,11 +231,11 @@ export default function Creator() {
               {pages.length > 1 && (
                 <button
                   onClick={() => removePage(page.id)}
-                  className=" text-gray-400 hover:text-red-500 transition-colors"
+                  className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
+                    className="h-5 w-5 sm:h-6 sm:w-6"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -254,14 +254,14 @@ export default function Creator() {
         </div>
 
         {/* 페이지 추가 버튼 */}
-        <div className="mt-6 flex justify-center">
+        <div className="mt-4 sm:mt-6 flex justify-center">
           <button
             onClick={addPage}
-            className="w-[680px] border-2 border-dashed border-gray-400 rounded-2xl py-6 flex justify-center items-center cursor-pointer hover:bg-amber-100/50 transition-colors disabled:opacity-50"
+            className="w-full max-w-[680px] border-2 border-dashed border-gray-400 rounded-2xl py-5 sm:py-6 flex justify-center items-center cursor-pointer hover:bg-amber-100/50 transition-colors disabled:opacity-50"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10 text-gray-500"
+              className="h-8 w-8 sm:h-10 sm:w-10 text-gray-500"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
