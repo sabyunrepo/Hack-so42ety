@@ -1,25 +1,18 @@
 # ==================== Multi-Stage Build (Optimized) ====================
 # Frontend 빌드만 담당 (nginx는 별도 컨테이너에서 실행)
 
-# Stage 1: Dependencies (캐시 최적화)
-FROM node:20-alpine AS dependencies
+# ==================== Stage 1: Builder ====================
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
 # package.json만 먼저 복사 (레이어 캐싱)
 COPY frontend/package*.json ./
 
-# 모든 의존성 설치 (devDependencies 포함 - vite, rollup 등 빌드 도구 필요)
+# 모든 의존성 설치 (devDependencies 포함)
+# COPY --from을 쓰지 않고 직접 설치하여 symlink 깨짐 방지
 RUN npm ci && \
     npm cache clean --force
-
-# ==================== Stage 2: Builder ====================
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-# Dependencies 복사
-COPY --from=dependencies /app/node_modules ./node_modules
 
 # 소스 코드 복사
 COPY frontend/ .
