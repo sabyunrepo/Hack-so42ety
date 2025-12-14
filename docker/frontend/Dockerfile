@@ -10,7 +10,7 @@ WORKDIR /app
 COPY frontend/package*.json ./
 
 # 모든 의존성 설치 (devDependencies 포함 - vite, rollup 등 빌드 도구 필요)
-RUN npm ci --ignore-scripts && \
+RUN npm ci && \
     npm cache clean --force
 
 # ==================== Stage 2: Builder ====================
@@ -31,7 +31,6 @@ ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Production 빌드
-ENV NODE_ENV=production
 # 빌드 결과물 검증
 RUN npm run build && \
     ls -lah /app/dist
