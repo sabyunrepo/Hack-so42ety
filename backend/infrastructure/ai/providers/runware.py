@@ -169,6 +169,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         """
         task_uuid = str(uuid.uuid4())
         image_base64 = base64.b64encode(image_data).decode('utf-8')
+        result = None  # ✅ 무조건 초기화
 
         # 설정에서 기본값 가져오기 (없으면 전달된 인자 사용)
         strength = strength if strength is not None else settings.runware_img2img_strength
@@ -181,16 +182,17 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "taskType": "imageInference",
                 "taskUUID": task_uuid,
                 "positivePrompt": prompt,
-                "seedImage": f"data:image/png;base64,{image_base64}",  # 이미지를 seedImage로 사용
-                "strength": strength,          # 변환 강도 (0.0-1.0)
-                "CFGScale": cfg_scale,         # 프롬프트 가이드 스케일
-                "steps": steps,                # 디노이징 스텝 수
-                "width": width,
-                "height": height,
+                "referenceImages": [f"data:image/png;base64,{image_base64}"],
+                # "width": width,
+                # "height": height,
                 "model": settings.runware_img2img_model,
                 "numberResults": 1
             }
         ]
+    # "seedImage": f"data:image/png;base64,{image_base64}",  # 이미지를 seedImage로 사용
+        # "strength": strength,          # 변환 강도 (0.0-1.0)
+        # "CFGScale": cfg_scale,         # 프롬프트 가이드 스케일
+        # "steps": steps,                # 디노이징 스텝 수
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
@@ -201,9 +203,20 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 },
                 json=payload
             )
+            if response.status_code >= 400:
+                logger.error("Runware API ERROR")
+                logger.error(f"Status Code: {response.status_code}")
+                logger.error(f"Response Text: {response.text}")
+
+                try:
+                    logger.error(f"Response JSON: {response.json()}")
+                except Exception:
+                    logger.error("Response is not JSON")
+                    response.raise_for_status()
+                    result = response.json()
+                    logger.info(f"Runware image generation response: {result}")
             response.raise_for_status()
             result = response.json()
-            logger.info(f"Runware image generation response: {result}")
 
             if "error" in result:
                 error_msg = result.get("error", "Unknown error")

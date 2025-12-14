@@ -167,6 +167,7 @@ class BookOrchestratorService:
             user_id=user_id,
             book_id=book.id,
             stories=stories,
+            tts_producer=self.tts_producer,
             images=images,
             voice_id=voice_id,
             level=level,
