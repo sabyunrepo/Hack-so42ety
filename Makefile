@@ -152,7 +152,7 @@ prod-deploy: ## 🚀 프로덕션 초기 배포 (환경 설정 + 빌드 + 실행
 	@echo ""
 	@echo "$(YELLOW)Step 5/5: Running database migrations...$(NC)"
 	@sleep 10
-	$(DOCKER_COMPOSE_PROD) exec -T backend alembic upgrade head
+	$(DOCKER_COMPOSE_PROD) exec -T backend sh -c "cd backend && alembic upgrade head"
 	@echo "$(GREEN)✓ Migrations completed$(NC)"
 	@echo ""
 	@echo "$(GREEN)========================================$(NC)"
