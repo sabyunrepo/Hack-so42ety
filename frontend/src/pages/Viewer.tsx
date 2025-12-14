@@ -52,6 +52,7 @@ const Viewer: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(0);
+  const [flipbookSize, setFlipbookSize] = useState({ width: 400, height: 550 });
 
   const bookRef = useRef<HTMLFlipBookRef | null>(null);
   const navigate = useNavigate();
@@ -77,6 +78,40 @@ const Viewer: React.FC = () => {
 
     fetchBook();
   }, [bookId]);
+
+  // 반응형 플립북 크기 조정
+  useEffect(() => {
+    const updateFlipbookSize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      // if (width < 1024) {
+        if (width < 640) {
+          // Mobile - 화면의 70% 활용
+          const bookWidth = Math.min(280, width * 0.7);
+          const bookHeight = bookWidth * 1.375; // 책 비율 유지
+          setFlipbookSize({
+            width: bookWidth,
+            height: Math.min(bookHeight, height * 0.6),
+          });
+          console.log(640)
+        } else if (width < 768) {
+          // Tablet
+          setFlipbookSize({ width: 330, height: 481 });
+          console.log(768)
+
+        } else if (width < 1024) {
+        // Small Desktop
+        setFlipbookSize({ width: 380, height: 522 });
+      } else {
+        // Large Desktop
+        setFlipbookSize({ width: 420, height: 577 });
+      }
+    };
+
+    updateFlipbookSize();
+    window.addEventListener("resize", updateFlipbookSize);
+    return () => window.removeEventListener("resize", updateFlipbookSize);
+  }, []);
 
   const handleNextPage = () => {
     if (bookRef.current) {
@@ -112,13 +147,13 @@ const Viewer: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
+      <div className="p-4 sm:p-6 md:p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 sm:gap-4">
           <div className="relative">
-            <div className="animate-spin rounded-full h-20 w-20 border-4 border-amber-200 border-t-amber-500"></div>
-            <div className="absolute inset-0 animate-ping rounded-full h-20 w-20 border-2 border-amber-400/40"></div>
+            <div className="animate-spin rounded-full h-16 w-16 sm:h-18 sm:w-18 md:h-20 md:w-20 border-4 border-amber-200 border-t-amber-500"></div>
+            <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 sm:h-18 sm:w-18 md:h-20 md:w-20 border-2 border-amber-400/40"></div>
           </div>
-          <div className="text-2xl font-bold text-amber-900 tracking-wide">
+          <div className="text-lg sm:text-xl md:text-2xl font-bold text-amber-900 tracking-wide text-center px-4">
             책을 불러오는 중...
           </div>
         </div>
@@ -130,9 +165,15 @@ const Viewer: React.FC = () => {
     return (
       <div className="p-4 sm:p-6 md:p-8 bg-gradient-to-br from-orange-50 to-amber-50 h-full flex items-center justify-center">
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4 text-center border-2 border-red-200">
-          <div className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4 animate-pulse">⚠️</div>
-          <div className="text-xl sm:text-2xl font-bold text-red-600 mb-2">오류가 발생했습니다</div>
-          <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">{errorMessage}</p>
+          <div className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4 animate-pulse">
+            ⚠️
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-red-600 mb-2">
+            오류가 발생했습니다
+          </div>
+          <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
+            {errorMessage}
+          </p>
           <button
             onClick={() => navigate("/")}
             className="px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
@@ -166,22 +207,25 @@ const Viewer: React.FC = () => {
   }
 
   return (
-    <div className=" p-7 flex flex-col justify-center items-center bg-gradient-to-br from-orange-50 via-amber-50/50 to-orange-50 min-h-full">
+    <div className="p-3 sm:p-4 md:p-6 flex flex-col items-center bg-gradient-to-br from-orange-50 via-amber-50/50 to-orange-50 min-h-full min-w-3xl ">
       {/* Header with title and close button */}
-      <div className="relative flex items-center justify-center w-full mb-6">
-        <h1 className="text-4xl font-bold text-amber-900 tracking-tight drop-shadow-sm">
+      <div className="relative flex items-center justify-center w-full mb-3 sm:mb-4 md:mb-5 px-2">
+        <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-amber-900 tracking-tight drop-shadow-sm text-center">
           {book.title || "제목 없음"}
         </h1>
         <button
           onClick={() => navigate("/")}
-          className="absolute right-8 bg-white rounded-full p-3.5 shadow-xl hover:scale-110 hover:bg-gradient-to-br hover:from-amber-400 hover:to-amber-500 hover:text-white transition-all duration-300 border-2 border-amber-200/50"
+          className="absolute right-1 sm:right-2 md:right-4 lg:right-6 bg-white rounded-full p-2 sm:p-2.5 md:p-3 shadow-xl hover:scale-110 hover:bg-gradient-to-br hover:from-amber-400 hover:to-amber-500 hover:text-white transition-all duration-300 border-2 border-amber-200/50"
         >
-          <X className="w-8 h-8" />
+          <X className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
         </button>
       </div>
+
       <HTMLFlipBook
-        width={400}
-        height={550}
+        // width={400}
+        // height={550}
+        width={flipbookSize.width}
+        height={flipbookSize.height}
         showCover={true}
         useMouseEvents={true}
         ref={bookRef}
@@ -193,6 +237,7 @@ const Viewer: React.FC = () => {
         disableFlipByClick={true}
         clickEventForward={false}
         size="fixed"
+        usePortrait={false}
         onFlip={(e: number | { data: number }) => {
           const pageNum = typeof e === "object" ? e.data : e;
           setCurrentPage(pageNum);
@@ -266,7 +311,7 @@ const Viewer: React.FC = () => {
             {pageData.dialogues.map((dialogue: Dialogue) => (
               <div
                 key={dialogue.id}
-                className=" w-full h-full flex items-center"
+                className=" w-full h-full mb-5 flex items-center"
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
                 onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                 onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
@@ -299,7 +344,7 @@ const Viewer: React.FC = () => {
       </HTMLFlipBook>
 
       {/* Navigation controls */}
-      <div className="w-full flex justify-center items-center gap-8 mt-6">
+      <div className="flex justify-center items-center gap-6 sm:gap-8 md:gap-10 lg:gap-12 mt-3 sm:mt-4 md:mt-5">
         <button
           onClick={handlePrevPage}
           disabled={currentPage === 0}
