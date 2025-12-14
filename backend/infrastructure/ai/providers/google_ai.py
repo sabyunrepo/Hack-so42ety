@@ -6,10 +6,14 @@ Google Gemini를 사용한 스토리 및 이미지 생성
 import json
 from typing import Optional, Dict, Any, List
 import httpx
+from typing import Type
+from pydantic import BaseModel
 
 from ..base import StoryGenerationProvider, ImageGenerationProvider
 from ....core.config import settings
 from google import genai
+import google.genai.types as genai_types
+# from google.genai import types
 
 
 class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
@@ -39,9 +43,7 @@ class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
     async def generate_story(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
-        max_length: Optional[int] = None,
-        temperature: Optional[float] = None,
+        response_schema: Optional[Type[BaseModel]] = None,
     ) -> str:
         """
         Gemini로 스토리 생성
@@ -55,18 +57,17 @@ class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
         Returns:
             str: 생성된 스토리
         """
-        # 컨텍스트를 프롬프트에 통합
-        full_prompt = self._build_story_prompt(prompt, context)
-
-
-        # Gemini API 호출
-        response = self.client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=full_prompt,
-        )
-
-        result = response.text
-        return result
+        response = await self.client.aio.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(
+                    # thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+                    temperature=0.1,
+                    response_mime_type="application/json",
+                    response_schema=response_schema,
+                ),
+            )
+        return response.parsed  # parsed가 schema_cls 타입으로 자동 변환됨
 
     async def generate_story_with_images(
         self,

@@ -96,22 +96,6 @@ class Settings(BaseSettings):
 
     # Video Generation
     ai_video_provider: str = Field(default="kling", env="AI_VIDEO_PROVIDER")
-    kling_access_key: str = Field(default="[]", env="KLING_ACCESS_KEY")
-    kling_secret_key: str = Field(default="[]", env="KLING_SECRET_KEY")
-    kling_api_url: str = Field(
-        default="https://api-singapore.klingai.com", env="KLING_API_URL"
-    )
-    kling_model_name: str = Field(default="kling-v2-1", env="KLING_MODEL_NAME")
-    kling_video_mode: str = Field(default="std", env="KLING_VIDEO_MODE")
-    kling_video_duration: str = Field(default="5", env="KLING_VIDEO_DURATION")
-    kling_key_cooldown_seconds: int = Field(
-        default=300, env="KLING_KEY_COOLDOWN_SECONDS"
-    )
-    kling_max_concurrent: int = Field(default=3, env="KLING_MAX_CONCURRENT")
-    kling_polling_interval: int = Field(default=10, env="KLING_POLLING_INTERVAL")
-    kling_max_polling_time: int = Field(default=600, env="KLING_MAX_POLLING_TIME")
-    kling_api_key: Optional[str] = Field(default=None, env="KLING_API_KEY")
-
     # Runware Video Generation
     runware_api_key: Optional[str] = Field(default=None, env="RUNWARE_API_KEY")
     runware_api_url: str = Field(
@@ -126,7 +110,8 @@ class Settings(BaseSettings):
     runware_img2img_strength: float = Field(default=0.7, env="RUNWARE_IMG2IMG_STRENGTH")
     runware_img2img_cfg_scale: float = Field(default=7.0, env="RUNWARE_IMG2IMG_CFG_SCALE")
     runware_img2img_steps: int = Field(default=30, env="RUNWARE_IMG2IMG_STEPS")
-    runware_img2img_model: str = Field(default="civitai:102438@133677", env="RUNWARE_IMG2IMG_MODEL")
+    runware_img2img_model: str = Field(default="google:4@1", env="RUNWARE_IMG2IMG_MODEL")
+    # runware_img2img_model: str = Field(default="civitai:102438@133677", env="RUNWARE_IMG2IMG_MODEL")
 
     @property
     def kling_access_keys(self) -> List[str]:

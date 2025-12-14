@@ -47,6 +47,7 @@ class Book(Base):
     genre: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     target_age: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     theme: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    level: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # 상태 (draft, published)
     status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False)
@@ -113,7 +114,6 @@ class Book(Base):
 
     # Soft delete support for quota tracking
     is_deleted: Mapped[bool] = mapped_column(
-        Boolean,
         default=False,
         server_default="false",
         nullable=False,

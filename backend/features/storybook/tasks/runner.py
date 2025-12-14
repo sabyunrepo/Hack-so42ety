@@ -19,6 +19,7 @@ from .core import (
     finalize_book_task,
 )
 
+logger = logging.getLogger(__name__)
 
 # Global Semaphores for Production Safety
 # 동시 실행 제어 (리소스 폭주 방지)
@@ -173,9 +174,10 @@ class TaskRunner:
             print(f"[TaskRunner] Executing task: {task.name} (id={task_id[:8]}...)")
 
             # 1. Wait for dependencies
-            await self._wait_for_dependencies(task_id)
+            dependency_results = await self._wait_for_dependencies(task_id)
 
             # 2. Execute task function with semaphore (prevent resource explosion)
+            # Option B: 의존성은 실행 순서만 보장, 데이터는 Redis 공유
             async with GLOBAL_TASK_LIMIT:
                 result = await task.func(*task.args, **task.kwargs)
 
@@ -335,7 +337,7 @@ async def create_storybook_dag(
             }
     """
     print("#######################################################################")
-    print("[create_storybook_dag] Creating DAG for book_id:", book_id)
+    print("[create_storybook_dag] Creating DAG for book_id:", book_id, "\n시작한다잉~~~")
     runner = TaskRunner()
 
     # Task Context
@@ -354,53 +356,46 @@ async def create_storybook_dag(
         args=(
             str(book_id),
             stories,
+            level,
+            len(stories),
             context,
         ),
     )
-    return "test"
 
-    # Task 2-3: 페이지별 Image + TTS 생성 (병렬)
-    image_tasks = []
-    tts_tasks = []
+    # Task 2: Image 생성 (배치, 모든 페이지 처리)
+    t_image = await runner.submit_task(
+        name="generate_image_batch",
+        func=generate_image_task,
+        args=(str(book_id), images, context),
+        depends_on=[t_story],  # 실행 순서만 보장, dialogues는 Redis 조회
+    )
 
-    for page_idx in range(len(stories)):
-        # Image Task (depends on Story)
-        t_image = await runner.submit_task(
-            name=f"generate_image_{page_idx}",
-            func=generate_image_task,
-            args=(str(book_id), page_idx, context),
-            depends_on=[t_story],
-        )
-        image_tasks.append(t_image)
+    # Task 3: TTS 생성 (배치, 모든 페이지 처리, Image와 병렬)
+    t_tts = await runner.submit_task(
+        name="generate_tts_batch",
+        func=generate_tts_task,
+        args=(str(book_id), context),
+        depends_on=[t_story],  # 실행 순서만 보장, dialogues는 Redis 조회
+    )
 
-        # TTS Task (depends on Story, 병렬로 Image와 동시 실행 가능)
-        t_tts = await runner.submit_task(
-            name=f"generate_tts_{page_idx}",
-            func=generate_tts_task,
-            args=(str(book_id), page_idx, context),
-            depends_on=[t_story],  # Image와 독립적
-        )
-        tts_tasks.append(t_tts)
-
-    # Task 4: Video 생성 (모든 Image Task 완료 후)
+    # Task 4: Video 생성 (Image 완료 후)
     t_video = await runner.submit_task(
         name="generate_video",
         func=generate_video_task,
         args=(str(book_id), context),
-        depends_on=image_tasks,  # 모든 이미지 완료 후
+        depends_on=[t_image],  # Image Task 완료 후 실행, Redis에서 image_urls 조회
     )
 
     # Task 5: Finalize (모든 Task 완료 후)
-    all_deps = [t_story, *image_tasks, *tts_tasks, t_video]
     t_finalize = await runner.submit_task(
         name="finalize_book",
         func=finalize_book_task,
         args=(str(book_id), context),
-        depends_on=all_deps,
+        depends_on=[t_story, t_image, t_tts, t_video],
     )
 
     # DAG 실행 (백그라운드)
-    all_task_ids = [t_story, *image_tasks, *tts_tasks, t_video, t_finalize]
+    all_task_ids = [t_story, t_image, t_tts, t_video, t_finalize]
 
     print(
         f"[create_storybook_dag] Submitting {len(all_task_ids)} tasks to background"
@@ -470,8 +465,8 @@ async def create_storybook_dag(
     return {
         "execution_id": execution_id,
         "story_task": t_story,
-        "image_tasks": image_tasks,
-        "tts_tasks": tts_tasks,
+        "image_task": t_image,       # 단일 태스크 (기존: image_tasks 리스트)
+        "tts_task": t_tts,            # 단일 태스크 (기존: tts_tasks 리스트)
         "video_task": t_video,
         "finalize_task": t_finalize,
         "all_tasks": all_task_ids,
@@ -514,7 +509,7 @@ async def shutdown_all_dags(timeout: float = 10.0) -> Dict[str, Any]:
         completed = sum(1 for r in results if not isinstance(r, Exception))
         errors = sum(1 for r in results if isinstance(r, Exception) and not isinstance(r, asyncio.CancelledError))
 
-        print(
+        logger.info(
             f"[Shutdown] DAG cleanup: cancelled={cancelled}, "
             f"completed={completed}, errors={errors}"
         )
@@ -522,7 +517,7 @@ async def shutdown_all_dags(timeout: float = 10.0) -> Dict[str, Any]:
         return {"cancelled": cancelled, "completed": completed, "timeout": 0}
 
     except asyncio.TimeoutError:
-        print(f"[Shutdown] Timeout after {timeout}s, some tasks may still be running")
+        logger.warning(f"[Shutdown] Timeout after {timeout}s, some tasks may still be running")
         return {"cancelled": 0, "completed": 0, "timeout": len(ACTIVE_DAG_TASKS)}
 
 
