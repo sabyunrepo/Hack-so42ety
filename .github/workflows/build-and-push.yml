@@ -60,10 +60,10 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=sha
-            # 'latest' tag for main branch
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            # 'latest' tag for main branch (and infra testing)
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/infra/git_action_develop' }}
             # 'prod' tag for main branch (for frontend consistency)
-            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/infra/git_action_develop' }}
             # 'dev' tag for dev branch
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
 
