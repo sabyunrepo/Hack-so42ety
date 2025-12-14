@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - infra/git_action_develop
     tags:
       - 'v*'
 

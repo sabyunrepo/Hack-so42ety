@@ -154,44 +154,23 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  # ==================== Frontend Builder (Production) ====================
-  frontend-builder:
-    build:
-      context: ./frontend
-      dockerfile: ../docker/frontend/Dockerfile
-      target: builder
-    image: moriai-frontend:prod
-    container_name: moriai-frontend-builder-prod
-    volumes:
-      - frontend-dist:/app/dist
-    command: sh -c "npm run build && echo 'Frontend build completed'"
-    restart: "no"
-    networks:
-      - moriai-network
-    # 리소스 제한 제거 - 빌드 후 자동 종료되는 일시적 컨테이너
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "2"
-
-  # ==================== Nginx (Production Settings) ====================
-  nginx:
+  # ==================== Frontend (Production - Nginx + Static Files) ====================
+  frontend:
+    # Build context is usually handled by GHCR image in prod, but keeping build context for reference
+    # In prod execution, it will pull the image.
     build:
       context: .
-      dockerfile: docker/nginx/Dockerfile
+      dockerfile: docker/frontend/Dockerfile
       args:
         APP_ENV: prod
-    image: moriai-nginx:prod
-    container_name: moriai-nginx-prod
+    image: moriai-frontend:prod
+    container_name: moriai-frontend-prod
     restart: unless-stopped
     ports:
       # 프로덕션: 내부 네트워크만 또는 Cloudflare Tunnel 사용 시 불필요
       - "127.0.0.1:80:80"
     volumes:
       - app-data:/app/data:ro
-      # Mount frontend build output
-      - frontend-dist:/usr/share/nginx/html:ro
     environment:
       - BACKEND_PORT=8000
     networks:
@@ -199,8 +178,6 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-      frontend-builder:
-        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -224,7 +201,7 @@ services:
     networks:
       - moriai-network
     depends_on:
-      - nginx
+      - frontend
     logging:
       driver: "json-file"
       options:
@@ -252,6 +229,3 @@ volumes:
       type: none
       o: bind
       device: ./data
-  frontend-dist:
-    driver: local
-    name: moriai-frontend-dist-prod
