@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { createStorybook, getVoices } from "../api/index";
+import { createStorybook, getVoices, getAllStorybooks } from "../api/index";
 import StoryInput from "../components/StoryInput";
 import BackButton from "../components/BackButton";
 import { AlertModal } from "../components/Modal";
@@ -35,6 +35,7 @@ export default function Creator() {
   const [showVoiceWarningModal, setShowVoiceWarningModal] = useState(false);
   const [showMaxPageModal, setShowMaxPageModal] = useState(false);
   const [showMinPageModal, setShowMinPageModal] = useState(false);
+  const [showMaxBooksModal, setShowMaxBooksModal] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -96,16 +97,24 @@ export default function Creator() {
 
     setIsSubmitting(true);
 
-    const stories = pages.map((page) => page.story);
-    const images = pages.map((page) => page.image) as File[];
-
-    if (images.some((img) => !img) || stories.some((s) => s.trim() === "")) {
-      setShowValidationModal(true);
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
+      // 책 권수 확인
+      const books = await getAllStorybooks();
+      if (books.length >= 5) {
+        setShowMaxBooksModal(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const stories = pages.map((page) => page.story);
+      const images = pages.map((page) => page.image) as File[];
+
+      if (images.some((img) => !img) || stories.some((s) => s.trim() === "")) {
+        setShowValidationModal(true);
+        setIsSubmitting(false);
+        return;
+      }
+
       await createStorybook({
         stories,
         images,
@@ -302,6 +311,15 @@ export default function Creator() {
         onClose={() => setShowMinPageModal(false)}
         title="페이지 제한"
         message="최소 한 페이지는 있어야 해요."
+        buttonText="확인"
+      />
+
+      {/* 최대 책 권수 제한 모달 */}
+      <AlertModal
+        isOpen={showMaxBooksModal}
+        onClose={() => setShowMaxBooksModal(false)}
+        title="책 권수 제한"
+        message="동화책은 최대 5권까지 만들 수 있어요. 기존 책을 삭제한 후 다시 시도해주세요."
         buttonText="확인"
       />
 
