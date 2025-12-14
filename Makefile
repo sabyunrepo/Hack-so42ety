@@ -123,6 +123,32 @@ prod-restart: ## 프로덕션 모드 재시작
 	@echo "$(BLUE)Restarting production environment...$(NC)"
 	$(DOCKER_COMPOSE_PROD) restart
 
+dev-deploy: ## 🚀 개발 서버 배포 (dev 브랜치 pull + 실행)
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)🚀 Dev Server Deployment Starting...$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 1/5: Pulling dev branch...$(NC)"
+	git pull origin dev
+	@echo "$(GREEN)✓ Code updated$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 2/5: Building images...$(NC)"
+	$(DOCKER_COMPOSE_PROD) build --no-cache
+	@echo "$(GREEN)✓ Images built$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 3/5: Starting services...$(NC)"
+	$(DOCKER_COMPOSE_PROD) up -d
+	@echo "$(GREEN)✓ Services started$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 4/5: Running database migrations...$(NC)"
+	@sleep 10
+	$(DOCKER_COMPOSE_PROD) exec -T backend sh -c "cd backend && alembic upgrade head"
+	@echo "$(GREEN)✓ Migrations completed$(NC)"
+	@echo ""
+	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(GREEN)🎉 Dev deployment completed!$(NC)"
+	@echo "$(GREEN)========================================$(NC)"
+
 prod-deploy: ## 🚀 프로덕션 초기 배포 (환경 설정 + 빌드 + 실행 + 마이그레이션)
 	@echo "$(BLUE)========================================$(NC)"
 	@echo "$(BLUE)🚀 Production Deployment Starting...$(NC)"
