@@ -23,4 +23,27 @@ export default defineConfig({
       // /data는 플러그인이 직접 서빙하므로 프록시 불필요
     },
   },
+
+  // Production build 최적화
+  build: {
+    // Source map 제거 (프로덕션 보안)
+    sourcemap: false,
+
+    // Minification 설정 (esbuild가 기본값, 더 빠름)
+    minify: 'esbuild',
+
+    // Chunk 최적화
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor 청크 분리
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+        },
+      },
+    },
+
+    // Chunk size warning 조정
+    chunkSizeWarningLimit: 1000,
+  },
 });

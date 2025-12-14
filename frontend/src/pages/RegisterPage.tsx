@@ -97,32 +97,32 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 via-amber-50/50 to-orange-50">
-      <div className="w-full max-w-md rounded-2xl bg-white/80 backdrop-blur-sm p-8 shadow-2xl border border-amber-100">
-        <div className="text-center mb-8">
+    <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-orange-50 via-amber-50/50 to-orange-50 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md rounded-2xl bg-white/80 backdrop-blur-sm p-6 sm:p-8 shadow-2xl border border-amber-100">
+        <div className="text-center mb-6 sm:mb-8">
           {/* <div className="text-5xl mb-4">✨</div> */}
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
+          <h2 className="text-2xl sm:text-3xl font-bold bg-linear-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
             회원가입
           </h2>
-          <p className="text-amber-700 mt-2 text-sm">새로운 이야기를 시작하세요!</p>
+          <p className="text-amber-700 mt-2 text-xs sm:text-sm">새로운 이야기를 시작하세요!</p>
         </div>
 
         {error && (
-          <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 shadow-sm">
+          <div className="mb-4 sm:mb-6 rounded-lg bg-red-50 border border-red-200 p-3 sm:p-4 text-red-700 shadow-sm">
             <div className="flex items-center gap-2">
-              <span className="text-lg">⚠️</span>
-              <span>{error}</span>
+              <span className="text-base sm:text-lg">⚠️</span>
+              <span className="text-sm sm:text-base">{error}</span>
             </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
           <div>
-            <label className="mb-2 block text-sm font-bold text-amber-900" htmlFor="email">
+            <label className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-bold text-amber-900" htmlFor="email">
               이메일
             </label>
             <input
-              className={`w-full appearance-none rounded-lg border-2 px-4 py-3 leading-tight text-gray-700 bg-white/50 focus:outline-none focus:bg-white transition-all duration-200 shadow-sm ${
+              className={`w-full appearance-none rounded-lg border-2 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base leading-tight text-gray-700 bg-white/50 focus:outline-none focus:bg-white transition-all duration-200 shadow-sm ${
                 emailError
                   ? "border-red-400 focus:border-red-500"
                   : "border-amber-200 focus:border-amber-400"
@@ -139,18 +139,18 @@ const RegisterPage = () => {
               required
             />
             {emailError && (
-              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+              <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-1">
                 <span>⚠️</span>
                 <span>{emailError}</span>
               </p>
             )}
           </div>
           <div>
-            <label className="mb-2 block text-sm font-bold text-amber-900" htmlFor="password">
+            <label className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-bold text-amber-900" htmlFor="password">
               비밀번호
             </label>
             <input
-              className={`w-full appearance-none rounded-lg border-2 px-4 py-3 leading-tight text-gray-700 bg-white/50 focus:outline-none focus:bg-white transition-all duration-200 shadow-sm ${
+              className={`w-full appearance-none rounded-lg border-2 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base leading-tight text-gray-700 bg-white/50 focus:outline-none focus:bg-white transition-all duration-200 shadow-sm ${
                 passwordError
                   ? "border-red-400 focus:border-red-500"
                   : "border-amber-200 focus:border-amber-400"
@@ -171,21 +171,21 @@ const RegisterPage = () => {
               required
             />
             {passwordError && (
-              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+              <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-1">
                 <span>⚠️</span>
                 <span>{passwordError}</span>
               </p>
             )}
-            <p className="mt-2 text-xs text-amber-600">
+            <p className="mt-1.5 sm:mt-2 text-xs text-amber-600">
               * 8자 이상의 안전한 비밀번호를 사용하세요
             </p>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-bold text-amber-900" htmlFor="confirmPassword">
+            <label className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-bold text-amber-900" htmlFor="confirmPassword">
               비밀번호 확인
             </label>
             <input
-              className={`w-full appearance-none rounded-lg border-2 px-4 py-3 leading-tight text-gray-700 bg-white/50 focus:outline-none focus:bg-white transition-all duration-200 shadow-sm ${
+              className={`w-full appearance-none rounded-lg border-2 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base leading-tight text-gray-700 bg-white/50 focus:outline-none focus:bg-white transition-all duration-200 shadow-sm ${
                 confirmPasswordError
                   ? "border-red-400 focus:border-red-500"
                   : "border-amber-200 focus:border-amber-400"
@@ -202,22 +202,22 @@ const RegisterPage = () => {
               required
             />
             {confirmPasswordError && (
-              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+              <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-1">
                 <span>⚠️</span>
                 <span>{confirmPasswordError}</span>
               </p>
             )}
           </div>
-          <div className="pt-4">
+          <div className="pt-3 sm:pt-4">
             <button
-              className="w-full bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold px-6 py-3 rounded-full shadow-lg hover:shadow-xl hover:from-amber-500 hover:to-amber-600 focus:outline-none focus:ring-4 focus:ring-amber-300 transition-all duration-300 transform hover:scale-[1.02] active:scale-95"
+              className="w-full bg-linear-to-r from-amber-400 to-amber-500 text-gray-900 font-bold px-6 py-2.5 sm:py-3 text-sm sm:text-base rounded-full shadow-lg hover:shadow-xl hover:from-amber-500 hover:to-amber-600 focus:outline-none focus:ring-4 focus:ring-amber-300 transition-all duration-300 transform hover:scale-[1.02] active:scale-95"
               type="submit"
             >
               가입하기
             </button>
           </div>
-          <div className="text-center pt-4">
-            <p className="text-sm text-amber-700">
+          <div className="text-center pt-3 sm:pt-4">
+            <p className="text-xs sm:text-sm text-amber-700">
               이미 계정이 있으신가요?{" "}
               <Link
                 className="font-bold text-amber-600 hover:text-amber-800 underline decoration-2 decoration-amber-300 hover:decoration-amber-500 transition-colors"

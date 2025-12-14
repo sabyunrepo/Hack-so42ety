@@ -87,32 +87,15 @@ services:
       retries: 3
       start_period: 40s
 
-  # ==================== Frontend Builder ====================
-  frontend-builder:
-    build:
-      context: ./frontend
-      dockerfile: ../docker/frontend/Dockerfile
-      target: builder
-    image: moriai-frontend:latest
-    container_name: moriai-frontend-builder
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - frontend-dist:/app/dist
-    networks:
-      - moriai-network
-    command: npm run build
-    restart: "no"
-
-  # ==================== Nginx Reverse Proxy ====================
-  nginx:
+  # ==================== Frontend (Nginx + Static Files) ====================
+  frontend:
     build:
       context: .
-      dockerfile: docker/nginx/Dockerfile
+      dockerfile: docker/frontend/Dockerfile
       args:
         APP_ENV: dev
-    image: moriai-nginx:dev
-    container_name: moriai-nginx
+    image: moriai-frontend:dev
+    container_name: moriai-frontend
     restart: unless-stopped
     ports:
       - "80:80"
@@ -135,7 +118,7 @@ services:
     networks:
       - moriai-network
     depends_on:
-      - nginx
+      - frontend
     profiles:
       - production  # Only run in production
 
@@ -160,6 +143,3 @@ volumes:
       type: none
       o: bind
       device: ./data
-  frontend-dist:
-    driver: local
-    name: moriai-frontend-dist

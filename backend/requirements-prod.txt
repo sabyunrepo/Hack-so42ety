@@ -5,6 +5,7 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
+asgi-correlation-id==4.3.0  # Request ID tracking
 
 # ==================== Database ====================
 sqlalchemy==2.0.23
@@ -44,6 +45,10 @@ pillow==10.1.0
 python-magic==0.4.27
 aiofiles==23.2.1
 boto3==1.34.0
+
+# ==================== Logging & Monitoring ====================
+structlog==24.1.0           # Structured logging
+sentry-sdk==1.40.0         # Sentry integration
 
 # ==================== Utilities ====================
 python-dateutil==2.8.2

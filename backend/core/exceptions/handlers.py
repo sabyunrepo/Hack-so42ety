@@ -44,9 +44,10 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
         },
     )
     
-    # Sentry에 예외 보고
-    import sentry_sdk
-    sentry_sdk.capture_exception(exc)
+    # Sentry에 예외 보고 (500 이상 서버 에러만)
+    if exc.status_code >= 500:
+        import sentry_sdk
+        sentry_sdk.capture_exception(exc)
 
     # 에러 응답 생성
     error_response = ErrorResponse(
@@ -153,9 +154,9 @@ async def http_exception_handler(
     )
 
     # Sentry에 예외 보고 (500 에러이거나 중요한 에러일 경우)
-    # 여기서는 모든 HTTPException을 일단 보냅니다 (필터링은 Sentry 대시보드에서 가능)
-    import sentry_sdk
-    sentry_sdk.capture_exception(exc)
+    if exc.status_code >= 500:
+        import sentry_sdk
+        sentry_sdk.capture_exception(exc)
 
     error_response = ErrorResponse(
         error_code=error_code,
