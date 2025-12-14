@@ -357,7 +357,8 @@ async def generate_tts_task(
                         )
                         continue
 
-                    file_name = f"users/{book.user_id}/audios/standalone/{uuid.uuid4()}.mp3"
+                    # file_name = f"users/{book.user_id}/audios/standalone/{uuid.uuid4()}.mp3"
+                    file_name = f"users/{book.user_id}/books/{book_id}/{uuid.uuid4()}.mp3"
                     audio = await repo.add_dialogue_audio(
                         dialogue_id=dialogue.id,
                         language_code=primary_translation.language_code,
