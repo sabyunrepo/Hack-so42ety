@@ -302,8 +302,8 @@ async def create_book_with_images(
         _images.append(_byte)
 
     # 이건 나중에 꼭 삭제 test
-    if len(stories) == 1 and "," in stories[0]:
-        stories = [s.strip() for s in stories[0].split(",")]
+    # if len(stories) == 1 and "," in stories[0]:
+    #     stories = [s.strip() for s in stories[0].split(",")]
 
     book = await service.create_storybook_async(
         user_id=current_user.id,

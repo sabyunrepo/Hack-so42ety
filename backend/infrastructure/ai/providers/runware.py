@@ -88,7 +88,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             # 에러 체크
             if "error" in result:
                 error_msg = result.get("error", "Unknown error")
-                logger.error(f"Runware image generation failed: {error_msg}")
+                logger.error(f"[Image Task] Runware image generation failed: {error_msg}")
                 raise Exception(f"Runware API error: {error_msg}")
 
             # 응답에서 이미지 URL 추출
@@ -101,7 +101,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             if not image_url:
                 raise Exception("No imageURL in response")
 
-            print(f"Runware image generated: {image_url}")
+            logger.info(f"[Image Task] Runware image generated: {image_url}")
 
             # 이미지 다운로드
             image_response = await client.get(image_url)
@@ -204,25 +204,26 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 json=payload
             )
             if response.status_code >= 400:
-                logger.error("Runware API ERROR")
-                logger.error(f"Status Code: {response.status_code}")
-                logger.error(f"Response Text: {response.text}")
+                logger.error("[Image Task] Runware API ERROR")
+                logger.error(f"[Image Task] Status Code: {response.status_code}")
+                logger.error(f"[Image Task] Response Text: {response.text}")
 
                 try:
-                    logger.error(f"Response JSON: {response.json()}")
+                    logger.error(f"[Image Task] Response JSON: {response.json()}")
                 except Exception:
-                    logger.error("Response is not JSON")
+                    logger.error("[Image Task] Response is not JSON")
                     response.raise_for_status()
                     result = response.json()
-                    logger.info(f"Runware image generation response: {result}")
+                    logger.info(f"[Image Task] Runware image generation response: {result}")
             response.raise_for_status()
             result = response.json()
 
             if "error" in result:
                 error_msg = result.get("error", "Unknown error")
-                logger.error(f"Runware image-to-image failed: {error_msg}")
+                logger.error(f"[Image Task] Runware image-to-image failed: {error_msg}")
                 raise Exception(f"Runware API error: {error_msg}")
 
+            logger.info(f"[Image Task] Image-to-image generation successful")
             return result
 
     async def generate_video(
@@ -295,10 +296,10 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                     "frame": "first"  # 첫 프레임에 이미지 배치
                 }
             ]
-            print(f"Mode: Image-to-Video (frameImages included, resized)")
+            logger.info(f"[Video Task] Mode: Image-to-Video (frameImages included, resized)")
         else:
             # 이미지가 없는 경우: Text-to-Video
-            print(f"Mode: Text-to-Video (no frameImages)")
+            logger.info(f"[Video Task] Mode: Text-to-Video (no frameImages)")
 
         if image_uuid is not None:
             payload[0]["frameImages"] = [
@@ -307,7 +308,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                     "frame": "first"
                 }
             ]
-            print(f"Mode: Image-to-Video (existing image UUID: {image_uuid})")
+            logger.info(f"[Video Task] Mode: Image-to-Video (existing image UUID: {image_uuid})")
         elif image_data is not None:
             payload[0]["frameImages"] = [
                 {
@@ -315,7 +316,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                     "frame": "first"
                 }
             ]
-            print("Mode: Image-to-Video (frameImages included)")
+            logger.info("[Video Task] Mode: Image-to-Video (frameImages included)")
         # Existing Image-to-Video: image_uuid 제공
 
         # FPS가 지정된 경우 추가
@@ -323,9 +324,8 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             payload[0]["fps"] = fps
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            print("payload:", payload)
-            print("self.base_url:", self.base_url)
-            print("self.api_key:", self.api_key)
+            logger.info(f"[Video Task] Sending request to {self.base_url}")
+            logger.info(f"[Video Task] Payload: {payload}")
 
             try:
                 response = await client.post(
@@ -339,7 +339,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 response.raise_for_status()
 
                 result = response.json()
-                print("API Response:", result)
+                logger.info(f"[Video Task] API Response: {result}")
 
                 # 에러 체크
                 if "errors" in result and len(result["errors"]) > 0:
@@ -348,18 +348,18 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                     error_code = error.get("code", "unknown")
                     error_param = error.get("parameter", "unknown")
 
-                    logger.error(f"Runware video generation failed: [{error_code}] {error_msg} (parameter: {error_param})")
-                    print(f"Full error object: {error}")
+                    logger.error(f"[Video Task] Runware video generation failed: [{error_code}] {error_msg} (parameter: {error_param})")
+                    logger.error(f"[Video Task] Full error object: {error}")
                     raise Exception(f"Runware API error [{error_code}]: {error_msg} (parameter: {error_param})")
 
             except httpx.HTTPStatusError as e:
                 # HTTP 에러 발생 시 응답 본문 출력
                 error_detail = e.response.text
-                print(f"HTTP Status Error: {e.response.status_code}")
-                print(f"Error Response Body: {error_detail}")
+                logger.error(f"[Video Task] HTTP Status Error: {e.response.status_code}")
+                logger.error(f"[Video Task] Error Response Body: {error_detail}")
                 raise Exception(f"HTTP {e.response.status_code}: {error_detail}")
 
-        print(f"Runware video generation started: task_uuid={task_uuid}, "
+        logger.info(f"[Video Task] Runware video generation started: task_uuid={task_uuid}, "
                    f"duration={duration}s, size={width}x{height}")
         return task_uuid
 
@@ -383,7 +383,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             "taskUUID": task_id
         }]
 
-        print(f"[check_video_status] Checking status for task_id: {task_id}")
+        logger.info(f"[Video Task] Checking status for task_id: {task_id}")
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
@@ -398,12 +398,12 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 response.raise_for_status()
 
                 result = response.json()
-                print(f"[check_video_status] API Response: {result}")
+                logger.info(f"[Video Task] API Response: {result}")
 
             except httpx.HTTPStatusError as e:
                 error_detail = e.response.text
-                print(f"[check_video_status] HTTP Status Error: {e.response.status_code}")
-                print(f"[check_video_status] Error Response Body: {error_detail}")
+                logger.error(f"[Video Task] HTTP Status Error: {e.response.status_code}")
+                logger.error(f"[Video Task] Error Response Body: {error_detail}")
                 # 에러 발생 시에도 processing으로 반환 (재시도 허용)
                 return {
                     "status": "processing",
@@ -412,7 +412,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                     "error": None
                 }
             except Exception as e:
-                print(f"[check_video_status] Unexpected error: {type(e).__name__}: {str(e)}")
+                logger.error(f"[Video Task] Unexpected error: {type(e).__name__}: {str(e)}")
                 return {
                     "status": "processing",
                     "progress": 50,
@@ -422,7 +422,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
 
         # Response 파싱 - Runware API는 {"data": [...]} 형태로 응답
         if not result:
-            print(f"[check_video_status] Empty result, status: processing")
+            logger.info(f"[Video Task] Empty result, status: processing")
             return {"status": "processing", "progress": 50, "video_url": None, "error": None}
 
         # 에러 체크
@@ -430,7 +430,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             error = result["errors"][0]
             error_msg = error.get("message", "Unknown error")
             error_code = error.get("code", "unknown")
-            print(f"[check_video_status] API returned error: [{error_code}] {error_msg}")
+            logger.error(f"[Video Task] API returned error: [{error_code}] {error_msg}")
             return {
                 "status": "failed",
                 "progress": 0,
@@ -440,16 +440,16 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
 
         # data 배열 확인
         if "data" not in result or len(result["data"]) == 0:
-            print(f"[check_video_status] No data in result, status: processing")
+            logger.info(f"[Video Task] No data in result, status: processing")
             return {"status": "processing", "progress": 50, "video_url": None, "error": None}
 
         task_result = result["data"][0]
-        print(f"[check_video_status] Task result: {task_result}")
+        logger.info(f"[Video Task] Task result: {task_result}")
 
         # 완료 체크 - videoURL이 있으면 완료
         if "videoURL" in task_result:
             video_url = task_result["videoURL"]
-            print(f"[check_video_status] Video completed! URL: {video_url}")
+            logger.info(f"[Video Task] Video completed! URL: {video_url}")
             return {
                 "status": "completed",
                 "progress": 100,
@@ -459,7 +459,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         # status 필드 체크 (processing 중일 때)
         elif "status" in task_result:
             status = task_result["status"]
-            print(f"[check_video_status] Task status: {status}")
+            logger.info(f"[Video Task] Task status: {status}")
             if status == "processing":
                 return {"status": "processing", "progress": 50, "video_url": None, "error": None}
             elif status == "failed":
@@ -472,11 +472,11 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 }
             else:
                 # 알 수 없는 상태
-                print(f"[check_video_status] Unknown status: {status}")
+                logger.info(f"[Video Task] Unknown status: {status}")
                 return {"status": "processing", "progress": 50, "video_url": None, "error": None}
         else:
             # status도 videoURL도 없으면 아직 처리 중
-            print(f"[check_video_status] No status or videoURL, assuming processing...")
+            logger.info(f"[Video Task] No status or videoURL, assuming processing...")
             return {"status": "processing", "progress": 50, "video_url": None, "error": None}
 
     async def download_video(self, video_url: str) -> bytes:
@@ -489,7 +489,10 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         Returns:
             bytes: 비디오 바이너리 데이터
         """
+        logger.info(f"[Video Task] Downloading video from {video_url}")
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(video_url)
             response.raise_for_status()
+            video_size = len(response.content)
+            logger.info(f"[Video Task] Video downloaded successfully (size: {video_size} bytes)")
             return response.content
