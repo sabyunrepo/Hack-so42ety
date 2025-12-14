@@ -85,7 +85,7 @@ services:
     build:
       context: .
       dockerfile: ./docker/backend/Dockerfile
-    image: moriai-backend:latest
+    image: ghcr.io/alsksssass/moriai-backend:latest
     container_name: moriai-backend-prod
     restart: unless-stopped
     init: true
@@ -163,7 +163,7 @@ services:
       dockerfile: docker/frontend/Dockerfile
       args:
         APP_ENV: prod
-    image: moriai-frontend:prod
+    image: ghcr.io/alsksssass/moriai-frontend:prod
     container_name: moriai-frontend-prod
     restart: unless-stopped
     ports:
