@@ -69,10 +69,8 @@ services:
       - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
-      - KLING_ACCESS_KEY=${KLING_ACCESS_KEY}
-      - KLING_SECRET_KEY=${KLING_SECRET_KEY}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174}
-      - RUNWARE_API=${RUNWARE_API}
+      - RUNWARE_API_KEY=${RUNWARE_API_KEY}
     env_file:
       - .env
     networks:

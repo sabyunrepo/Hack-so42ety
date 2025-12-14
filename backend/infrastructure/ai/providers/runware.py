@@ -67,7 +67,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "positivePrompt": prompt,
                 "width": width,
                 "height": height,
-                "model": "civitai:102438@133677",
+                "model": settings.runware_img2img_model,
                 "numberResults": 1
             }
         ]
@@ -106,6 +106,9 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             # 이미지 다운로드
             image_response = await client.get(image_url)
             image_response.raise_for_status()
+
+
+
 
             return image_response.content
 
@@ -199,37 +202,20 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 json=payload
             )
             response.raise_for_status()
-
             result = response.json()
+            logger.info(f"Runware image generation response: {result}")
 
-            # 에러 체크
             if "error" in result:
                 error_msg = result.get("error", "Unknown error")
                 logger.error(f"Runware image-to-image failed: {error_msg}")
                 raise Exception(f"Runware API error: {error_msg}")
 
-            # 응답에서 이미지 URL 추출
-            if "data" not in result or len(result["data"]) == 0:
-                raise Exception("No image data in response")
-
-            image_data_result = result["data"][0]
-            image_url = image_data_result.get("imageURL")
-
-            if not image_url:
-                raise Exception("No imageURL in response")
-
-            print(f"Runware image-to-image generated: {image_url}, "
-                       f"strength={strength}, CFGScale={cfg_scale}, steps={steps}")
-
-            # 이미지 다운로드
-            image_response = await client.get(image_url)
-            image_response.raise_for_status()
-
-            return image_response.content
+            return result
 
     async def generate_video(
         self,
-        image_data: bytes,
+        image_data: Optional[bytes] = None,
+        image_uuid: Optional[str] = None,
         prompt: Optional[str] = None,
         duration: int = 5,
         width: int = 720,
@@ -273,16 +259,12 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
 
         task_uuid = str(uuid.uuid4())
 
-        #test
-        model = 'klingai:6@0'
-        # "width": width,
-        # "height": height,
-        # Payload 기본 구조
+        # model = 'klingai:6@0'
         payload = [{
             "taskType": "videoInference",
             "taskUUID": task_uuid,
             "positivePrompt": prompt or "animate this image naturally with smooth motion",
-            "model": model,
+            "model": settings.runware_video_model,
             "duration": duration,
 
             "outputFormat": output_format,
@@ -304,6 +286,24 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         else:
             # 이미지가 없는 경우: Text-to-Video
             print(f"Mode: Text-to-Video (no frameImages)")
+
+        if image_uuid is not None:
+            payload[0]["frameImages"] = [
+                {
+                    "inputImage": image_uuid,
+                    "frame": "first"
+                }
+            ]
+            print(f"Mode: Image-to-Video (existing image UUID: {image_uuid})")
+        elif image_data is not None:
+            payload[0]["frameImages"] = [
+                {
+                    "inputImage": f"data:image/png;base64,{image_data}",
+                    "frame": "first"
+                }
+            ]
+            print("Mode: Image-to-Video (frameImages included)")
+        # Existing Image-to-Video: image_uuid 제공
 
         # FPS가 지정된 경우 추가
         if fps is not None:

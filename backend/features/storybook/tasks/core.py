@@ -5,28 +5,38 @@ Storybook Task Definitions
 
 import logging
 import uuid
-from typing import Dict, Any, Optional
-
+from typing import  List
+import httpx
 from backend.core.database.session import AsyncSessionLocal
-from backend.core.dependencies import get_storage_service, get_ai_factory
+from backend.core.dependencies import get_storage_service, get_ai_factory, get_cache_service, get_event_bus
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.features.storybook.repository import BookRepository
 from backend.features.storybook.models import BookStatus
+from backend.features.storybook.schemas import create_stories_response_schema, TTSExpressionResponse
+from backend.features.storybook.prompts.generate_story_prompt import GenerateStoryPrompt
+from backend.features.storybook.prompts.generate_tts_expression_prompt import EnhanceAudioPrompt
+from backend.features.storybook.prompts.generate_image_prompt import GenerateImagePrompt
 from backend.core.config import settings
+from backend.features.tts.service import TTSService
+from backend.features.tts.repository import AudioRepository, VoiceRepository
+from backend.features.tts.exceptions import BookVoiceNotConfiguredException
+
 
 from .schemas import TaskResult, TaskContext, TaskStatus
 from .store import TaskStore
+
+#test
+import asyncio
 
 logger = logging.getLogger(__name__)
 
 
 async def generate_story_task(
     book_id: str,
-    prompt: str,
+    stories: List[str],
+    level: str,
     num_pages: int,
-    target_age: str,
-    theme: str,
     context: TaskContext,
 ) -> TaskResult:
     """
@@ -43,16 +53,8 @@ async def generate_story_task(
     Returns:
         TaskResult: 성공 시 story_data_key 반환
     """
-    print(f"[Story Task] Starting for book_id={book_id}")
-    story_key = f"story:{book_id}"
-    return TaskResult(
-        status=TaskStatus.COMPLETED,
-        result={
-            "story_key": story_key,
-            "title": "hello",
-            "num_pages": 2,
-        },
-    )
+    logger.info(f"[Story Task] Starting for book_id={book_id}")
+    logger.info(f"[Story Task] stories={stories}, level={level}, num_pages={num_pages}")
 
     async with AsyncSessionLocal() as session:
         try:
@@ -62,52 +64,77 @@ async def generate_story_task(
 
             # 1. Update pipeline stage
             book_uuid = uuid.UUID(book_id)
-            book = await repo.get(book_uuid)
-            if not book:
-                raise ValueError(f"Book {book_id} not found")
-
-            book.pipeline_stage = "story"
-            book.progress_percentage = 10
-            await session.commit()
-
-            logger.debug(f"[Story Task] Updated book pipeline_stage=story")
 
             # 2. Generate story (AI call)
+            max_dialogues_per_page = 3  # 임시 고정값, 추후 조정 가능
             story_provider = ai_factory.get_story_provider()
-
-            full_prompt = f"""
-Create a children's story for age {target_age} with theme '{theme}'.
-Topic: {prompt}
-Length: {num_pages} pages.
-Format: JSON with 'title', 'pages' (list of {{"content": "...", "image_prompt": "..."}}).
-"""
-
-            logger.debug(f"[Story Task] Calling AI story provider")
-            generated_data = await story_provider.generate_story_with_images(
-                prompt=full_prompt,
-                num_images=num_pages,
-                context={"target_age": target_age, "theme": theme},
+            response_schema = create_stories_response_schema(
+                max_pages=num_pages,
+                max_dialogues_per_page=max_dialogues_per_page,
+                max_chars_per_dialogue=85,
+                max_title_length=20,
             )
+            prompt = GenerateStoryPrompt(diary_entries=stories).render()
+            generated_data = await story_provider.generate_story(
+                prompt=prompt,
+                response_schema=response_schema,
+            )
+            book_title = generated_data.title
+            dialogues = generated_data.stories
+
+            emotion_prefixed_prompt = EnhanceAudioPrompt(stories=dialogues, title=book_title).render()
+            response_with_emotion = await story_provider.generate_story(
+                prompt=emotion_prefixed_prompt,
+                response_schema=TTSExpressionResponse,
+            )
+            dialogues_with_emotions = response_with_emotion.stories
 
             # 3. Store in Redis
             story_key = f"story:{book_id}"
-            await task_store.set(story_key, generated_data, ttl=3600)
+            await task_store.set(story_key, {"dialogues": dialogues_with_emotions, "title": book_title}, ttl=3600)
 
-            logger.debug(f"[Story Task] Stored story in Redis: {story_key}")
+            # 4. Create Dialogue + DialogueTranslation for each page
+            book = await repo.get_with_pages(book_uuid)
+            if not book or not book.pages:
+                raise ValueError(f"Book {book_id} has no pages for dialogues creation")
 
-            # 4. Update DB with title
-            book.title = generated_data.get("title", "Untitled Story")
-            book.progress_percentage = 20
+            pages = book.pages
+            
+            for page_idx, page_dialogues in enumerate(dialogues):
+                page = next((p for p in pages if p.sequence == page_idx + 1), None)
+                if not page:
+                    logger.warning(f"[Story Task] Page {page_idx + 1} not found, skipping dialogues")
+                    continue
+                for dialogue_idx, dialogue_text in enumerate(page_dialogues):
+                    await repo.add_dialogue_with_translation(
+                        page_id=page.id,
+                        speaker="Narrator", # test 이거 무슨 의미?
+                        sequence=dialogue_idx + 1,
+                        translations=[
+                            {"language_code": "en", "text": dialogue_text, "is_primary": True}
+                        ],
+                    )
+
+            # 5. Update DB with title
+            updated = await repo.update(
+                    book_uuid,
+                    pipeline_stage="story",
+                    progress_percentage=30,
+                    title=book_title,
+                    error_message=None,
+                )
+            if not updated:
+                raise ValueError(f"Book {book_id} not found for update")
             await session.commit()
 
-            logger.info(f"[Story Task] Completed for book_id={book_id}")
 
+            logger.info(f"[Story Task] Completed for book_id={book_id}")
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={
                     "story_key": story_key,
-                    "title": book.title,
-                    "num_pages": len(generated_data.get("pages", [])),
+                    "title": book_title,
+                    "dialogues": dialogues,
                 },
             )
 
@@ -118,122 +145,118 @@ Format: JSON with 'title', 'pages' (list of {{"content": "...", "image_prompt": 
             try:
                 async with AsyncSessionLocal() as error_session:
                     error_repo = BookRepository(error_session)
-                    error_book = await error_repo.get(uuid.UUID(book_id))
-                    if error_book:
-                        error_book.pipeline_stage = "failed"
-                        error_book.error_message = f"Story generation failed: {str(e)}"
-                        error_book.status = BookStatus.FAILED
+                    updated_book = await error_repo.update(
+                        id=uuid.UUID(book_id),
+                        pipeline_stage="failed",
+                        error_message=f"Story generation failed: {str(e)}",
+                        status=BookStatus.FAILED,
+                    )
+                    if updated_book:
                         await error_session.commit()
             except Exception as db_error:
                 logger.error(f"[Story Task] Failed to update error in DB: {db_error}")
-
             return TaskResult(status=TaskStatus.FAILED, error=str(e))
 
 
 async def generate_image_task(
     book_id: str,
-    page_index: int,
+    images: List[bytes],
     context: TaskContext,
 ) -> TaskResult:
     """
-    Task 2: Image 생성 (페이지별)
+    Task 2: Image 생성 (배치 처리 - 모든 페이지)
 
     Args:
         book_id: Book UUID (string)
-        page_index: 페이지 인덱스 (0부터 시작)
+        images: 모든 페이지의 원본 이미지 바이트 리스트
         context: Task 실행 컨텍스트
 
     Returns:
-        TaskResult: 성공 시 page_id, image_url 반환
+        TaskResult: 성공 시 모든 페이지의 image_urls 반환
     """
-    logger.info(f"[Image Task] Starting for book_id={book_id}, page={page_index}")
+    logger.info(f"[Image Task] Starting batch processing for book_id={book_id}, {len(images)} images")
+    logger.info(f"[Image Task] Batch processing {len(images)} images for book_id={book_id}")
 
+    storage_service = get_storage_service()
+    task_store = TaskStore()
+    story_key = f"story:{book_id}"
+    story_data = await task_store.get(story_key)
+    dialogues = story_data.get("dialogues", []) if story_data else []
+
+    prompts = [GenerateImagePrompt(
+        stories=dialogue, style_keyword="cartoon"
+    ).render() for dialogue in dialogues]       
+    ai_factory = get_ai_factory()    
+    image_provider = ai_factory.get_image_provider()
+
+    # Image-to-Image 모드
+    tasks = [
+        image_provider.generate_image_from_image(image_data=img, prompt=prompt)
+        for img, prompt in zip(images, prompts)
+    ]
+
+    # asyncio.gather로 병렬 실행
+    results = await asyncio.gather(*tasks)
+    image_infos = [
+        {
+            "imageUUID": r["data"][0]["imageUUID"],
+            "imageURL": r["data"][0]["imageURL"]
+        }
+        for r in results
+    ]
+
+    await task_store.set(
+        f"images:{book_id}",
+        {"images": image_infos, "page_count": len(images)},
+        ttl=3600
+    )
+
+    # cover image 다운로드받아서 저장하기
+    timeout = httpx.Timeout(settings.http_timeout, read=settings.http_read_timeout)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.get(image_infos[0]['imageURL'])
+        response.raise_for_status()
+        image_bytes =  response.content
+
+    
     async with AsyncSessionLocal() as session:
         try:
             repo = BookRepository(session)
-            task_store = TaskStore()
-            ai_factory = get_ai_factory()
-            storage_service = get_storage_service()
-
-            # 1. Get story data from Redis
-            story_key = f"story:{book_id}"
-            story_data = await task_store.get(story_key)
-
-            if not story_data:
-                raise ValueError(f"Story data not found in Redis: {story_key}")
-
-            pages_data = story_data.get("pages", [])
-            if page_index >= len(pages_data):
-                raise ValueError(f"Page index {page_index} out of range (total: {len(pages_data)})")
-
-            page_data = pages_data[page_index]
-            image_prompt = page_data.get("image_prompt", "")
-            content = page_data.get("content", "")
-
-            logger.debug(f"[Image Task] Retrieved story data for page {page_index}")
-
-            # 2. Generate image (AI call)
-            image_provider = ai_factory.get_image_provider()
-
-            logger.debug(f"[Image Task] Calling AI image provider")
-            image_bytes = await image_provider.generate_image(
-                prompt=image_prompt,
-                width=1024,
-                height=1024
-            )
-
-            # 3. Upload to storage
             book_uuid = uuid.UUID(book_id)
             book = await repo.get(book_uuid)
             if not book:
                 raise ValueError(f"Book {book_id} not found")
+            user_id = book.user_id
 
-            file_name = f"{book.base_path}/images/page_{page_index + 1}.png"
-            image_url = await storage_service.save(
+            file_name = f"users/{user_id}/books/{book_id}/images/page_1_cover.png"
+            storage_url = await storage_service.save(
                 image_bytes,
                 file_name,
                 content_type="image/png"
             )
 
-            logger.debug(f"[Image Task] Uploaded image to: {image_url}")
-
-            # 4. Create Page in DB
-            page = await repo.add_page(
-                book_id=book_uuid,
-                page_data={
-                    "sequence": page_index + 1,
-                    "image_url": image_url,
-                    "image_prompt": image_prompt,
-                },
-            )
+            # 5. Update DB with cover image
+            updated = await repo.update(
+                    book_uuid,
+                    pipeline_stage="image",
+                    progress_percentage=60,
+                    cover_image=file_name,
+                )
+            if not updated:
+                raise ValueError(f"Book {book_id} not found for update")
             await session.commit()
-
-            # 5. Store page info in Redis for TTS task
-            page_info_key = f"page:{book_id}:{page_index}"
-            await task_store.set(
-                page_info_key,
-                {
-                    "page_id": str(page.id),
-                    "content": content,
-                    "image_url": image_url,
-                },
-                ttl=3600
-            )
-
-            logger.info(f"[Image Task] Completed for book_id={book_id}, page={page_index}")
-
+            logger.debug(f"[Image Task] Updated book with cover image: {file_name}")
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={
-                    "page_id": str(page.id),
-                    "page_index": page_index,
-                    "image_url": image_url,
+                    "image_infos": image_infos,
+                    "page_count": len(images),
                 },
             )
 
         except Exception as e:
             logger.error(
-                f"[Image Task] Failed for book_id={book_id}, page={page_index}: {e}",
+                f"[Image Task] Batch failed for book_id={book_id}: {e}",
                 exc_info=True
             )
             return TaskResult(status=TaskStatus.FAILED, error=str(e))
@@ -241,112 +264,244 @@ async def generate_image_task(
 
 async def generate_tts_task(
     book_id: str,
-    page_index: int,
     context: TaskContext,
 ) -> TaskResult:
     """
-    Task 3: TTS 생성 (페이지별)
+    Task 3: TTS 생성 (배치 처리 - 모든 페이지)
 
     Args:
         book_id: Book UUID (string)
-        page_index: 페이지 인덱스 (0부터 시작)
         context: Task 실행 컨텍스트
 
     Returns:
-        TaskResult: 성공 시 dialogue_id, audio_url 반환
+        TaskResult: 성공 시 모든 audio_urls 반환
     """
-    logger.info(f"[TTS Task] Starting for book_id={book_id}, page={page_index}")
-
+    logger.info(f"[TTS Task] Starting batch processing for book_id={book_id}")
     async with AsyncSessionLocal() as session:
         try:
+            # === Phase 1: Data Retrieval & Validation ===
             repo = BookRepository(session)
             task_store = TaskStore()
-            ai_factory = get_ai_factory()
-            storage_service = get_storage_service()
-
-            # 1. Get page info from Redis (created by image task)
-            page_info_key = f"page:{book_id}:{page_index}"
-            page_info = await task_store.get(page_info_key)
-
-            if not page_info:
-                raise ValueError(f"Page info not found in Redis: {page_info_key}")
-
-            page_id_str = page_info.get("page_id")
-            content = page_info.get("content", "")
-
-            if not content:
-                logger.warning(f"[TTS Task] No content for page {page_index}, skipping")
-                return TaskResult(
-                    status=TaskStatus.COMPLETED,
-                    result={"skipped": True, "reason": "No content"}
-                )
-
-            logger.debug(f"[TTS Task] Retrieved page info for page {page_index}")
-
-            # 2. Create dialogue with translation
-            page_uuid = uuid.UUID(page_id_str)
-            dialogue = await repo.add_dialogue_with_translation(
-                page_id=page_uuid,
-                speaker="Narrator",
-                sequence=1,
-                translations=[
-                    {"language_code": "en", "text": content, "is_primary": True}
-                ],
-            )
-
-            # 3. Generate TTS (AI call)
-            tts_provider = ai_factory.get_tts_provider()
-
-            logger.debug(f"[TTS Task] Calling AI TTS provider")
-            audio_bytes = await tts_provider.text_to_speech(content)
-
-            # 4. Upload to storage
             book_uuid = uuid.UUID(book_id)
-            book = await repo.get(book_uuid)
+
+            # Get story data from Redis
+            story_key = f"story:{book_id}"
+            story_data = await task_store.get(story_key)
+            if not story_data:
+                raise ValueError(f"Story data not found in Redis: {story_key}")
+
+            # Get Book with eager loading (IMPORTANT: use get_with_pages!)
+            book = await repo.get_with_pages(book_uuid)
             if not book:
                 raise ValueError(f"Book {book_id} not found")
 
-            audio_file_name = f"{book.base_path}/audios/page_{page_index + 1}.mp3"
-            audio_url = await storage_service.save(
-                audio_bytes,
-                audio_file_name,
-                content_type="audio/mpeg"
+            # Validate voice_id
+            if not book.voice_id:
+                raise BookVoiceNotConfiguredException(book_id=book_id)
+            logger.info(f"[TTS Task] Book loaded: user_id={book.user_id}, voice_id={book.voice_id}")
+
+            # === Phase 2: Build Task List ===
+            tasks_to_generate = []
+            for page in book.pages:
+                for dialogue in page.dialogues:
+                    primary_translation = next(
+                        (t for t in dialogue.translations if t.is_primary),
+                        None
+                    )
+                    if not primary_translation:
+                        logger.warning(
+                            f"[TTS Task] No primary translation for dialogue {dialogue.id}, skipping"
+                        )
+                        continue
+
+                    # Skip empty text
+                    if not primary_translation.text.strip():
+                        logger.warning(
+                            f"[TTS Task] Empty text for dialogue {dialogue.id}, skipping"
+                        )
+                        continue
+
+
+                    tasks_to_generate.append({
+                        "dialogue_id": dialogue.id,
+                        "text": primary_translation.text,
+                        "language_code": primary_translation.language_code,
+                        "page_seq": page.sequence,
+                        "dialogue_seq": dialogue.sequence,
+                    })
+
+            if not tasks_to_generate:
+                raise ValueError("No dialogues found for TTS generation")
+
+            logger.info(f"[TTS Task] Generating TTS for {len(tasks_to_generate)} dialogues")
+
+            # === Phase 3: TTS Service Setup & Parallel Generation ===
+            # Initialize TTSService manually for background tasks
+            audio_repo = AudioRepository(session)
+            voice_repo = VoiceRepository(session)
+            storage_service = get_storage_service()
+            ai_factory = get_ai_factory()
+            event_bus = get_event_bus()
+            cache_service = get_cache_service(event_bus=event_bus)
+
+            tts_service = TTSService(
+                audio_repo=audio_repo,
+                voice_repo=voice_repo,
+                storage_service=storage_service,
+                ai_factory=ai_factory,
+                db_session=session,
+                cache_service=cache_service,
+                event_bus=event_bus,
             )
 
-            logger.debug(f"[TTS Task] Uploaded audio to: {audio_url}")
+            async def generate_single_tts(task_info):
+                """Generate TTS for a single dialogue (TTS only, no DB)"""
+                try:
+                    logger.info(f"[TTS Task] Generating TTS for dialogue {task_info['dialogue_id']}")
+                    # 1. Generate TTS using TTSService (saves to standalone path)
+                    audio = await tts_service.generate_speech(
+                        user_id=book.user_id,
+                        text=task_info["text"],
+                        voice_id=book.voice_id,
+                    )
 
-            # 5. Add dialogue audio
-            voice_id = (
-                settings.DEFAULT_VOICE_ID
-                if hasattr(settings, "DEFAULT_VOICE_ID")
-                else "default"
-            )
+                    logger.info(f"[TTS Task] Successfully generated TTS for dialogue {task_info['dialogue_id']}")
+                    return {
+                        "success": True,
+                        "dialogue_id": task_info["dialogue_id"],
+                        "language_code": task_info["language_code"],
+                        "audio_url": audio.file_path,
+                        "duration": None,
+                    }
 
-            await repo.add_dialogue_audio(
-                dialogue_id=dialogue.id,
-                language_code="en",
-                voice_id=voice_id,
-                audio_url=audio_url,
+                except Exception as e:
+                    logger.error(
+                        f"[TTS Task] Failed to generate TTS for dialogue {task_info['dialogue_id']}: {e}",
+                        exc_info=True
+                    )
+                    return {
+                        "success": False,
+                        "dialogue_id": task_info["dialogue_id"],
+                        "language_code": task_info.get("language_code", "en"),
+                        "error": str(e),
+                    }
+
+            # === Phase 4: Batch Processing (5 at a time to avoid ElevenLabs concurrency limit) ===
+            BATCH_SIZE = 5
+            all_results = []
+            success_count = 0
+            failed_count = 0
+
+            logger.info(f"[TTS Task] Processing {len(tasks_to_generate)} tasks in batches of {BATCH_SIZE}")
+            for i in range(0, len(tasks_to_generate), BATCH_SIZE):
+                batch = tasks_to_generate[i:i+BATCH_SIZE]
+                batch_num = (i // BATCH_SIZE) + 1
+                total_batches = (len(tasks_to_generate) + BATCH_SIZE - 1) // BATCH_SIZE
+                logger.info(f"[TTS Task] Processing batch {batch_num}/{total_batches} ({len(batch)} items)")
+
+                # Execute batch in parallel
+                batch_tasks = [generate_single_tts(task_info) for task_info in batch]
+                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+
+                # Process batch results and save to DB sequentially
+                for result in batch_results:
+                    if isinstance(result, Exception):
+                        failed_count += 1
+                        logger.error(f"[TTS Task] Task raised exception: {result}")
+                        continue
+
+                    if not result["success"]:
+                        failed_count += 1
+                        # Create failed DialogueAudio record
+                        await repo.add_dialogue_audio(
+                            dialogue_id=result["dialogue_id"],
+                            language_code=result.get("language_code", "en"),
+                            voice_id=book.voice_id,
+                            audio_url="",
+                            duration=None,
+                            status="FAILED",
+                        )
+                        continue
+
+                    # Create successful DialogueAudio record
+                    await repo.add_dialogue_audio(
+                        dialogue_id=result["dialogue_id"],
+                        language_code=result["language_code"],
+                        voice_id=book.voice_id,
+                        audio_url=result["audio_url"],
+                        duration=result.get("duration"),
+                        status="COMPLETED",
+                    )
+                    success_count += 1
+
+                # Commit batch to DB
+                await session.commit()
+                logger.info(f"[TTS Task] Batch {batch_num}/{total_batches} completed and committed to DB")
+
+                all_results.extend(batch_results)
+
+            # === Phase 5: Update Progress ===
+            await repo.update(
+                book_uuid,
+                pipeline_stage="tts",
+                progress_percentage=70,
+                error_message=None,
             )
             await session.commit()
 
-            logger.info(f"[TTS Task] Completed for book_id={book_id}, page={page_index}")
+            logger.info(
+                f"[TTS Task] Completed for book_id={book_id}: "
+                f"{success_count} succeeded, {failed_count} failed"
+            )
 
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={
-                    "dialogue_id": str(dialogue.id),
-                    "page_index": page_index,
-                    "audio_url": audio_url,
+                    "success_count": success_count,
+                    "failed_count": failed_count,
+                    "total_count": len(tasks_to_generate),
                 },
             )
 
+        except BookVoiceNotConfiguredException as e:
+            logger.error(f"[TTS Task] Voice not configured for book_id={book_id}: {e}")
+            # Update book status to FAILED
+            try:
+                async with AsyncSessionLocal() as error_session:
+                    error_repo = BookRepository(error_session)
+                    await error_repo.update(
+                        id=book_uuid,
+                        pipeline_stage="failed",
+                        error_message=f"TTS generation failed: {str(e)}",
+                        status=BookStatus.FAILED,
+                    )
+                    await error_session.commit()
+            except Exception as db_error:
+                logger.error(f"[TTS Task] Failed to update error in DB: {db_error}")
+
+            return TaskResult(status=TaskStatus.FAILED, error=str(e))
+
         except Exception as e:
             logger.error(
-                f"[TTS Task] Failed for book_id={book_id}, page={page_index}: {e}",
+                f"[TTS Task] Failed for book_id={book_id}: {e}",
                 exc_info=True
             )
+            # Update book status to FAILED
+            try:
+                async with AsyncSessionLocal() as error_session:
+                    error_repo = BookRepository(error_session)
+                    await error_repo.update(
+                        id=uuid.UUID(book_id),
+                        pipeline_stage="failed",
+                        error_message=f"TTS generation failed: {str(e)}",
+                        status=BookStatus.FAILED,
+                    )
+                    await error_session.commit()
+            except Exception as db_error:
+                logger.error(f"[TTS Task] Failed to update error in DB: {db_error}")
+
             return TaskResult(status=TaskStatus.FAILED, error=str(e))
+
 
 
 async def generate_video_task(
@@ -354,68 +509,115 @@ async def generate_video_task(
     context: TaskContext,
 ) -> TaskResult:
     """
-    Task 4: Video 생성 (전체 책)
+    Task 4: Video 생성 (Image Task의 결과 사용)
 
     Args:
         book_id: Book UUID (string)
         context: Task 실행 컨텍스트
 
+    Note:
+        Image Task가 생성한 이미지 URL을 Redis에서 조회하여 사용
+        Redis key: images:{book_id} -> {"image_urls": [...]}
+
     Returns:
         TaskResult: 성공 시 video_url 반환 (실패해도 치명적이지 않음)
     """
     logger.info(f"[Video Task] Starting for book_id={book_id}")
+    ai_factory = get_ai_factory()
+    video_provider = ai_factory.get_video_provider()
+
+    task_store = TaskStore()
+    story_key = f"story:{book_id}"
+    story_data = await task_store.get(story_key)
+    prompts = []
+    dialogues = story_data.get("dialogues", []) if story_data else []
+    for dialogue in dialogues:
+        prompt = " ".join(dialogue)
+        prompts.append(prompt)
+
+    image_key = f"images:{book_id}"
+    image_data = await task_store.get(image_key)
+    image_uuids = [img_info['imageUUID'] for img_info in image_data.get("images", [])] if image_data else []
+
+    tasks = [
+        video_provider.generate_video(image_uuid=img_uuid, prompt=prompt)
+        for img_uuid, prompt in zip(image_uuids, prompts)
+    ]
+
+    # asyncio.gather로 병렬 실행
+    results = await asyncio.gather(*tasks)
+
+    max_wait_time = 600  # 10분
+    poll_interval = 10   # 10초마다 체크
+    elapsed_time = 0
+    completed_videos = []
+    task_uuids = results  # generate_video()는 task_uuid 문자열을 직접 반환
+
+    while elapsed_time < max_wait_time and len(completed_videos) < len(task_uuids):
+        for task_uuid in task_uuids:
+            if task_uuid in [v["task_uuid"] for v in completed_videos]:
+                continue  # 이미 완료된 작업
+
+            status_response = await video_provider.check_video_status(task_uuid)
+            if status_response["status"] == "completed":
+                completed_videos.append({
+                    "task_uuid": task_uuid,
+                    "video_url": status_response["video_url"]
+                })
+                logger.debug(f"[Video Task] Video task {task_uuid} completed")
+            elif status_response["status"] == "failed":
+                logger.warning(f"[Video Task] Video task {task_uuid} failed")
+
+        if len(completed_videos) < len(task_uuids):
+            await asyncio.sleep(poll_interval)
+            elapsed_time += poll_interval
+    # 결과 확인
+    logger.info(f"[Video Task] All task results: {completed_videos}")
 
     async with AsyncSessionLocal() as session:
         try:
             repo = BookRepository(session)
-            ai_factory = get_ai_factory()
             storage_service = get_storage_service()
-
-            # 1. Get book with pages
             book_uuid = uuid.UUID(book_id)
-            book = await repo.get_with_pages(book_uuid)
+            s3_video_urls = []
+            book = await repo.get_with_pages(book_uuid)  # ✅ eager loading            
+            pages = book.pages
+            user_id = book.user_id
 
-            if not book:
-                raise ValueError(f"Book {book_id} not found")
+            completed_videos_urls = [v["video_url"] for v in completed_videos]
+            for idx, url in enumerate(completed_videos_urls):
+                video_bytes = await video_provider.download_video(url)
+                video_size = len(video_bytes)
+                
+                file_name = f"users/{user_id}/books/{book_id}/videos/book_video_{idx}.mp4"
+                storage_url = await storage_service.save(
+                    video_bytes,
+                    file_name,
+                    content_type="video/mp4"
+                )
+                logger.debug(f"[Video Task] Uploaded video to storage: {storage_url} (size: {video_size} bytes)")
+                s3_video_urls.append(file_name)
 
-            if not book.pages:
-                raise ValueError(f"Book {book_id} has no pages")
-
-            logger.debug(f"[Video Task] Retrieved book with {len(book.pages)} pages")
-
-            # 2. Update pipeline stage
-            book.pipeline_stage = "video"
-            book.progress_percentage = 80
+            for page_idx, video_url in enumerate(s3_video_urls):
+                page = next((p for p in pages if p.sequence == page_idx + 1), None)
+                if not page:
+                    logger.warning(f"[Story Task] Page {page_idx + 1} not found, skipping dialogues")
+                    continue
+                page.image_url = video_url  # 또는 video_url용 컬럼이 있으면 그것
+                session.add(page)  # ORM 세션에 반영
             await session.commit()
 
-            # 3. Get video provider
-            try:
-                video_provider = ai_factory.get_video_provider()
-            except Exception as e:
-                logger.warning(f"[Video Task] Video provider not available: {e}")
-                # Video는 선택적 기능이므로 실패해도 OK
-                return TaskResult(
-                    status=TaskStatus.COMPLETED,
-                    result={"skipped": True, "reason": "Video provider not available"}
+            updated = await repo.update(
+                    book_uuid,
+                    pipeline_stage="video",
+                    progress_percentage=80,
+                    error_message=None,
                 )
+            if not updated:
+                raise ValueError(f"Book {book_id} not found for update")
+            await session.commit()
 
-            # 4. Collect image URLs
-            image_urls = [page.image_url for page in book.pages if page.image_url]
-
-            if not image_urls:
-                logger.warning(f"[Video Task] No images found for book {book_id}")
-                return TaskResult(
-                    status=TaskStatus.COMPLETED,
-                    result={"skipped": True, "reason": "No images"}
-                )
-
-            # 5. Generate video (AI call) - 이 부분은 실제 video provider의 메서드에 따라 조정 필요
-            logger.debug(f"[Video Task] Calling AI video provider with {len(image_urls)} images")
-
-            # TODO: Implement actual video generation logic based on video provider API
-            # For now, we'll mark as skipped
-            logger.warning(f"[Video Task] Video generation not yet implemented")
-
+            # 4. Get video provider
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={
@@ -424,32 +626,10 @@ async def generate_video_task(
                 }
             )
 
-            # Example implementation (uncomment when video provider is ready):
-            # video_bytes = await video_provider.create_video(
-            #     image_urls=image_urls,
-            #     duration_per_image=3.0
-            # )
-            #
-            # # 6. Upload to storage
-            # video_file_name = f"{book.base_path}/videos/book_video.mp4"
-            # video_url = await storage_service.save(
-            #     video_bytes,
-            #     video_file_name,
-            #     content_type="video/mp4"
-            # )
-            #
-            # logger.info(f"[Video Task] Completed for book_id={book_id}, video_url={video_url}")
-            #
-            # return TaskResult(
-            #     status=TaskStatus.COMPLETED,
-            #     result={"video_url": video_url},
-            # )
-
         except Exception as e:
             logger.error(f"[Video Task] Failed for book_id={book_id}: {e}", exc_info=True)
-            # Video 실패는 치명적이지 않으므로 COMPLETED로 반환
             return TaskResult(
-                status=TaskStatus.COMPLETED,
+                status=TaskStatus.FAILED,
                 result={"skipped": True, "reason": f"Video generation failed: {str(e)}"}
             )
 
@@ -473,28 +653,28 @@ async def finalize_book_task(
         TaskResult: 성공 시 book_id 반환
     """
     logger.info(f"[Finalize Task] Starting for book_id={book_id}")
-
     async with AsyncSessionLocal() as session:
         try:
             repo = BookRepository(session)
-            task_store = TaskStore()
-
-            # 1. Get book
             book_uuid = uuid.UUID(book_id)
-            book = await repo.get_with_pages(book_uuid)
+            task_store = TaskStore()
+            story_key = f"story:{book_id}"
+            story_data = await task_store.get(story_key)
+            book_title = story_data.get("title", "Untitled Story") if story_data else "Untitled Story"
+            num_pages = len(story_data.get("dialogues", [])) if story_data else 0
 
-            if not book:
-                raise ValueError(f"Book {book_id} not found")
+            updated = await repo.update(
+                book_uuid,
+                status=BookStatus.COMPLETED,
+                pipeline_stage="completed",
+                progress_percentage=100,
+                error_message=None,
+            )
 
-            logger.debug(f"[Finalize Task] Retrieved book: {book.title}")
+            if not updated:
+                raise ValueError(f"Book {book_id} not found for update")
 
-            # 2. Update status to COMPLETED
-            book.status = BookStatus.COMPLETED
-            book.pipeline_stage = "completed"
-            book.progress_percentage = 100
-            book.error_message = None  # Clear any previous errors
             await session.commit()
-
             logger.debug(f"[Finalize Task] Updated book status to COMPLETED")
 
             # 3. Cleanup Redis (비동기 실행, 에러 무시)
@@ -510,8 +690,8 @@ async def finalize_book_task(
                 status=TaskStatus.COMPLETED,
                 result={
                     "book_id": book_id,
-                    "title": book.title,
-                    "num_pages": len(book.pages) if book.pages else 0,
+                    "title": book_title,
+                    "num_pages": num_pages,
                 },
             )
 
@@ -522,11 +702,13 @@ async def finalize_book_task(
             try:
                 async with AsyncSessionLocal() as error_session:
                     error_repo = BookRepository(error_session)
-                    error_book = await error_repo.get(uuid.UUID(book_id))
-                    if error_book:
-                        error_book.pipeline_stage = "failed"
-                        error_book.error_message = f"Finalization failed: {str(e)}"
-                        error_book.status = BookStatus.FAILED
+                    updated_book = await error_repo.update(
+                        id=uuid.UUID(book_id),
+                        pipeline_stage="failed",
+                        error_message=f"Finalization failed: {str(e)}",
+                        status=BookStatus.FAILED,
+                    )
+                    if updated_book:
                         await error_session.commit()
             except Exception as db_error:
                 logger.error(f"[Finalize Task] Failed to update error in DB: {db_error}")
