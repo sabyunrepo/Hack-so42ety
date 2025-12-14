@@ -45,6 +45,10 @@ event_bus: RedisStreamsEventBus = None
 # 전역 Voice Sync Task 인스턴스
 voice_sync_task: asyncio.Task = None
 
+# 전역 TTS Worker 인스턴스
+from backend.features.tts.worker import TTSWorker
+tts_worker: TTSWorker = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -120,6 +124,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠ Voice sync task failed to start: {e}")
 
+    # TTS Worker 시작 (이벤트 컨슈머)
+    global tts_worker
+    try:
+        tts_worker = TTSWorker()
+        asyncio.create_task(tts_worker.start())
+        print("✓ TTS Worker started")
+    except Exception as e:
+        print(f"⚠ TTS Worker failed to start: {e}")
+
     print(f"✓ {settings.app_title} Started Successfully")
     print("=" * 60)
 
@@ -148,6 +161,14 @@ async def lifespan(app: FastAPI):
             print("✓ Event Bus stopped")
         except Exception as e:
             print(f"⚠ Event Bus stop error: {e}")
+
+    # TTS Worker 중지
+    if tts_worker:
+        try:
+            await tts_worker.shutdown()
+            print("✓ TTS Worker stopped")
+        except Exception as e:
+            print(f"⚠ TTS Worker stop error: {e}")
     
     await engine.dispose()
     print("✓ Database connections closed")
