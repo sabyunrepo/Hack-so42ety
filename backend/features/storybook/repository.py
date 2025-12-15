@@ -212,6 +212,86 @@ class BookRepository(AbstractRepository[Book]):
         await self.session.refresh(audio)
         return audio
 
+    # ==================== Progress Tracking Methods ====================
+
+    async def update_progress(
+        self,
+        book_id: uuid.UUID,
+        pipeline_stage: Optional[str] = None,
+        progress_percentage: Optional[int] = None,
+        task_metadata: Optional[dict] = None,
+        error_message: Optional[str] = None,
+    ) -> Optional[Book]:
+        """
+        비동기 파이프라인 진행 상황 업데이트
+
+        Args:
+            book_id: Book UUID
+            pipeline_stage: 파이프라인 단계 (story|images|tts|video|finalizing|completed|failed)
+            progress_percentage: 진행률 (0-100)
+            task_metadata: Task 메타데이터 (JSONB)
+            error_message: 에러 메시지
+
+        Returns:
+            Optional[Book]: 업데이트된 Book, 없으면 None
+        """
+        update_data = {}
+
+        if pipeline_stage is not None:
+            update_data["pipeline_stage"] = pipeline_stage
+
+        if progress_percentage is not None:
+            update_data["progress_percentage"] = progress_percentage
+
+        if task_metadata is not None:
+            update_data["task_metadata"] = task_metadata
+
+        if error_message is not None:
+            update_data["error_message"] = error_message
+
+        if not update_data:
+            # 업데이트할 데이터가 없으면 현재 Book 반환
+            return await self.get(book_id)
+
+        return await self.update(book_id, **update_data)
+
+    async def get_progress(self, book_id: uuid.UUID) -> Optional[dict]:
+        """
+        Book 생성 진행 상황 조회
+
+        Args:
+            book_id: Book UUID
+
+        Returns:
+            Optional[dict]: 진행 상황 정보
+                {
+                    "status": "creating|completed|failed",
+                    "pipeline_stage": "story|images|tts|video|completed",
+                    "progress_percentage": 0-100,
+                    "task_metadata": {...},
+                    "error_message": str | None,
+                    "title": str,
+                    "created_at": datetime,
+                }
+            Book이 없으면 None
+        """
+        book = await self.get(book_id)
+
+        if not book:
+            return None
+
+        return {
+            "status": book.status,
+            "pipeline_stage": book.pipeline_stage,
+            "progress_percentage": book.progress_percentage,
+            "task_metadata": book.task_metadata,
+            "error_message": book.error_message,
+            "retry_count": book.retry_count,
+            "title": book.title,
+            "created_at": book.created_at,
+            "updated_at": book.updated_at,
+        }
+
     # ==================== Quota Management Methods ====================
 
     async def count_active_books(self, user_id: uuid.UUID) -> int:
