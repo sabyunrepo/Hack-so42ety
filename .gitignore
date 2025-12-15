@@ -65,6 +65,7 @@ data/*
 !data/shared/
 backups/
 *.log
+**/.temp/
 
 # ==================== Node ====================
 node_modules/

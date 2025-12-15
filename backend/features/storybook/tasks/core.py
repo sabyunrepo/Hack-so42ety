@@ -82,7 +82,7 @@ async def generate_story_task(
             )
 
             logger.info(
-                f"[Story Task] Attempt {attempt} generated_data={generated_data}"
+                f"[Story Task] [Book: {book_id}] Attempt {attempt} generated_data={generated_data}"
             )
 
             book_title, dialogues = validate_generated_story(generated_data)
@@ -93,7 +93,7 @@ async def generate_story_task(
         except Exception as e:
             last_error = e
             logger.info(
-                f"[Story Task] Attempt {attempt} failed: {e}"
+                f"[Story Task] [Book: {book_id}] Attempt {attempt} failed: {e}"
             )
 
     else:
@@ -136,7 +136,7 @@ async def generate_story_task(
             for page_idx, page_dialogues in enumerate(dialogues):
                 page = next((p for p in pages if p.sequence == page_idx + 1), None)
                 if not page:
-                    logger.info(f"[Story Task] Page {page_idx + 1} not found, skipping dialogues")
+                    logger.info(f"[Story Task] [Book: {book_id}] Page {page_idx + 1} not found, skipping dialogues")
                     continue
                 for dialogue_idx, dialogue_text in enumerate(page_dialogues):
                     await repo.add_dialogue_with_translation(
@@ -261,7 +261,8 @@ async def generate_image_task(
                 raise ValueError(f"Book {book_id} not found")
             user_id = book.user_id
 
-            file_name = f"users/{user_id}/books/{book_id}/images/page_1_cover.png"
+            file_name = f"{book.base_path}/images/cover.png"
+            logger.info(f"[Image Task] [Book: {book_id}] Using base_path: {book.base_path}, is_default: {book.is_default}")
             storage_url = await storage_service.save(
                 image_bytes,
                 file_name,
@@ -278,9 +279,9 @@ async def generate_image_task(
             if not updated:
                 raise ValueError(f"Book {book_id} not found for update")
             await session.commit()
-            logger.info(f"[Image Task] Updated book with cover image: {file_name}")
-            logger.info("####################################################################")
-            logger.info(f"[Image Task] Image COMPLETED!!!!!!!!!!!!!!!!")
+            logger.info(f"[Image Task] [Book: {book_id}] Updated book with cover image: {file_name}")
+            logger.info(f"[Image Task] [Book: {book_id}] ####################################################################")
+            logger.info(f"[Image Task] [Book: {book_id}] Image COMPLETED!!!!!!!!!!!!!!!!")
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={
@@ -334,7 +335,7 @@ async def generate_tts_task(
             # Validate voice_id
             if not book.voice_id:
                 raise BookVoiceNotConfiguredException(book_id=book_id)
-            logger.info(f"[TTS Task] Book loaded: user_id={book.user_id}, voice_id={book.voice_id}")
+            logger.info(f"[TTS Task] [Book: {book_id}] Book loaded: user_id={book.user_id}, voice_id={book.voice_id}")
 
             # === Phase 2: Build Task List ===
             tasks_to_generate = []
@@ -346,19 +347,21 @@ async def generate_tts_task(
                     )
                     if not primary_translation:
                         logger.info(
-                            f"[TTS Task] No primary translation for dialogue {dialogue.id}, skipping"
+                            f"[TTS Task] [Book: {book_id}] No primary translation for dialogue {dialogue.id}, skipping"
                         )
                         continue
 
                     # Skip empty text
                     if not primary_translation.text.strip():
                         logger.info(
-                            f"[TTS Task] Empty text for dialogue {dialogue.id}, skipping"
+                            f"[TTS Task] [Book: {book_id}] Empty text for dialogue {dialogue.id}, skipping"
                         )
                         continue
 
                     # file_name = f"users/{book.user_id}/audios/standalone/{uuid.uuid4()}.mp3"
-                    file_name = f"users/{book.user_id}/books/{book_id}/{uuid.uuid4()}.mp3"
+                    audio_uuid = uuid.uuid4()
+                    file_name = f"{book.base_path}/{audio_uuid}.mp3"
+                    logger.info(f"[TTS Task] [Book: {book_id}] Audio path: {file_name} (is_default: {book.is_default})")
                     audio = await repo.add_dialogue_audio(
                         dialogue_id=dialogue.id,
                         language_code=primary_translation.language_code,
@@ -372,8 +375,8 @@ async def generate_tts_task(
                         )
                         continue
 
-                    logger.info(f"[TTS Task] Enqueuing TTS for dialogue {dialogue.id}, audio_id={audio.id}")
-                    logger.info(f"[TTS Task] Text: {primary_translation.text}")
+                    logger.info(f"[TTS Task] [Book: {book_id}] Enqueuing TTS for dialogue {dialogue.id}, audio_id={audio.id}")
+                    logger.info(f"[TTS Task] [Book: {book_id}] Text: {primary_translation.text}")
                     await tts_producer.enqueue_tts_task(
                         dialogue_audio_id=audio.id,
                         text=primary_translation.text,
@@ -522,14 +525,13 @@ async def generate_video_task(
 
     logger.info(f"[Video Task] [Book: {book_id}] Completed {len(completed_videos)}/{len(task_uuids)} videos")
 
-    # === Phase: Get user_id for S3 path (minimal DB access) ===
+    # === Phase: Get Book object for base_path (minimal DB access) ===
     async with AsyncSessionLocal() as temp_session:
         temp_repo = BookRepository(temp_session)
         book_uuid = uuid.UUID(book_id)
         book = await temp_repo.get(book_uuid)
         if not book:
             raise ValueError(f"Book {book_id} not found")
-        user_id = book.user_id
 
     # === Phase: HTTP 다운로드 + S3 업로드 - 세션 밖에서 실행 ===
     # task_uuids 순서대로 정렬하여 video_urls 추출 (페이지 순서 보장)
@@ -547,7 +549,8 @@ async def generate_video_task(
         video_bytes = await video_provider.download_video(video_url)
         video_size = len(video_bytes)
 
-        file_name = f"users/{user_id}/books/{book_id}/videos/book_video_{page_idx}.mp4"
+        file_name = f"{book.base_path}/videos/video_{page_idx}.mp4"
+        logger.info(f"[Video Task] [Book: {book_id}] Page {page_idx + 1}: Video path: {file_name} (is_default: {book.is_default})")
         storage_url = await storage_service.save(
             video_bytes,
             file_name,
@@ -652,7 +655,7 @@ async def finalize_book_task(
                 raise ValueError(f"Book {book_id} not found for update")
 
             await session.commit()
-            logger.info(f"[Finalize Task] Updated book status to COMPLETED")
+            logger.info(f"[Finalize Task] [Book: {book_id}] Updated book status to COMPLETED")
 
         except Exception as e:
             logger.error(f"[Finalize Task] Failed for book_id={book_id}: {e}", exc_info=True)
@@ -677,9 +680,9 @@ async def finalize_book_task(
     # === Phase 3: Redis Cleanup - 세션 밖에서 실행 (비동기, 에러 무시) ===
     try:
         cleanup_count = await task_store.cleanup_book_tasks(book_id)
-        logger.info(f"[Finalize Task] Cleaned up {cleanup_count} Redis keys")
+        logger.info(f"[Finalize Task] [Book: {book_id}] Cleaned up {cleanup_count} Redis keys")
     except Exception as cleanup_error:
-        logger.info(f"[Finalize Task] Redis cleanup failed: {cleanup_error}")
+        logger.info(f"[Finalize Task] [Book: {book_id}] Redis cleanup failed: {cleanup_error}")
 
     logger.info(f"[Finalize Task] Completed for book_id={book_id}")
 
