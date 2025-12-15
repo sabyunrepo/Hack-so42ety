@@ -7,38 +7,47 @@ from backend.core.dependencies import get_storage_service
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.features.auth.models import User
 from backend.features.storybook.service import BookOrchestratorService
-from backend.features.storybook.schemas import CreateBookRequest, BookResponse, BookListResponse
+from backend.features.storybook.schemas import (
+    CreateBookRequest,
+    BookResponse,
+    BookListResponse,
+    BookSummaryResponse,
+)
 from backend.features.storybook.models import Book
-from backend.features.storybook.dependencies import get_book_service_readonly, get_book_service_write
+from backend.features.storybook.dependencies import (
+    get_book_service_readonly,
+    get_book_service_write,
+)
 
 router = APIRouter()
 
 
-
-def convert_book_urls_to_api_format(book: Book, storage_service: AbstractStorageService) -> Book:
+def convert_book_urls_to_api_format(
+    book: Book, storage_service: AbstractStorageService
+) -> Book:
     """
     Book ORM 객체의 URL을 변환 (세션에서 분리하여 안전하게 수정)
-    
+
     ⚠️ 핵심 아이디어: session.expunge()로 ORM 객체를 세션에서 분리한 후
     URL을 변환하면 DB에 영향을 주지 않습니다.
-    
+
     Args:
         book: Book ORM 모델
         storage_service: Storage Service (Local 또는 S3)
-    
+
     Returns:
         Book: URL이 변환된 Book 객체 (세션에서 분리됨)
     """
     # ORM 객체를 세션에서 분리 (이후 수정해도 DB에 영향 없음)
     from sqlalchemy.orm import object_session
     from sqlalchemy import inspect
-    
+
     session = object_session(book)
     if session:
         # Book 객체 분리
         if inspect(book).session is not None:
             session.expunge(book)
-        
+
         # 연관된 객체들도 모두 분리
         for page in book.pages:
             if inspect(page).session is not None:
@@ -52,20 +61,21 @@ def convert_book_urls_to_api_format(book: Book, storage_service: AbstractStorage
                 for audio in dialogue.audios:
                     if inspect(audio).session is not None:
                         session.expunge(audio)
-    
+
     # 이제 안전하게 URL 변환 가능
     if book.cover_image:
         book.cover_image = storage_service.get_url(book.cover_image)
-    
+
     for page in book.pages:
         if page.image_url:
             page.image_url = storage_service.get_url(page.image_url)
-        
+
         for dialogue in page.dialogues:
             for audio in dialogue.audios:
                 audio.audio_url = storage_service.get_url(audio.audio_url)
-    
+
     return book
+
 
 @router.post(
     "/create",
@@ -139,108 +149,6 @@ async def create_book(
     # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
     return BookResponse.from_orm_with_urls(book, storage_service)
 
-@router.get(
-    "/books/{book_id}/progress",
-    summary="동화책 생성 진행 상황 조회",
-    responses={
-        200: {"description": "진행 상황 조회 성공"},
-        401: {"description": "인증 실패"},
-        404: {"description": "동화책을 찾을 수 없음"},
-    },
-)
-async def get_book_progress(
-    book_id: UUID,
-    current_user: User = Depends(get_current_user),
-    service: BookOrchestratorService = Depends(get_book_service_write),
-):
-    """
-    동화책 생성 진행 상황 실시간 조회
-
-    비동기로 생성 중인 동화책의 진행 상황을 확인합니다.
-    프론트엔드에서 5초마다 polling하여 진행률을 표시할 수 있습니다.
-
-    Args:
-        book_id (UUID): 조회할 동화책 ID
-        current_user: 인증된 사용자 정보
-
-    Returns:
-        dict: 진행 상황 정보
-            {
-                "status": "creating|completed|failed",
-                "pipeline_stage": "story|images|tts|video|completed",
-                "progress_percentage": 0-100,
-                "task_metadata": {
-                    "execution_id": "...",
-                    "story_task": "...",
-                    "image_tasks": [...],
-                    ...
-                },
-                "error_message": str | null,
-                "title": str,
-                "created_at": datetime,
-                "updated_at": datetime
-            }
-
-    Pipeline Stages:
-        - initializing: 초기화 중
-        - story: 스토리 생성 중 (10-20%)
-        - images: 이미지 생성 중 (20-60%)
-        - tts: 음성 생성 중 (60-80%)
-        - video: 비디오 생성 중 (80-90%)
-        - finalizing: 완료 처리 중 (90-100%)
-        - completed: 완료됨 (100%)
-        - failed: 실패
-
-    Raises:
-        HTTPException 404: 동화책을 찾을 수 없음
-        HTTPException 401: 인증 실패
-
-    Example:
-        ```
-        GET /api/v1/storybook/books/550e8400-e29b-41d4-a716-446655440000/progress
-
-        Response:
-        {
-          "status": "creating",
-          "pipeline_stage": "images",
-          "progress_percentage": 45,
-          "task_metadata": {...},
-          "error_message": null,
-          "title": "우주를 탐험하는 용감한 고양이",
-          "created_at": "2024-01-01T00:00:00Z",
-          "updated_at": "2024-01-01T00:01:00Z"
-        }
-        ```
-
-    Note:
-        - 완료된 책(status="completed")에 대해서는 progress_percentage=100
-        - 실패한 책(status="failed")에 대해서는 error_message에 에러 내용 포함
-        - 본인이 생성한 책만 조회 가능
-    """
-    from fastapi import HTTPException
-
-    progress = await service.book_repo.get_progress(book_id)
-
-    if not progress:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Book {book_id} not found"
-        )
-
-    # 권한 확인 (본인 책인지 확인은 service 레이어에서도 가능하지만, 여기서 간단히 처리)
-    # TODO: service.get_book으로 권한 확인하는 것이 더 안전
-    book = await service.get_book(book_id, user_id=current_user.id)
-    if not book:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Book {book_id} not found or access denied"
-        )
-
-    return progress
-
-# NOTE: This endpoint is temporarily commented out during image-to-image implementation.
-# Use /test endpoint to test image-to-image functionality.
-# Will be re-enabled after image-to-image testing is complete.
 
 @router.post(
     "/create/with-images",
@@ -301,10 +209,6 @@ async def create_book_with_images(
         _byte = await image.read()
         _images.append(_byte)
 
-    # 이건 나중에 꼭 삭제 test
-    # if len(stories) == 1 and "," in stories[0]:
-    #     stories = [s.strip() for s in stories[0].split(",")]
-
     book = await service.create_storybook_async(
         user_id=current_user.id,
         stories=stories,
@@ -317,9 +221,10 @@ async def create_book_with_images(
     book = convert_book_urls_to_api_format(book, storage_service)
     return book
 
+
 @router.get(
     "/books",
-    response_model=List[BookResponse],
+    response_model=List[BookSummaryResponse],
     summary="내 동화책 목록 조회",
     responses={
         200: {"description": "조회 성공"},
@@ -342,7 +247,7 @@ async def list_books(
         storage_service: Storage Service (URL 변환용)
 
     Returns:
-        List[BookResponse]: 동화책 목록
+        List[BookSummaryResponse]: 동화책 목록 (페이지 정보 제외)
             - 생성 시간 역순으로 정렬
             - 각 동화책의 기본 정보 포함 (id, title, status, created_at)
             - 페이지 정보는 상세 조회 API에서 확인 가능
@@ -350,10 +255,13 @@ async def list_books(
     Raises:
         HTTPException 401: 인증 실패
     """
-    books = await service.get_books(current_user.id)
+    books = await service.get_books_summary(current_user.id)
 
-    # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
-    return [BookResponse.from_orm_with_urls(book, storage_service) for book in books]
+    # ✅ ORM → DTO 변환 + URL 변환 (페이지 정보 제외)
+    return [
+        BookSummaryResponse.from_orm_with_urls(book, storage_service) for book in books
+    ]
+
 
 @router.get(
     "/books/{book_id}",
@@ -403,14 +311,15 @@ async def get_book(
     # RLS가 있지만, 서비스 레벨에서도 한 번 더 체크하는 것이 안전 (또는 RLS가 처리)
     # Service에서 StorybookUnauthorizedException을 발생시키도록 변경 필요
     from backend.features.storybook.exceptions import StorybookUnauthorizedException
+
     if book.user_id != current_user.id and not book.is_default:
         raise StorybookUnauthorizedException(
-            storybook_id=str(book_id),
-            user_id=str(current_user.id)
+            storybook_id=str(book_id), user_id=str(current_user.id)
         )
 
     # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
     return BookResponse.from_orm_with_urls(book, storage_service)
+
 
 @router.delete(
     "/books/{book_id}",
