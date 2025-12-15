@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     # ==================== Sentry ====================
     sentry_dsn: Optional[str] = Field(default=None, env="SENTRY_DSN")
     sentry_environment: str = Field(default="dev", env="SENTRY_ENVIRONMENT")
-    sentry_traces_sample_rate: float = Field(default=0.0, env="SENTRY_TRACES_SAMPLE_RATE")
+    sentry_traces_sample_rate: float = Field(
+        default=0.0, env="SENTRY_TRACES_SAMPLE_RATE"
+    )
 
     # ==================== Server ====================
     backend_port: int = Field(default=8000, env="BACKEND_PORT")
@@ -108,9 +110,13 @@ class Settings(BaseSettings):
 
     # Runware Image-to-Image Parameters
     runware_img2img_strength: float = Field(default=0.7, env="RUNWARE_IMG2IMG_STRENGTH")
-    runware_img2img_cfg_scale: float = Field(default=7.0, env="RUNWARE_IMG2IMG_CFG_SCALE")
+    runware_img2img_cfg_scale: float = Field(
+        default=7.0, env="RUNWARE_IMG2IMG_CFG_SCALE"
+    )
     runware_img2img_steps: int = Field(default=30, env="RUNWARE_IMG2IMG_STEPS")
-    runware_img2img_model: str = Field(default="google:4@1", env="RUNWARE_IMG2IMG_MODEL")
+    runware_img2img_model: str = Field(
+        default="google:4@1", env="RUNWARE_IMG2IMG_MODEL"
+    )
     # runware_img2img_model: str = Field(default="civitai:102438@133677", env="RUNWARE_IMG2IMG_MODEL")
 
     @property
@@ -148,25 +154,21 @@ class Settings(BaseSettings):
     # ==================== Redis Cache & Event Bus ====================
     redis_host: str = Field(default="redis", env="REDIS_HOST")
     redis_port: int = Field(default=6379, env="REDIS_PORT")
-    
+
     @property
     def redis_url(self) -> str:
         """Redis 연결 URL"""
         return f"redis://{self.redis_host}:{self.redis_port}"
 
     # ==================== CORS ====================
-    cors_origins_str: str = Field(
-        default="http://localhost:5173", env="CORS_ORIGINS"
-    )
+    cors_origins_str: str = Field(default="http://localhost:5173", env="CORS_ORIGINS")
 
     @property
     def cors_origins(self) -> List[str]:
         """CORS origins를 쉼표로 분리하여 리스트로 반환"""
         return [origin.strip() for origin in self.cors_origins_str.split(",")]
 
-    cors_allow_credentials: bool = Field(
-        default=True, env="CORS_ALLOW_CREDENTIALS"
-    )
+    cors_allow_credentials: bool = Field(default=True, env="CORS_ALLOW_CREDENTIALS")
     cors_allow_methods: str = Field(
         default="GET,POST,PUT,DELETE,OPTIONS", env="CORS_ALLOW_METHODS"
     )
@@ -176,6 +178,14 @@ class Settings(BaseSettings):
     max_books_per_user: int = Field(default=3, env="MAX_BOOKS_PER_USER")
     max_pages_per_book: int = Field(default=5, env="MAX_PAGES_PER_BOOK")
     max_voice_clones_per_user: int = Field(default=1, env="MAX_VOICE_CLONES_PER_USER")
+
+    # ==================== Difficulty Validation ====================
+    # 스토리 난이도 검증을 위한 Flesch-Kincaid Grade Level 허용 오차 값 (임시로 10.0 설정)
+    fk_tolerance: float = Field(
+        default=10.0,
+        env="FK_TOLERANCE",
+        description="Flesch-Kincaid Grade Level tolerance for difficulty validation",
+    )
 
     # ==================== Feature Flags ====================
     use_template_mode: bool = Field(default=False, env="USE_TEMPLATE_MODE")
@@ -189,7 +199,34 @@ class Settings(BaseSettings):
     video_generation_limit: int = Field(
         default=20,
         env="VIDEO_GENERATION_LIMIT",
-        description="Maximum concurrent video generation requests (server-wide)"
+        description="Maximum concurrent video generation requests (server-wide)",
+    )
+
+    # ==================== Task Retry Configuration ====================
+    task_story_max_retries: int = Field(
+        default=3,
+        env="TASK_STORY_MAX_RETRIES",
+        description="Story generation task maximum retry attempts",
+    )
+    task_image_max_retries: int = Field(
+        default=2,
+        env="TASK_IMAGE_MAX_RETRIES",
+        description="Image generation task maximum retry attempts (per image)",
+    )
+    task_video_max_retries: int = Field(
+        default=2,
+        env="TASK_VIDEO_MAX_RETRIES",
+        description="Video generation task maximum retry attempts (per video)",
+    )
+    task_retry_delay: float = Field(
+        default=2.0,
+        env="TASK_RETRY_DELAY",
+        description="Delay between retry attempts in seconds",
+    )
+    task_retry_exponential_backoff: bool = Field(
+        default=True,
+        env="TASK_RETRY_EXPONENTIAL_BACKOFF",
+        description="Use exponential backoff for retry delays",
     )
 
     # ==================== Pydantic Config ====================
