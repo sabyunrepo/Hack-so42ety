@@ -67,7 +67,7 @@ const Viewer: React.FC = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data: any = await getStorybookById(bookId);
+        const data: BookData = await getStorybookById(bookId);
         setBook(data);
       } catch (error) {
         setErrorMessage(getUserFriendlyErrorMessage(error));
@@ -85,21 +85,20 @@ const Viewer: React.FC = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
       // if (width < 1024) {
-        if (width < 640) {
-          // Mobile - 화면의 70% 활용
-          const bookWidth = Math.min(280, width * 0.7);
-          const bookHeight = bookWidth * 1.375; // 책 비율 유지
-          setFlipbookSize({
-            width: bookWidth,
-            height: Math.min(bookHeight, height * 0.6),
-          });
-          console.log(640)
-        } else if (width < 768) {
-          // Tablet
-          setFlipbookSize({ width: 330, height: 481 });
-          console.log(768)
-
-        } else if (width < 1024) {
+      if (width < 640) {
+        // Mobile - 화면의 70% 활용
+        const bookWidth = Math.min(280, width * 0.7);
+        const bookHeight = bookWidth * 1.375; // 책 비율 유지
+        setFlipbookSize({
+          width: bookWidth,
+          height: Math.min(bookHeight, height * 0.6),
+        });
+        // console.log(640);
+      } else if (width < 768) {
+        // Tablet
+        setFlipbookSize({ width: 330, height: 481 });
+        // console.log(768);
+      } else if (width < 1024) {
         // Small Desktop
         setFlipbookSize({ width: 380, height: 522 });
       } else {
@@ -127,7 +126,6 @@ const Viewer: React.FC = () => {
     }
   };
 
-  // Helper to check if url is video
   // Helper to check if url is video
   const isVideo = (url?: string) => {
     if (!url) return false;
@@ -222,8 +220,6 @@ const Viewer: React.FC = () => {
       </div>
 
       <HTMLFlipBook
-        // width={400}
-        // height={550}
         width={flipbookSize.width}
         height={flipbookSize.height}
         showCover={true}
@@ -307,16 +303,15 @@ const Viewer: React.FC = () => {
                   "linear-gradient(to left, rgba(0,0,0,0.1) 20%, transparent 100%)",
               }}
             ></div>
-
-            {pageData.dialogues.map((dialogue: Dialogue) => (
-              <div
-                key={dialogue.id}
-                className=" w-full h-full mb-5 flex items-center"
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
-              >
-                <div className="relative">
+            <div className=" w-full h-full flex flex-col justify-center items-start">
+              {pageData.dialogues.map((dialogue: Dialogue) => (
+                <div
+                  key={dialogue.id}
+                  className="relative w-full mb-5 flex items-center justify-start "
+                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                  onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
+                >
                   <ClickableText
                     text={getDialogueText(dialogue, "en")}
                     book_id={bookId!}
@@ -325,8 +320,8 @@ const Viewer: React.FC = () => {
                     src={getDialogueAudioUrl(dialogue, "en") || ""}
                   />
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </Page>,
         ])}
 

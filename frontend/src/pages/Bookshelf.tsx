@@ -80,7 +80,6 @@ export default function Bookshelf() {
         setIsLoading(true);
         const data = await getAllStorybooks();
         setBooks(data);
-        console.log(data);
         setError(null);
       } catch (err) {
         setError(getUserFriendlyErrorMessage(err));

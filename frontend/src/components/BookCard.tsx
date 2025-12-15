@@ -11,8 +11,6 @@ interface BookCardProps {
   onClick?: () => void;
 }
 
-
-
 export default function BookCard({
   book,
   isEditing = false,
@@ -43,8 +41,6 @@ export default function BookCard({
     if (book.status === "error") {
       return "https://placehold.co/400x600/fef2f2/ef4444?text=생성+실패";
     }
-    console.log(book.cover_image);
-
     return (
       book.cover_image ||
       "https://placehold.co/400x600/22c55e/ffffff?text=No+Image"
@@ -93,11 +89,22 @@ export default function BookCard({
             <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 border-4 border-amber-400/20 border-t-amber-400 mb-3 sm:mb-4"></div>
             <div className="absolute inset-0 animate-ping rounded-full h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 border-2 border-amber-400/40"></div>
           </div>
-          <p className="text-white font-bold text-base sm:text-lg tracking-wide">생성중...</p>
+          <p className="text-white font-bold text-base sm:text-lg tracking-wide">
+            생성중...
+          </p>
           <div className="flex gap-1 mt-2">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            <div
+              className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-amber-400 rounded-full animate-bounce"
+              style={{ animationDelay: "0ms" }}
+            ></div>
+            <div
+              className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-amber-400 rounded-full animate-bounce"
+              style={{ animationDelay: "150ms" }}
+            ></div>
+            <div
+              className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-amber-400 rounded-full animate-bounce"
+              style={{ animationDelay: "300ms" }}
+            ></div>
           </div>
         </div>
       )}
@@ -106,11 +113,17 @@ export default function BookCard({
       {isError && (
         <div className="absolute inset-0 bg-gradient-to-br from-red-600 to-red-700 rounded-[13px] flex flex-col items-center justify-center z-20 pointer-events-none backdrop-blur-sm">
           <div className="relative mb-2 sm:mb-3">
-            <div className="text-white text-4xl sm:text-5xl md:text-6xl drop-shadow-lg animate-pulse">⚠️</div>
+            <div className="text-white text-4xl sm:text-5xl md:text-6xl drop-shadow-lg animate-pulse">
+              ⚠️
+            </div>
             <div className="absolute inset-0 blur-xl bg-red-300/30 rounded-full"></div>
           </div>
-          <p className="text-white font-bold text-base sm:text-lg md:text-xl tracking-wide drop-shadow-md">생성 실패</p>
-          <p className="text-red-100 text-xs sm:text-sm mt-1.5 sm:mt-2 px-3 sm:px-4 py-1 bg-white/10 rounded-full backdrop-blur-sm">삭제 후 재시도</p>
+          <p className="text-white font-bold text-base sm:text-lg md:text-xl tracking-wide drop-shadow-md">
+            생성 실패
+          </p>
+          <p className="text-red-100 text-xs sm:text-sm mt-1.5 sm:mt-2 px-3 sm:px-4 py-1 bg-white/10 rounded-full backdrop-blur-sm">
+            삭제 후 재시도
+          </p>
         </div>
       )}
 
