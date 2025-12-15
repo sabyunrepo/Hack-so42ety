@@ -77,7 +77,8 @@ class BookOrchestratorService:
         stories: List[str],
         images: List[bytes],
         voice_id: str,
-        level: int=1,
+        level: int,
+        is_default: bool,
 
     ) -> Book:
         """
@@ -138,6 +139,7 @@ class BookOrchestratorService:
             status=BookStatus.CREATING,
             voice_id=voice_id,
             level=level,
+            is_default=is_default,
             pipeline_stage="init",
         )
 

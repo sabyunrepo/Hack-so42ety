@@ -257,9 +257,9 @@ async def get_book_progress(
 async def create_book_with_images(
     stories: List[str] = Form(...),
     images: List[UploadFile] = File(...),
-    # voice_id: str = Form(None),
     voice_id: str = Form(default="EXAVITQu4vr4xnSDxMaL", description="TTS 음성 ID"),
-    # level: int = Form(default=1, description="난이도 레벨")
+    level: int = Form(default=1, description="난이도 레벨"),
+    is_default: bool = Form(default=False, description="샘플 동화책 여부"),
     current_user: User = Depends(get_current_user),
     service: BookOrchestratorService = Depends(get_book_service_write),
     storage_service: AbstractStorageService = Depends(get_storage_service),
@@ -310,7 +310,8 @@ async def create_book_with_images(
         stories=stories,
         images=_images,
         voice_id=voice_id,
-        # level=level,
+        level=level,
+        is_default=is_default,
     )
 
     book = convert_book_urls_to_api_format(book, storage_service)
