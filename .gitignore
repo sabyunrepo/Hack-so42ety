@@ -48,8 +48,10 @@ htmlcov/
 
 # ==================== Environment Variables ====================
 .env
+.env.*
 .env.local
 .env.*.local
+*.env
 
 # ==================== Database ====================
 *.db
