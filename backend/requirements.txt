@@ -1,6 +1,6 @@
 # ==================== Core Framework ====================
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi==0.115.6  # Updated for anyio 4.x compatibility
+uvicorn[standard]==0.32.1  # Updated with fastapi
 python-multipart==0.0.6
 
 # ==================== Database ====================
@@ -18,13 +18,13 @@ google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.2.0
 
 # ==================== Validation & Settings ====================
-pydantic==2.5.2
+pydantic==2.12.5  # Updated for google-genai compatibility (>=2.9.0)
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
 email-validator==2.1.0
 
 # ==================== HTTP Client ====================
-httpx==0.25.2
+httpx==0.28.1  # Updated for google-genai compatibility
 aiohttp==3.9.1
 
 # ==================== Caching ====================
@@ -40,6 +40,7 @@ sentry-sdk==1.40.0         # Sentry integration
 google-generativeai==0.3.1  # Google Gemini
 openai==1.6.1               # OpenAI (GPT) - 추후 사용
 elevenlabs==0.2.26          # ElevenLabs TTS
+google-genai==1.55.0        # Google Gemini SDK (newer API)
 
 # ==================== File Processing ====================
 pillow==10.1.0              # Image processing

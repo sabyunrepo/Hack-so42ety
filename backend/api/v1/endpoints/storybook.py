@@ -14,6 +14,7 @@ from backend.features.storybook.dependencies import get_book_service_readonly, g
 router = APIRouter()
 
 
+
 def convert_book_urls_to_api_format(book: Book, storage_service: AbstractStorageService) -> Book:
     """
     Book ORM 객체의 URL을 변환 (세션에서 분리하여 안전하게 수정)
@@ -65,7 +66,6 @@ def convert_book_urls_to_api_format(book: Book, storage_service: AbstractStorage
                 audio.audio_url = storage_service.get_url(audio.audio_url)
     
     return book
-
 
 @router.post(
     "/create",
@@ -139,6 +139,109 @@ async def create_book(
     # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
     return BookResponse.from_orm_with_urls(book, storage_service)
 
+@router.get(
+    "/books/{book_id}/progress",
+    summary="동화책 생성 진행 상황 조회",
+    responses={
+        200: {"description": "진행 상황 조회 성공"},
+        401: {"description": "인증 실패"},
+        404: {"description": "동화책을 찾을 수 없음"},
+    },
+)
+async def get_book_progress(
+    book_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: BookOrchestratorService = Depends(get_book_service_write),
+):
+    """
+    동화책 생성 진행 상황 실시간 조회
+
+    비동기로 생성 중인 동화책의 진행 상황을 확인합니다.
+    프론트엔드에서 5초마다 polling하여 진행률을 표시할 수 있습니다.
+
+    Args:
+        book_id (UUID): 조회할 동화책 ID
+        current_user: 인증된 사용자 정보
+
+    Returns:
+        dict: 진행 상황 정보
+            {
+                "status": "creating|completed|failed",
+                "pipeline_stage": "story|images|tts|video|completed",
+                "progress_percentage": 0-100,
+                "task_metadata": {
+                    "execution_id": "...",
+                    "story_task": "...",
+                    "image_tasks": [...],
+                    ...
+                },
+                "error_message": str | null,
+                "title": str,
+                "created_at": datetime,
+                "updated_at": datetime
+            }
+
+    Pipeline Stages:
+        - initializing: 초기화 중
+        - story: 스토리 생성 중 (10-20%)
+        - images: 이미지 생성 중 (20-60%)
+        - tts: 음성 생성 중 (60-80%)
+        - video: 비디오 생성 중 (80-90%)
+        - finalizing: 완료 처리 중 (90-100%)
+        - completed: 완료됨 (100%)
+        - failed: 실패
+
+    Raises:
+        HTTPException 404: 동화책을 찾을 수 없음
+        HTTPException 401: 인증 실패
+
+    Example:
+        ```
+        GET /api/v1/storybook/books/550e8400-e29b-41d4-a716-446655440000/progress
+
+        Response:
+        {
+          "status": "creating",
+          "pipeline_stage": "images",
+          "progress_percentage": 45,
+          "task_metadata": {...},
+          "error_message": null,
+          "title": "우주를 탐험하는 용감한 고양이",
+          "created_at": "2024-01-01T00:00:00Z",
+          "updated_at": "2024-01-01T00:01:00Z"
+        }
+        ```
+
+    Note:
+        - 완료된 책(status="completed")에 대해서는 progress_percentage=100
+        - 실패한 책(status="failed")에 대해서는 error_message에 에러 내용 포함
+        - 본인이 생성한 책만 조회 가능
+    """
+    from fastapi import HTTPException
+
+    progress = await service.book_repo.get_progress(book_id)
+
+    if not progress:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book {book_id} not found"
+        )
+
+    # 권한 확인 (본인 책인지 확인은 service 레이어에서도 가능하지만, 여기서 간단히 처리)
+    # TODO: service.get_book으로 권한 확인하는 것이 더 안전
+    book = await service.get_book(book_id, user_id=current_user.id)
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book {book_id} not found or access denied"
+        )
+
+    return progress
+
+# NOTE: This endpoint is temporarily commented out during image-to-image implementation.
+# Use /test endpoint to test image-to-image functionality.
+# Will be re-enabled after image-to-image testing is complete.
+
 @router.post(
     "/create/with-images",
     response_model=BookResponse,
@@ -154,7 +257,9 @@ async def create_book(
 async def create_book_with_images(
     stories: List[str] = Form(...),
     images: List[UploadFile] = File(...),
-    voice_id: str = Form(None),
+    # voice_id: str = Form(None),
+    voice_id: str = Form(default="EXAVITQu4vr4xnSDxMaL", description="TTS 음성 ID"),
+    # level: int = Form(default=1, description="난이도 레벨")
     current_user: User = Depends(get_current_user),
     service: BookOrchestratorService = Depends(get_book_service_write),
     storage_service: AbstractStorageService = Depends(get_storage_service),
@@ -189,24 +294,27 @@ async def create_book_with_images(
         - 이미지와 스토리 배열의 길이가 동일해야 함
         - 지원 이미지 형식: JPG, PNG, WEBP
     """
-    # 이미지 파일 읽기
-    image_data_list = []
-    content_types = []
+    print("######################################################")
+    print(f"stories: {stories}, number of images: {len(images)}")
+    _images = []
     for image in images:
-        content = await image.read()
-        image_data_list.append(content)
-        content_types.append(image.content_type)
+        _byte = await image.read()
+        _images.append(_byte)
 
-    book = await service.create_storybook_with_images(
+    # 이건 나중에 꼭 삭제 test
+    # if len(stories) == 1 and "," in stories[0]:
+    #     stories = [s.strip() for s in stories[0].split(",")]
+
+    book = await service.create_storybook_async(
         user_id=current_user.id,
         stories=stories,
-        images=image_data_list,
-        image_content_types=content_types,
-        voice_id=voice_id
+        images=_images,
+        voice_id=voice_id,
+        # level=level,
     )
 
-    # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
-    return BookResponse.from_orm_with_urls(book, storage_service)
+    book = convert_book_urls_to_api_format(book, storage_service)
+    return book
 
 @router.get(
     "/books",
