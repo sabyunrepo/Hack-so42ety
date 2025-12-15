@@ -47,10 +47,49 @@ class Book(Base):
     genre: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     target_age: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     theme: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    level: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # 상태 (draft, published)
     status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False)
-    
+
+    # 비동기 파이프라인 추적 필드
+    # Pipeline stage: init, story, images, tts, video, finalizing, completed, failed
+    pipeline_stage: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="Current pipeline stage: init|story|images|tts|video|finalizing|completed|failed"
+    )
+
+    # Task metadata (JSONB): task IDs, progress, errors
+    task_metadata: Mapped[Optional[dict]] = mapped_column(
+        JSONB,
+        nullable=True,
+        comment="Task execution metadata: task_ids, progress, errors"
+    )
+
+    # Progress tracking (0-100)
+    progress_percentage: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+        comment="Overall progress: 0-100"
+    )
+
+    # Error tracking
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Last error message if status=FAILED"
+    )
+
+    # Retry tracking
+    retry_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+        comment="Number of retry attempts"
+    )
+
     # TTS 음성 ID (ElevenLabs voice ID for word TTS)
     voice_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
@@ -75,7 +114,6 @@ class Book(Base):
 
     # Soft delete support for quota tracking
     is_deleted: Mapped[bool] = mapped_column(
-        Boolean,
         default=False,
         server_default="false",
         nullable=False,
@@ -297,6 +335,14 @@ class DialogueAudio(Base):
 
     # ElevenLabs 음성 ID (다양한 음성 지원)
     voice_id: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # 상태 (PENDING, PROCESSING, COMPLETED, FAILED)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="PENDING",
+        server_default="PENDING",
+        nullable=False
+    )
 
     # 오디오 파일 URL
     audio_url: Mapped[str] = mapped_column(String(1024), nullable=False)

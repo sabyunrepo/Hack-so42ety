@@ -62,11 +62,11 @@ export default function StoryInput({
 
   return (
     <>
-      <div className="bg-white flex-1 rounded-3xl shadow-lg p-6 flex gap-6 items-start relative transition-all w-[680px]">
+      <div className="bg-white rounded-3xl shadow-lg p-4 sm:p-5 md:p-6 flex gap-4 sm:gap-5 md:gap-6 items-start relative transition-all w-full">
         {/* 이미지 업로드 영역 */}
         <div
           onClick={handleImageClick}
-          className="w-32 h-32 rounded-lg bg-gray-100 flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden hover:bg-gray-200 transition-colors"
+          className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-lg bg-gray-100 flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden hover:bg-gray-200 transition-colors"
         >
           <input
             type="file"
@@ -82,21 +82,21 @@ export default function StoryInput({
               className="w-full h-full object-cover"
             />
           ) : (
-            <img className="w-12 h-12" src={Img_Icon} alt="Upload" />
+            <img className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12" src={Img_Icon} alt="Upload" />
           )}
         </div>
 
         {/* 텍스트 입력 영역 */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <div className="relative">
             <textarea
               value={page.story}
               onChange={handleStoryChange}
               placeholder="여기에 이야기를 입력하세요..."
-              className="w-full h-32 border border-gray-200 rounded-lg p-3 pr-16 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full h-20 sm:h-24 md:h-28 lg:h-32 border border-gray-200 rounded-lg p-2 sm:p-2.5 md:p-3 pr-12 sm:pr-14 md:pr-16 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm sm:text-base"
               maxLength={100}
             />
-            <div className="absolute bottom-2 right-2 text-gray-600 text-sm bg-white px-1 rounded">
+            <div className="absolute bottom-1.5 sm:bottom-2 right-1.5 sm:right-2 text-gray-600 text-xs sm:text-sm bg-white px-1 rounded">
               {page.story.length}/100
             </div>
           </div>

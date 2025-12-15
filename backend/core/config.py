@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     app_env: str = Field(default="dev", env="APP_ENV")
     debug: bool = Field(default=False, env="DEBUG")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_json_format: bool = Field(default=False, env="LOG_JSON_FORMAT")
+
+    # ==================== Sentry ====================
+    sentry_dsn: Optional[str] = Field(default=None, env="SENTRY_DSN")
+    sentry_environment: str = Field(default="dev", env="SENTRY_ENVIRONMENT")
+    sentry_traces_sample_rate: float = Field(default=0.0, env="SENTRY_TRACES_SAMPLE_RATE")
 
     # ==================== Server ====================
     backend_port: int = Field(default=8000, env="BACKEND_PORT")
@@ -86,25 +92,26 @@ class Settings(BaseSettings):
     tts_default_language: str = Field(default="en", env="TTS_DEFAULT_LANGUAGE")
 
     # Image Generation
-    ai_image_provider: str = Field(default="google", env="AI_IMAGE_PROVIDER")
+    ai_image_provider: str = Field(default="runware", env="AI_IMAGE_PROVIDER")
 
     # Video Generation
-    ai_video_provider: str = Field(default="kling", env="AI_VIDEO_PROVIDER")
-    kling_access_key: str = Field(default="[]", env="KLING_ACCESS_KEY")
-    kling_secret_key: str = Field(default="[]", env="KLING_SECRET_KEY")
-    kling_api_url: str = Field(
-        default="https://api-singapore.klingai.com", env="KLING_API_URL"
+    ai_video_provider: str = Field(default="runware", env="AI_VIDEO_PROVIDER")
+    # Runware Video Generation
+    runware_api_key: Optional[str] = Field(default=None, env="RUNWARE_API_KEY")
+    runware_api_url: str = Field(
+        default="https://api.runware.ai/v1", env="RUNWARE_API_URL"
     )
-    kling_model_name: str = Field(default="kling-v2-1", env="KLING_MODEL_NAME")
-    kling_video_mode: str = Field(default="std", env="KLING_VIDEO_MODE")
-    kling_video_duration: str = Field(default="5", env="KLING_VIDEO_DURATION")
-    kling_key_cooldown_seconds: int = Field(
-        default=300, env="KLING_KEY_COOLDOWN_SECONDS"
-    )
-    kling_max_concurrent: int = Field(default=3, env="KLING_MAX_CONCURRENT")
-    kling_polling_interval: int = Field(default=10, env="KLING_POLLING_INTERVAL")
-    kling_max_polling_time: int = Field(default=600, env="KLING_MAX_POLLING_TIME")
-    kling_api_key: Optional[str] = Field(default=None, env="KLING_API_KEY")
+    # runware_video_model: str = Field(default="runware:100@1", env="RUNWARE_VIDEO_MODEL")
+    runware_video_model: str = Field(default="klingai:6@0", env="RUNWARE_VIDEO_MODEL")
+    runware_video_mode: str = Field(default="std", env="RUNWARE_VIDEO_MODE")
+    runware_video_duration: int = Field(default=5, env="RUNWARE_VIDEO_DURATION")
+
+    # Runware Image-to-Image Parameters
+    runware_img2img_strength: float = Field(default=0.7, env="RUNWARE_IMG2IMG_STRENGTH")
+    runware_img2img_cfg_scale: float = Field(default=7.0, env="RUNWARE_IMG2IMG_CFG_SCALE")
+    runware_img2img_steps: int = Field(default=30, env="RUNWARE_IMG2IMG_STEPS")
+    runware_img2img_model: str = Field(default="google:4@1", env="RUNWARE_IMG2IMG_MODEL")
+    # runware_img2img_model: str = Field(default="civitai:102438@133677", env="RUNWARE_IMG2IMG_MODEL")
 
     @property
     def kling_access_keys(self) -> List[str]:
@@ -168,6 +175,7 @@ class Settings(BaseSettings):
     # ==================== Business Logic ====================
     max_books_per_user: int = Field(default=3, env="MAX_BOOKS_PER_USER")
     max_pages_per_book: int = Field(default=5, env="MAX_PAGES_PER_BOOK")
+    max_voice_clones_per_user: int = Field(default=1, env="MAX_VOICE_CLONES_PER_USER")
 
     # ==================== Feature Flags ====================
     use_template_mode: bool = Field(default=False, env="USE_TEMPLATE_MODE")
@@ -176,6 +184,13 @@ class Settings(BaseSettings):
     http_timeout: float = Field(default=60.0, env="HTTP_TIMEOUT")
     http_read_timeout: float = Field(default=300.0, env="HTTP_READ_TIMEOUT")
     http_max_connections: int = Field(default=10, env="HTTP_MAX_CONNECTIONS")
+
+    # ==================== Resource Limits ====================
+    video_generation_limit: int = Field(
+        default=20,
+        env="VIDEO_GENERATION_LIMIT",
+        description="Maximum concurrent video generation requests (server-wide)"
+    )
 
     # ==================== Pydantic Config ====================
     model_config = SettingsConfigDict(

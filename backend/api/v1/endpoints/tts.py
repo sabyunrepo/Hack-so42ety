@@ -4,7 +4,7 @@ from typing import List
 from uuid import UUID
 import logging
 
-from backend.core.database.session import get_db
+from backend.core.database.session import get_db_readonly, get_db_write
 from backend.core.auth.dependencies import get_current_user_object as get_current_user
 from backend.core.dependencies import (
     get_storage_service,
@@ -44,14 +44,34 @@ def convert_audio_url(audio, storage_service) -> None:
         # file_path(순수 경로)를 기반으로 file_url(접근 URL) 생성
         audio.file_url = storage_service.get_url(audio.file_path)
 
-def get_tts_service(
-    db: AsyncSession = Depends(get_db),
+def get_tts_service_readonly(
+    db: AsyncSession = Depends(get_db_readonly),
     storage_service = Depends(get_storage_service),
     ai_factory = Depends(get_ai_factory),
     cache_service = Depends(get_cache_service),
     event_bus = Depends(get_event_bus),
 ) -> TTSService:
-    """TTSService 의존성 주입"""
+    """TTSService 의존성 주입 (ReadOnly용)"""
+    audio_repo = AudioRepository(db)
+    voice_repo = VoiceRepository(db)
+    return TTSService(
+        audio_repo=audio_repo,
+        voice_repo=voice_repo,
+        storage_service=storage_service,
+        ai_factory=ai_factory,
+        db_session=db,
+        cache_service=cache_service,
+        event_bus=event_bus,
+    )
+
+def get_tts_service_write(
+    db: AsyncSession = Depends(get_db_write),
+    storage_service = Depends(get_storage_service),
+    ai_factory = Depends(get_ai_factory),
+    cache_service = Depends(get_cache_service),
+    event_bus = Depends(get_event_bus),
+) -> TTSService:
+    """TTSService 의존성 주입 (Write용)"""
     audio_repo = AudioRepository(db)
     voice_repo = VoiceRepository(db)
     return TTSService(
@@ -78,7 +98,7 @@ def get_tts_service(
 async def generate_speech(
     request: GenerateSpeechRequest,
     current_user: User = Depends(get_current_user),
-    service: TTSService = Depends(get_tts_service),
+    service: TTSService = Depends(get_tts_service_write),
     storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
@@ -139,7 +159,7 @@ async def generate_speech(
 )
 async def list_voices(
     current_user: User = Depends(get_current_user),
-    service: TTSService = Depends(get_tts_service),
+    service: TTSService = Depends(get_tts_service_readonly),
 ):
     """
     사용자별 음성 목록 조회
@@ -204,7 +224,7 @@ async def create_voice_clone(
     description: str = Form(None),
     visibility: str = Form("private"),
     current_user: User = Depends(get_current_user),
-    service: TTSService = Depends(get_tts_service),
+    service: TTSService = Depends(get_tts_service_write),
 ):
     """
     Voice Clone 생성
@@ -298,7 +318,7 @@ async def create_voice_clone(
 async def generate_word_tts(
     book_id: UUID,
     word: str,
-    service: TTSService = Depends(get_tts_service),
+    service: TTSService = Depends(get_tts_service_write),
 ):
     """
     Book별 단어 TTS 생성 (캐싱 지원)
@@ -346,7 +366,7 @@ async def generate_word_tts(
           "audio_url": "/api/v1/files/shared/books/32e543c7.../words/hello.mp3",
           "cached": false,
           "duration_ms": 245,
-          "voice_id": "uzyfnLLlKo55AbgBU5uH"
+          "voice_id": "SDF3xZmtvClcRUCSmgGW"
         }
         ```
     """

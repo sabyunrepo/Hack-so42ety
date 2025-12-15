@@ -4,10 +4,13 @@ FastAPI 통합 백엔드 서비스
 """
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
+from asgi_correlation_id import CorrelationIdMiddleware
+import sentry_sdk
 
 from .core.config import settings
 from .core.database import engine, Base
@@ -17,6 +20,21 @@ from .core.events.redis_streams_bus import RedisStreamsEventBus
 from .core.dependencies import set_event_bus
 from .core.cache.config import initialize_cache
 from .core.tasks.voice_sync import sync_voice_status_periodically
+from .core.logging import configure_logging, get_logger
+from backend.features.tts.producer import TTSProducer
+from backend.features.storybook.dependencies import set_tts_producer
+
+# Sentry 초기화
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.sentry_environment,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+    )
+
+# 로깅 설정 초기화
+configure_logging()
+logger = get_logger(__name__)
 
 
 
@@ -26,6 +44,10 @@ event_bus: RedisStreamsEventBus = None
 
 # 전역 Voice Sync Task 인스턴스
 voice_sync_task: asyncio.Task = None
+
+# 전역 TTS Worker 인스턴스
+from backend.features.tts.worker import TTSWorker
+tts_worker: TTSWorker = None
 
 
 @asynccontextmanager
@@ -45,11 +67,11 @@ async def lifespan(app: FastAPI):
     global event_bus
     
     # Startup
-    print("=" * 60)
-    print(f"{settings.app_title} Starting...")
-    print(f"Version: {settings.app_version}")
-    print(f"Environment: {settings.app_env}")
-    print(f"Debug Mode: {settings.debug}")
+    logger.info("Application Starting", 
+        version=settings.app_version, 
+        env=settings.app_env, 
+        debug=settings.debug
+    )
     print("=" * 60)
 
     # 데이터베이스 연결 확인
@@ -82,6 +104,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠ Event Bus failed to start: {e}")
 
+    # TTS Producer 초기화 (싱글톤)
+    try:
+        tts_producer = TTSProducer(event_bus=event_bus)
+        set_tts_producer(tts_producer)
+        print("✓ TTS Producer initialized")
+    except Exception as e:
+        print(f"⚠ TTS Producer initialization failed: {e}")
+
     # Voice 동기화 작업 시작
     try:
         voice_sync_task = asyncio.create_task(
@@ -93,6 +123,15 @@ async def lifespan(app: FastAPI):
         print("✓ Voice sync task started")
     except Exception as e:
         print(f"⚠ Voice sync task failed to start: {e}")
+
+    # TTS Worker 시작 (이벤트 컨슈머)
+    global tts_worker
+    try:
+        tts_worker = TTSWorker()
+        asyncio.create_task(tts_worker.start())
+        print("✓ TTS Worker started")
+    except Exception as e:
+        print(f"⚠ TTS Worker failed to start: {e}")
 
     print(f"✓ {settings.app_title} Started Successfully")
     print("=" * 60)
@@ -122,6 +161,14 @@ async def lifespan(app: FastAPI):
             print("✓ Event Bus stopped")
         except Exception as e:
             print(f"⚠ Event Bus stop error: {e}")
+
+    # TTS Worker 중지
+    if tts_worker:
+        try:
+            await tts_worker.shutdown()
+            print("✓ TTS Worker stopped")
+        except Exception as e:
+            print(f"⚠ TTS Worker stop error: {e}")
     
     await engine.dispose()
     print("✓ Database connections closed")
@@ -274,7 +321,9 @@ AI 기반 맞춤형 동화책 생성 플랫폼 백엔드 API
 )
 
 
+
 # 미들웨어 설정
+app.add_middleware(CorrelationIdMiddleware) # Request ID 추적
 app.add_middleware(UserContextMiddleware)
 setup_cors(app)
 
@@ -355,6 +404,8 @@ async def root():
         "status": "running",
         "docs": "/docs" if settings.debug else None,
     }
+
+
 
 
 # ==================== Global Exception Handlers ====================

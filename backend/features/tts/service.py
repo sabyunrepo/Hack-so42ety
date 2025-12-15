@@ -7,9 +7,10 @@ from pathlib import Path
 
 from .models import Audio, Voice, VoiceVisibility, VoiceStatus
 from .repository import AudioRepository, VoiceRepository
+from backend.core.utils.trace import log_process
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.storage.base import AbstractStorageService
-from backend.core.cache.service import cache_result
+from backend.core.cache.service import cache_result, invalidate_cache
 from backend.core.events.bus import EventBus
 from backend.core.events.types import EventType
 from backend.core.tasks.voice_queue import VoiceSyncQueue
@@ -22,6 +23,7 @@ from .exceptions import (
     WordTooLongException,
     WordInvalidException,
     BookVoiceNotConfiguredException,
+    VoiceCloneLimitExceededException,
 )
 from backend.features.storybook.exceptions import StorybookNotFoundException
 
@@ -54,6 +56,7 @@ class TTSService:
         self.event_bus = event_bus
         self.voice_queue = VoiceSyncQueue()  # Redis 작업 큐
 
+    @log_process(step="Generate Speech", desc="TTS 음성 생성 및 업로드")
     async def generate_speech(
         self,
         user_id: uuid.UUID,
@@ -119,6 +122,8 @@ class TTSService:
 
         return audio
 
+    @invalidate_cache("tts:voices:{user_id}")
+    @log_process(step="Create Voice Clone", desc="Voice Cloning 요청")
     async def create_voice_clone(
         self,
         user_id: uuid.UUID,
@@ -156,6 +161,16 @@ class TTSService:
         except Exception as e:
             raise TTSGenerationFailedException(
                 reason=f"TTS Provider 초기화 실패: {str(e)}"
+            )
+
+        # 0. Voice Clone 생성 한도 확인
+        from backend.core.config import settings
+        
+        current_count = await self.voice_repo.count_user_voices(user_id)
+        if current_count >= settings.max_voice_clones_per_user:
+            raise VoiceCloneLimitExceededException(
+                current_count=current_count,
+                max_limit=settings.max_voice_clones_per_user
             )
         
         # ElevenLabs API 호출 - Voice Clone 생성
@@ -216,14 +231,27 @@ class TTSService:
             include_default=True,
         )
         
-        # 기본 Voice (ElevenLabs premade) 추가
+        # 기본 Voice (ElevenLabs premade) 설정 및 필터링
+        # 허용된 Voice ID 및 표시 이름 매핑
+        allowed_voices_map = {
+            "IKne3meq5aSn9XLyUdCD": "Charlie(남자)",
+            "TX3LPaxmHKxFdv7VOQHJ": "Liam(남자)",
+            "XrExE9yKIg1WjnnlVkGX": "Matilda(여자)",
+            "cgSgspJ2msm6clMCkdW9": "Jessica(여자)",
+        }
+
         tts_provider = self.ai_factory.get_tts_provider()
+        premade_voices = []
         try:
-            premade_voices = await tts_provider.get_available_voices()
-            premade_voices = [
-                v for v in premade_voices 
-                if v.get("category") == "premade"
-            ]
+            available_voices = await tts_provider.get_available_voices()
+            for v in available_voices:
+                voice_id = v.get("voice_id")
+                if voice_id in allowed_voices_map:
+                    # 허용된 Voice인 경우 이름 변경 후 추가
+                    v["name"] = allowed_voices_map[voice_id]
+                    v["category"] = "premade" # 확실하게 설정
+                    premade_voices.append(v)
+                    
         except Exception as e:
             logger.warning(f"Failed to fetch premade voices: {e}")
             premade_voices = []

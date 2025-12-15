@@ -16,10 +16,14 @@ from backend.core.events.redis_streams_bus import RedisStreamsEventBus
 from backend.core.events.types import EventType
 from backend.core.tasks.voice_queue import VoiceSyncQueue
 from backend.core.database.session import get_db
+from backend.core.utils.trace import log_process
 
-logger = logging.getLogger(__name__)
+from backend.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
+@log_process(step="Task Voice Sync", desc="Voice Cloning 상태 동기화 작업")
 async def sync_voice_status_periodically(
     event_bus: RedisStreamsEventBus,
     interval: int = 60,  # 1분마다 실행
@@ -41,14 +45,17 @@ async def sync_voice_status_periodically(
         try:
             await asyncio.sleep(interval)
             
+            
             # Redis 큐에서 대기 중인 작업 조회
             queued_voice_ids = await voice_queue.get_all()
             
+            logger.debug("Voice sync heartbeat", extra={"queued_count": len(queued_voice_ids)})
+
             if not queued_voice_ids:
-                logger.debug("No voices in sync queue, skipping")
+                # logger.debug("No voices in sync queue, skipping") # 너무 빈번하면 시끄러우므로 debug 유지
                 continue
             
-            logger.info(f"Found {len(queued_voice_ids)} voices in sync queue")
+            logger.info(f"Found {len(queued_voice_ids)} voices in sync queue", extra={"voice_ids": list(queued_voice_ids)})
             
             # DB 세션 생성
             async for db_session in get_db():
@@ -80,7 +87,7 @@ async def sync_voice_status_periodically(
                     for voice in voices:
                         try:
                             # 생성 후 경과 시간 확인
-                            age_minutes = (datetime.utcnow() - voice.created_at).total_seconds() / 60
+                            age_minutes = (datetime.now() - voice.created_at).total_seconds() / 60
                             if age_minutes > max_age_minutes:
                                 logger.warning(
                                     f"Voice {voice.id} exceeded max age ({age_minutes:.1f} minutes), "
@@ -89,6 +96,15 @@ async def sync_voice_status_periodically(
                                 await voice_repo.update_status(
                                     voice_id=voice.id,
                                     status=VoiceStatus.FAILED,
+                                )
+                                
+                                # 이벤트 발행 (캐시 무효화)
+                                await event_bus.publish(
+                                    EventType.VOICE_UPDATED,
+                                    {
+                                        "voice_id": str(voice.id),
+                                        "user_id": str(voice.user_id),
+                                    }
                                 )
                                 # 큐에서 제거
                                 await voice_queue.dequeue(voice.id)
@@ -99,47 +115,85 @@ async def sync_voice_status_periodically(
                                 voice.elevenlabs_voice_id
                             )
                             
-                            # 완료 확인
-                            if voice_details.get("status") == "completed":
-                                logger.info(f"Voice {voice.id} completed, updating database")
-                                
+                            preview_url = voice_details.get("preview_url")
+                            
+                            # 1. Preview URL이 있는 경우 -> 성공
+                            if preview_url:
+                                logger.info(f"Voice {voice.id} completed with preview url")
                                 await voice_repo.update_status(
                                     voice_id=voice.id,
                                     status=VoiceStatus.COMPLETED,
-                                    preview_url=voice_details.get("preview_url"),
+                                    preview_url=preview_url,
                                 )
-                                
-                                # 이벤트 발행 (캐시 무효화)
+                                # 완료 이벤트 및 큐 제거
                                 await event_bus.publish(
                                     EventType.VOICE_CREATED,
-                                    {
-                                        "voice_id": str(voice.id),
-                                        "user_id": str(voice.user_id),
-                                    }
+                                    {"voice_id": str(voice.id), "user_id": str(voice.user_id)}
                                 )
-                                
-                                # 큐에서 제거
                                 await voice_queue.dequeue(voice.id)
-                                
-                                logger.info(f"Voice {voice.id} sync completed and removed from queue")
+                                continue
+
+                            # 2. Preview URL이 없는 경우 -> 추가 검증 필요
                             
-                            # 실패 확인
-                            elif voice_details.get("status") == "failed":
-                                logger.warning(f"Voice {voice.id} failed")
-                                
-                                await voice_repo.update_status(
-                                    voice_id=voice.id,
-                                    status=VoiceStatus.FAILED,
-                                )
-                                
-                                # 큐에서 제거
-                                await voice_queue.dequeue(voice.id)
+                            # 이미 Trigger TTS를 성공했는지 확인
+                            is_triggered = await voice_queue.is_trigger_processed(voice.id)
                             
-                            # 아직 처리 중
+                            if is_triggered:
+                                # 이미 Trigger 성공했으나 아직 URL 없음
+                                if age_minutes > max_age_minutes:
+                                    # 30분 지남 -> 성공 처리 (Case: TTS 작동하지만 URL만 없는 경우)
+                                    logger.info(
+                                        f"Voice {voice.id} time expired but TTS triggered successfully. "
+                                        f"Marking as COMPLETED without preview URL"
+                                    )
+                                    await voice_repo.update_status(
+                                        voice_id=voice.id,
+                                        status=VoiceStatus.COMPLETED,
+                                        preview_url=None, # URL 없이 완료
+                                    )
+                                    await event_bus.publish(
+                                        EventType.VOICE_CREATED,
+                                        {"voice_id": str(voice.id), "user_id": str(voice.user_id)}
+                                    )
+                                    await voice_queue.dequeue(voice.id)
+                                else:
+                                    # 아직 30분 안됨 -> 계속 대기 (URL 생성 기다림)
+                                    logger.debug(f"Voice {voice.id} triggered but waiting for URL (age: {age_minutes:.1f}m)")
+                            
                             else:
-                                logger.debug(f"Voice {voice.id} still processing")
-                                # 큐에 유지 (다음 주기에 다시 확인)
-                                
+                                # Trigger 시도 안함 (또는 실패 상태)
+                                try:
+                                    logger.info(f"Voice {voice.id} missing preview, attempting trigger TTS")
+                                    # 짧은 텍스트로 TTS 요청 (결과 무시)
+                                    await tts_provider.text_to_speech(
+                                        text="Hello",
+                                        voice_id=voice.elevenlabs_voice_id
+                                    )
+                                    # 성공 시 플래그 설정
+                                    await voice_queue.mark_trigger_processed(voice.id)
+                                    logger.info(f"Trigger TTS successful for voice {voice.id}")
+                                    
+                                    # 이번 턴은 대기 (다음 턴에 URL 확인 or 시간 체크)
+                                    
+                                except Exception as trigger_error:
+                                    logger.warning(
+                                        f"Trigger TTS failed for voice {voice.id}: {trigger_error}"
+                                    )
+                                    # 실패 시 플래그 설정 안함 -> 다음 턴에 재시도
+                                    
+                                    if age_minutes > max_age_minutes:
+                                        # 30분 지났는데도 Trigger 실패 -> 진짜 실패
+                                        logger.warning(f"Voice {voice.id} failed (timeout & tts failed)")
+                                        await voice_repo.update_status(
+                                            voice_id=voice.id,
+                                            status=VoiceStatus.FAILED,
+                                        )
+                                        await event_bus.publish(
+                                            EventType.VOICE_UPDATED,
+                                            {"voice_id": str(voice.id), "user_id": str(voice.user_id)}
+                                        )
+                                        await voice_queue.dequeue(voice.id)
+                        
                         except Exception as e:
                             logger.error(
                                 f"Error syncing voice {voice.id}: {e}",
@@ -147,7 +201,6 @@ async def sync_voice_status_periodically(
                             )
                             # 개별 Voice 동기화 실패는 계속 진행
                             # 큐에는 유지 (재시도)
-                    
                     await db_session.commit()
                     logger.info("Voice status sync completed")
                     

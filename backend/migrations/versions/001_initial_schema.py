@@ -269,7 +269,8 @@ def upgrade() -> None:
 
     # ==================== Initial Data: System User ====================
     system_user_id = '00000000-0000-0000-0000-000000000001'
-    system_password_hash = '$2b$12$Otv/lV/GXJf7PqpQFtaIkOjOooVovCN9KAMgXU6RJjBkix.Pz2TdK'  # Password: 123123123
+    # Password: 123123123 (Argon2id hash)
+    system_password_hash = '$argon2id$v=19$m=65536,t=4,p=4$kdI6pxQi5JwTohRCCGHMeQ$6O4Jfwk+jrdhX7xGsNbBGaJICDU/DECYbQFTYIoCHRQ'
     
     op.execute(f"""
         INSERT INTO users (id, email, password_hash, is_active, created_at, updated_at)
@@ -285,7 +286,7 @@ def upgrade() -> None:
 
     # ==================== Initial Data: Shared Book 1 ====================
     book_1_id = '1c8e135a-8e4a-46fb-ac24-13baaacfd586'
-    default_voice_id = 'uzyfnLLlKo55AbgBU5uH'  # Default ElevenLabs voice for shared books
+    default_voice_id = 'SDF3xZmtvClcRUCSmgGW'  # Default ElevenLabs voice for shared books
     
     op.execute(f"""
         INSERT INTO books (id, user_id, title, cover_image, status, voice_id, is_default, is_public, visibility, created_at, updated_at)
@@ -367,7 +368,7 @@ def upgrade() -> None:
                 gen_random_uuid(),
                 '{dialogue_id}'::uuid,
                 'en',
-                'uzyfnLLlKo55AbgBU5uH',
+                'SDF3xZmtvClcRUCSmgGW',
                 '/shared/books/{book_1_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
                 NOW(),
                 NOW()
@@ -455,7 +456,7 @@ def upgrade() -> None:
                 gen_random_uuid(),
                 '{dialogue_id}'::uuid,
                 'en',
-                'uzyfnLLlKo55AbgBU5uH',
+                'SDF3xZmtvClcRUCSmgGW',
                 '/shared/books/{book_2_id}/audios/page_{page_seq}_dialogue_{dialogue_seq}.mp3',
                 NOW(),
                 NOW()

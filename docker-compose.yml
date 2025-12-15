@@ -69,9 +69,13 @@ services:
       - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
-      - KLING_ACCESS_KEY=${KLING_ACCESS_KEY}
-      - KLING_SECRET_KEY=${KLING_SECRET_KEY}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174}
+      - RUNWARE_API_KEY=${RUNWARE_API_KEY}
+      - AI_IMAGE_PROVIDER=${AI_IMAGE_PROVIDER}
+      - AI_VIDEO_PROVIDER=${AI_VIDEO_PROVIDER}
+      - RUNWARE_VIDEO_MODEL=${RUNWARE_VIDEO_MODEL}
+      - RUNWARE_IMG2IMG_MODEL=${RUNWARE_IMG2IMG_MODEL}
+      - VIDEO_GENERATION_LIMIT=${VIDEO_GENERATION_LIMIT}
     env_file:
       - .env
     networks:
@@ -88,32 +92,15 @@ services:
       retries: 3
       start_period: 40s
 
-  # ==================== Frontend Builder ====================
-  frontend-builder:
-    build:
-      context: ./frontend
-      dockerfile: ../docker/frontend/Dockerfile
-      target: builder
-    image: moriai-frontend:latest
-    container_name: moriai-frontend-builder
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - frontend-dist:/app/dist
-    networks:
-      - moriai-network
-    command: npm run build
-    restart: "no"
-
-  # ==================== Nginx Reverse Proxy ====================
-  nginx:
+  # ==================== Frontend (Nginx + Static Files) ====================
+  frontend:
     build:
       context: .
-      dockerfile: docker/nginx/Dockerfile
+      dockerfile: docker/frontend/Dockerfile
       args:
         APP_ENV: dev
-    image: moriai-nginx:dev
-    container_name: moriai-nginx
+    image: moriai-frontend:dev
+    container_name: moriai-frontend
     restart: unless-stopped
     ports:
       - "80:80"
@@ -136,7 +123,7 @@ services:
     networks:
       - moriai-network
     depends_on:
-      - nginx
+      - frontend
     profiles:
       - production  # Only run in production
 
@@ -161,6 +148,3 @@ volumes:
       type: none
       o: bind
       device: ./data
-  frontend-dist:
-    driver: local
-    name: moriai-frontend-dist
