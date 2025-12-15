@@ -43,6 +43,57 @@ export default function StoryInput({
     }
   };
 
+  const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve({ width: img.width, height: img.height });
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('이미지 크기를 확인할 수 없습니다.'));
+      };
+
+      img.src = objectUrl;
+    });
+  };
+
+  const resizeImage = async (file: File): Promise<File> => {
+    try {
+      const imageCompression = (await import('browser-image-compression')).default;
+
+      // 이미 작은 이미지는 스킵
+      const { width, height } = await getImageDimensions(file);
+      if (width <= 840 && height <= 840) {
+        console.log('이미지가 이미 작습니다. 리사이징을 건너뜁니다.');
+        return file;
+      }
+
+      // [ ] 이미지 리사이징 옵션 (최하)
+      const options = {
+        maxWidthOrHeight: 840,
+        quality: 0.85,
+        useWebWorker: true,
+        fileType: file.type,
+      };
+
+      const compressedFile = await imageCompression(file, options);
+
+      console.log(
+        `이미지 리사이징 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`
+      );
+
+      return compressedFile;
+    } catch (error) {
+      console.warn('이미지 리사이징 실패, 원본 파일 사용:', error);
+      return file;
+    }
+  };
+
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -77,6 +128,9 @@ export default function StoryInput({
           return;
         }
       }
+
+      // 이미지 리사이징 및 최적화
+      processedFile = await resizeImage(processedFile);
 
       updatePage(page.id, "image", processedFile);
       const reader = new FileReader();
