@@ -25,7 +25,7 @@ const AudioPlayer = ({ src }: AudioPlayerProps) => {
 
   return (
     <div
-      className="inline-flex items-center gap-2 absolute bottom-0 right-3"
+      className="inline-flex items-center  absolute bottom-0 right-0"
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
