@@ -339,6 +339,7 @@ async def generate_tts_task(
 
             # === Phase 2: Build Task List ===
             tasks_to_generate = []
+            tasks_to_enqueue = []
             for page in book.pages:
                 for dialogue in page.dialogues:
                     primary_translation = next(
@@ -374,13 +375,15 @@ async def generate_tts_task(
                             f"[TTS Task] Failed to create DialogueAudio record for dialogue {dialogue.id}, skipping"
                         )
                         continue
-
+                    
                     logger.info(f"[TTS Task] [Book: {book_id}] Enqueuing TTS for dialogue {dialogue.id}, audio_id={audio.id}")
                     logger.info(f"[TTS Task] [Book: {book_id}] Text: {primary_translation.text}")
-                    await tts_producer.enqueue_tts_task(
-                        dialogue_audio_id=audio.id,
-                        text=primary_translation.text,
-                    )
+                    tasks_to_enqueue.append({
+                        "audio_id": audio.id,
+                        "text": primary_translation.text,
+                        "dialogue_id": dialogue.id
+                    })
+                    tasks_to_generate.append(audio.id)
 
             await repo.update(
                 book_uuid,
@@ -389,6 +392,16 @@ async def generate_tts_task(
                 error_message=None,
             )
             await session.commit()
+            
+            # === Phase 3: Enqueue Tasks (After Commit) ===
+            # 트랜잭션 커밋 후 큐에 불어넣어야 Worker가 DB에서 조회 가능 (Race Condition 방지)
+            logger.info(f"[TTS Task] Enqueuing {len(tasks_to_enqueue)} tasks to Redis...")
+            for task in tasks_to_enqueue:
+                await tts_producer.enqueue_tts_task(
+                    dialogue_audio_id=task["audio_id"],
+                    text=task["text"],
+                )
+                logger.debug(f"[TTS Task] Enqueued audio_id={task['audio_id']}")
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={

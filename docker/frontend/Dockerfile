@@ -4,14 +4,18 @@
 # ==================== Stage 1: Builder ====================
 FROM node:20-alpine AS builder
 
+# ARM64 크로스 컴파일 최적화
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
 WORKDIR /app
 
 # package.json만 먼저 복사 (레이어 캐싱)
 COPY frontend/package*.json ./
 
 # 모든 의존성 설치 (devDependencies 포함)
-# COPY --from을 쓰지 않고 직접 설치하여 symlink 깨짐 방지
-RUN npm ci && \
+# ARM64 빌드 시 안정성 향상을 위한 옵션 추가
+RUN npm ci --prefer-offline --no-audit --legacy-peer-deps && \
     npm cache clean --force
 
 # 소스 코드 복사
