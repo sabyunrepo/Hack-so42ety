@@ -22,33 +22,68 @@ export default function StoryInput({
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const convertHeicToJpeg = async (file: File): Promise<File> => {
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const convertedBlob = await heic2any({
+        blob: file,
+        toType: 'image/jpeg',
+        quality: 0.8,
+      });
+
+      // heic2any는 Blob 또는 Blob[]를 반환할 수 있음
+      const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+
+      // Blob을 File 객체로 변환
+      return new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), {
+        type: 'image/jpeg',
+      });
+    } catch {
+      throw new Error('HEIC 파일 변환에 실패했습니다.');
+    }
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // 파일 타입 검증 (png, jpg, jpeg만 허용)
-      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+      // 파일 타입 검증 (png, jpg, jpeg, heic, heif 허용)
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/heif'];
       if (!allowedTypes.includes(file.type)) {
-        setAlertMessage('PNG, JPG, JPEG 파일만 업로드 가능합니다.');
+        setAlertMessage('PNG, JPG, JPEG, HEIC 파일만 업로드 가능합니다.');
         setShowAlert(true);
         e.target.value = ''; // 입력 초기화
         return;
       }
 
       // 파일 크기 검증 (5MB 이하)
-      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      const maxSize = 15 * 1024 * 1024; // 5MB in bytes
       if (file.size > maxSize) {
-        setAlertMessage('파일 크기는 5MB 이하만 가능합니다.');
+        setAlertMessage('파일 크기는 15MB 이하만 가능합니다.');
         setShowAlert(true);
         e.target.value = ''; // 입력 초기화
         return;
       }
 
-      updatePage(page.id, "image", file);
+      let processedFile = file;
+
+      // HEIC/HEIF 파일인 경우 JPEG로 변환
+      if (file.type === 'image/heic' || file.type === 'image/heif') {
+        try {
+          processedFile = await convertHeicToJpeg(file);
+        } catch (error) {
+          setAlertMessage(error instanceof Error ? error.message : 'HEIC 파일 변환에 실패했습니다.');
+          setShowAlert(true);
+          e.target.value = ''; // 입력 초기화
+          return;
+        }
+      }
+
+      updatePage(page.id, "image", processedFile);
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(processedFile);
     }
   };
 
@@ -70,7 +105,7 @@ export default function StoryInput({
         >
           <input
             type="file"
-            accept="image/png,image/jpeg,image/jpg"
+            accept="image/png,image/jpeg,image/jpg,image/heic,image/heif"
             ref={fileInputRef}
             onChange={handleImageChange}
             className="hidden"
