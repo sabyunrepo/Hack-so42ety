@@ -17,9 +17,14 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
   const playWord = async (word: string) => {
     try {
       // 특수문자 제거
-      const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
+      let cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
 
       if (!cleanWord) return;
+
+      // [ ] I 발음이 "이" 로 나오는 현상 처리
+      if (cleanWord === "i") {
+        cleanWord = "eye";
+      }
 
       setPlayingWord(cleanWord);
 
@@ -83,7 +88,7 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             className={`cursor-pointer hover:bg-yellow-200 hover:text-yellow-800 rounded px-1 transition-all ${
-              isPlaying ? "bg-yellow-300 text-yellow-900 font-bold" : ""
+              isPlaying ? "bg-yellow-300 text-yellow-900" : ""
             }`}
             title={`Click to hear: ${cleanWord}`}
           >
