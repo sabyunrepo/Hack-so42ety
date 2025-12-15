@@ -17,8 +17,8 @@ export default function BookCard({
   onDelete,
   onClick,
 }: BookCardProps) {
-  const isProcessing = book.status === "process";
-  const isError = book.status === "error";
+  const isProcessing = book.status === "creating";
+  const isError = book.status === "failed";
 
   const handleClick = () => {
     // process 또는 error 상태일 때는 클릭 불가
@@ -32,18 +32,18 @@ export default function BookCard({
 
   // 책 상태에 따른 이미지 처리
   const getBookImage = (): string => {
-    if (book.status === "process") {
+    if (book.status === "completed") {
       return (
         book.cover_image ||
-        "https://placehold.co/400x600/f3f4f6/9ca3af?text=생성+중..."
+        "https://placehold.co/400x600/f3f4f6/9ca3af?text=No+Image..."
       );
     }
-    if (book.status === "error") {
+    if (book.status === "failed") {
       return "https://placehold.co/400x600/fef2f2/ef4444?text=생성+실패";
     }
     return (
       book.cover_image ||
-      "https://placehold.co/400x600/22c55e/ffffff?text=No+Image"
+      "https://placehold.co/400x600/f3f4f6/9ca3af?text=Creating"
     );
   };
 
