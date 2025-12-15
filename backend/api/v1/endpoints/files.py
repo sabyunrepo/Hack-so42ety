@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.database.session import get_db
+from backend.core.database.session import get_db_readonly
 from backend.core.auth.dependencies import get_optional_user_object
 from backend.core.dependencies import (
     get_storage_service,
@@ -79,7 +79,7 @@ def get_filename(file_path: str) -> str:
 )
 async def head_file(
     file_path: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_readonly),
     current_user: Optional[User] = Depends(get_optional_user_object),
     storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
@@ -149,7 +149,7 @@ async def head_file(
 async def get_file(
     file_path: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_readonly),
     current_user: Optional[User] = Depends(get_optional_user_object),
     storage_service: AbstractStorageService = Depends(get_storage_service),
     cache_service: CacheService = Depends(get_cache_service),

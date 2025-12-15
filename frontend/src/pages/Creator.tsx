@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { createStorybook, getVoices } from "../api/index";
+import { createStorybook, getVoices, getAllStorybooks } from "../api/index";
 import StoryInput from "../components/StoryInput";
 import BackButton from "../components/BackButton";
 import { AlertModal } from "../components/Modal";
@@ -11,20 +11,18 @@ interface Page {
   story: string;
 }
 
-interface Voice {
-  voice_id: string;
-  voice_label: string;
-  state: string;
-  preview_url?: string;
-}
-
 // 백엔드 응답 형식
-interface VoiceResponse {
+
+export interface VoiceResponse {
   voice_id: string;
   name: string;
   language: string;
   gender: string;
-  preview_url?: string;
+  preview_url: string;
+  category: string;
+  visibility: string;
+  status: string;
+  is_custom: boolean;
 }
 
 export default function Creator() {
@@ -32,11 +30,12 @@ export default function Creator() {
     { id: 1, image: null, story: "" },
   ]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [voices, setVoices] = useState<Voice[]>([]);
+  const [voices, setVoices] = useState<VoiceResponse[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<string>("");
   const [showVoiceWarningModal, setShowVoiceWarningModal] = useState(false);
   const [showMaxPageModal, setShowMaxPageModal] = useState(false);
   const [showMinPageModal, setShowMinPageModal] = useState(false);
+  const [showMaxBooksModal, setShowMaxBooksModal] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -47,16 +46,7 @@ export default function Creator() {
     const fetchVoices = async () => {
       try {
         // 백엔드는 배열을 직접 반환
-        const data: VoiceResponse[] = await getVoices();
-        
-        // 백엔드 응답을 프론트엔드 형식으로 변환
-        const voiceList: Voice[] = (data || []).map((voice) => ({
-          voice_id: voice.voice_id,
-          voice_label: voice.name,
-          state: voice.preview_url ? "success" : "pending",
-          preview_url: voice.preview_url,
-        }));
-        
+        const voiceList: VoiceResponse[] = await getVoices();
         setVoices(voiceList);
         if (voiceList.length > 0) {
           setSelectedVoice(voiceList[0].voice_id);
@@ -73,12 +63,13 @@ export default function Creator() {
   }, []);
 
   const addPage = () => {
-    if (pages.length >= 6) {
+    if (pages.length >= 5) {
       setShowMaxPageModal(true);
       return;
     }
     const newPage: Page = { id: Date.now(), image: null, story: "" };
     setPages([...pages, newPage]);
+    console.log("voices 길이 : ", voices.length);
   };
 
   const removePage = (id: number) => {
@@ -106,16 +97,24 @@ export default function Creator() {
 
     setIsSubmitting(true);
 
-    const stories = pages.map((page) => page.story);
-    const images = pages.map((page) => page.image) as File[];
-
-    if (images.some((img) => !img) || stories.some((s) => s.trim() === "")) {
-      setShowValidationModal(true);
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
+      // 책 권수 확인
+      const books = await getAllStorybooks();
+      if (books.length >= 5) {
+        setShowMaxBooksModal(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const stories = pages.map((page) => page.story);
+      const images = pages.map((page) => page.image) as File[];
+
+      if (images.some((img) => !img) || stories.some((s) => s.trim() === "")) {
+        setShowValidationModal(true);
+        setIsSubmitting(false);
+        return;
+      }
+
       await createStorybook({
         stories,
         images,
@@ -139,17 +138,17 @@ export default function Creator() {
   };
 
   return (
-    <div className="p-8 font-sans relative">
-      <div className="max-w-3xl mx-auto ">
+    <div className="p-4 sm:p-6 md:p-8 font-sans relative">
+      <div className="max-w-3xl mx-auto">
         <BackButton />
         {/* 상단 컨트롤 */}
-        <div className="flex items-center justify-between gap-4 pt-24">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pt-16 sm:pt-20 md:pt-24">
           {/* 음성 선택 */}
           {voices.length > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1 sm:flex-initial">
               <label
                 htmlFor="voice-select"
-                className="text-gray-700 font-medium"
+                className="text-gray-700 font-medium text-sm sm:text-base whitespace-nowrap"
               >
                 음성:
               </label>
@@ -159,7 +158,7 @@ export default function Creator() {
                 onChange={(e) => {
                   setSelectedVoice(e.target.value);
                 }}
-                className="bg-white border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                className="bg-white border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-amber-300 flex-1 sm:flex-initial"
               >
                 {voices.map((voice) => (
                   <option
@@ -167,40 +166,45 @@ export default function Creator() {
                     value={voice.voice_id}
                     // disabled={voice.state !== "success"}
                   >
-                    {voice.voice_label}
-                    {voice.state !== "success" && " - 프리뷰 없음"}
+                    {voice.name}
+                    {/* {voice.status !== "completed" && " - 프리뷰 생성중"} */}
                   </option>
                 ))}
               </select>
 
               {/* 미리듣기 버튼 */}
               {voices.find((v) => v.voice_id === selectedVoice) && (
-                <button
-                  onClick={() =>
-                    playPreview(
+                <div className="relative group">
+                  <button
+                    onClick={() =>
+                      playPreview(
+                        voices.find((v) => v.voice_id === selectedVoice)
+                          ?.preview_url
+                      )
+                    }
+                    disabled={
+                      !voices.find((v) => v.voice_id === selectedVoice)
+                        ?.preview_url
+                    }
+                    className={`border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base transition-colors ${
                       voices.find((v) => v.voice_id === selectedVoice)
                         ?.preview_url
-                    )
-                  }
-                  disabled={
-                    !voices.find((v) => v.voice_id === selectedVoice)
-                      ?.preview_url
-                  }
-                  className={`border rounded-lg px-3 py-2 transition-colors ${
-                    voices.find((v) => v.voice_id === selectedVoice)
-                      ?.preview_url
-                      ? "bg-white border-gray-300 hover:bg-gray-50 cursor-pointer"
-                      : "bg-gray-100 border-gray-200 cursor-not-allowed opacity-60"
-                  }`}
-                  title={
-                    voices.find((v) => v.voice_id === selectedVoice)
+                        ? "bg-white border-gray-300 hover:bg-gray-50 cursor-pointer"
+                        : "bg-gray-100 border-gray-200 cursor-not-allowed opacity-60"
+                    }`}
+                  >
+                    🔊
+                  </button>
+                  {/* 툴팁 */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800 text-white text-xs sm:text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-50 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                    {voices.find((v) => v.voice_id === selectedVoice)
                       ?.preview_url
                       ? "음성 미리듣기"
-                      : "프리뷰 음성이 만들어지지 않아서 들을 수 없지만 해당 보이스로 동화는 만들 수 있습니다"
-                  }
-                >
-                  🔊
-                </button>
+                      : "프리뷰 음성이 만들어지지 않았지만 동화 생성은 가능합니다"}
+                    {/* 툴팁 화살표 */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-800"></div>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -209,22 +213,22 @@ export default function Creator() {
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="bg-amber-300 text-gray-800 font-semibold px-5 py-2 rounded-full shadow-sm hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-amber-300 text-gray-800 font-semibold px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-base rounded-full shadow-sm hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
           >
             {isSubmitting ? "만드는 중..." : "생성 완료"}
           </button>
         </div>
 
         {/* 페이지 리스트 */}
-        <div className="mt-16 space-y-8">
+        <div className="mt-8 sm:mt-12 md:mt-16 space-y-6 sm:space-y-8">
           {pages.map((page, index) => (
             <div
               key={page.id}
-              className="flex gap-4 items-start justify-center h-44"
+              className="flex gap-3 sm:gap-4 items-start justify-center min-h-[10rem] sm:min-h-[11rem] md:min-h-[11rem]"
             >
               {/* 페이지 번호 배지 */}
-              <div className="pt-2 h-full flex items-center">
-                <div className="flex items-center justify-center bg-[#F2BF27] w-8 h-8 rounded-full shadow-md font-bold text-white text-lg">
+              <div className="pt-2 h-full flex items-center flex-shrink-0">
+                <div className="flex items-center justify-center bg-[#F2BF27] w-7 h-7 sm:w-8 sm:h-8 rounded-full shadow-md font-bold text-white text-base sm:text-lg">
                   {index + 1}
                 </div>
               </div>
@@ -236,11 +240,11 @@ export default function Creator() {
               {pages.length > 1 && (
                 <button
                   onClick={() => removePage(page.id)}
-                  className=" text-gray-400 hover:text-red-500 transition-colors"
+                  className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
+                    className="h-5 w-5 sm:h-6 sm:w-6"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -259,14 +263,14 @@ export default function Creator() {
         </div>
 
         {/* 페이지 추가 버튼 */}
-        <div className="mt-6 flex justify-center">
+        <div className="mt-4 sm:mt-6 flex justify-center">
           <button
             onClick={addPage}
-            className="w-[680px] border-2 border-dashed border-gray-400 rounded-2xl py-6 flex justify-center items-center cursor-pointer hover:bg-amber-100/50 transition-colors disabled:opacity-50"
+            className="w-full max-w-[680px] border-2 border-dashed border-gray-400 rounded-2xl py-5 sm:py-6 flex justify-center items-center cursor-pointer hover:bg-amber-100/50 transition-colors disabled:opacity-50"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10 text-gray-500"
+              className="h-8 w-8 sm:h-10 sm:w-10 text-gray-500"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -297,7 +301,7 @@ export default function Creator() {
         isOpen={showMaxPageModal}
         onClose={() => setShowMaxPageModal(false)}
         title="페이지 제한"
-        message="동화는 최대 6페이지까지 만들 수 있어요."
+        message="동화는 최대 5 페이지까지 만들 수 있어요."
         buttonText="확인"
       />
 
@@ -307,6 +311,15 @@ export default function Creator() {
         onClose={() => setShowMinPageModal(false)}
         title="페이지 제한"
         message="최소 한 페이지는 있어야 해요."
+        buttonText="확인"
+      />
+
+      {/* 최대 책 권수 제한 모달 */}
+      <AlertModal
+        isOpen={showMaxBooksModal}
+        onClose={() => setShowMaxBooksModal(false)}
+        title="책 권수 제한"
+        message="동화책은 최대 5권까지 만들 수 있어요. 기존 책을 삭제한 후 다시 시도해주세요."
         buttonText="확인"
       />
 

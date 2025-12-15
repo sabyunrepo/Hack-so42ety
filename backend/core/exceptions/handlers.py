@@ -43,6 +43,11 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
             "details": exc.details,
         },
     )
+    
+    # Sentry에 예외 보고 (500 이상 서버 에러만)
+    if exc.status_code >= 500:
+        import sentry_sdk
+        sentry_sdk.capture_exception(exc)
 
     # 에러 응답 생성
     error_response = ErrorResponse(
@@ -148,6 +153,11 @@ async def http_exception_handler(
         },
     )
 
+    # Sentry에 예외 보고 (500 에러이거나 중요한 에러일 경우)
+    if exc.status_code >= 500:
+        import sentry_sdk
+        sentry_sdk.capture_exception(exc)
+
     error_response = ErrorResponse(
         error_code=error_code,
         message=str(exc.detail),
@@ -186,6 +196,10 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
             "exception_type": type(exc).__name__,
         },
     )
+    
+    # Sentry에 예외 보고
+    import sentry_sdk
+    sentry_sdk.capture_exception(exc)
 
     # 프로덕션에서는 상세 에러 정보를 숨김
     from backend.core.config import settings

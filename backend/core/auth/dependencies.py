@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database import get_db
+from ..database.session import get_db_readonly
 from .jwt_manager import JWTManager
 
 # HTTP Bearer 토큰 스킴
@@ -17,7 +17,7 @@ security = HTTPBearer()
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_readonly),
 ) -> dict:
     """
     현재 인증된 사용자 정보 추출
@@ -83,7 +83,7 @@ async def get_current_active_user(
 
 async def get_current_user_object(
     current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_readonly),
 ):
     """
     현재 인증된 사용자 객체(DB 모델) 반환
@@ -104,7 +104,7 @@ async def get_current_user_object(
 
 async def get_optional_user_object(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_readonly),
 ):
     """
     선택적 사용자 객체 반환 (인증되지 않은 경우 None)

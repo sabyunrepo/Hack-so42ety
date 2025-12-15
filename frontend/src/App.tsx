@@ -6,20 +6,21 @@ import Settings from "./pages/Settings";
 import Creator from "./pages/Creator";
 import Viewer from "./pages/Viewer";
 import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
+// import RegisterPage from "./pages/RegisterPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import RequireAuth from "./components/RequireAuth";
 
 function App() {
   return (
     <AuthProvider>
-      <div className="flex flex-col w-full h-screen bg-orange-50 overflow-auto min-w-[900px]">
+      <div className="flex flex-col w-full h-screen bg-orange-50 overflow-auto">
         <Header />
         <div className="flex-1 max-w-7xl mx-auto w-full ">
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            
+            {/* [ ]  회원가입 주석처리*/}
+            {/* <Route path="/register" element={<RegisterPage />} /> */}
+
             <Route
               path="/"
               element={

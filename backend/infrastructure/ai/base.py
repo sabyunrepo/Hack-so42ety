@@ -13,6 +13,7 @@ class AIProviderType(str, Enum):
 
     GOOGLE = "google"
     OPENAI = "openai"
+    RUNWARE = "runware"
     CUSTOM = "custom"
 
 
@@ -27,6 +28,7 @@ class VideoProviderType(str, Enum):
     """비디오 제공자 타입"""
 
     KLING = "kling"
+    RUNWARE = "runware"
     CUSTOM = "custom"
 
 
@@ -217,7 +219,7 @@ class TTSProvider(ABC):
             ]
         """
         pass
-    
+
     async def clone_voice(
         self,
         name: str,
@@ -226,31 +228,31 @@ class TTSProvider(ABC):
     ) -> Dict[str, Any]:
         """
         Voice Clone 생성 (선택적 메서드)
-        
+
         Args:
             name: Voice 이름
             audio_file: 오디오 파일 (bytes)
             description: Voice 설명 (선택)
-        
+
         Returns:
             Dict[str, Any]: {
                 "voice_id": str,
                 "name": str,
                 ...
             }
-        
+
         Raises:
             NotImplementedError: Provider가 Voice Clone을 지원하지 않는 경우
         """
         raise NotImplementedError("Voice clone not supported by this provider")
-    
+
     async def get_voice_details(self, voice_id: str) -> Dict[str, Any]:
         """
         Voice 상세 정보 조회 (선택적 메서드)
-        
+
         Args:
             voice_id: Voice ID
-        
+
         Returns:
             Dict[str, Any]: {
                 "voice_id": str,
@@ -259,7 +261,7 @@ class TTSProvider(ABC):
                 "preview_url": Optional[str],
                 ...
             }
-        
+
         Raises:
             NotImplementedError: Provider가 Voice 상세 조회를 지원하지 않는 경우
         """
