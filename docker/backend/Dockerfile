@@ -3,6 +3,10 @@
 # Stage 1: Builder (빌드 도구 포함)
 FROM python:3.12-slim AS builder
 
+# ARM64 크로스 컴파일 최적화
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
 WORKDIR /app
 
 # 빌드 전용 시스템 패키지 설치
