@@ -285,7 +285,8 @@ export default function Bookshelf() {
       <ConfirmModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
-        title="삭제 하시겠습니까?"
+        title="책 삭제"
+        message="삭제 하시겠습니까?"
         onConfirm={() => confirmDeleteBook()}
       />
     </div>

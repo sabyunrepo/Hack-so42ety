@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
 import {
   ENGLISH_SCRIPT_EXTENDED,
   KOREAN_SCRIPT_EXTENDED,
@@ -27,6 +26,8 @@ export function ConfirmModal({
   isOpen,
   onClose,
   title,
+  message,
+  submessage,
   onConfirm,
 }: ModalProps) {
   const handleConfirm = () => {
@@ -43,7 +44,7 @@ export function ConfirmModal({
 
   return (
     <div className="fixed inset-0 bg-gray-600/30 bg-opacity-50 flex items-center justify-center z-50 px-4">
-      <div className="w-full max-w-sm sm:w-96 h-72 sm:h-80 relative bg-white rounded-[33px] shadow-xl">
+      <div className="flex flex-col justify-center items-center gap-3 w-full max-w-sm sm:w-96 h-72 sm:h-80 relative bg-white rounded-[33px] shadow-xl">
         {/* X 버튼 */}
         <button
           onClick={onClose}
@@ -53,21 +54,30 @@ export function ConfirmModal({
         </button>
 
         {/* 경고 아이콘 (노란색 원형) */}
-        <div className="absolute top-12 sm:top-14 left-1/2 transform -translate-x-1/2">
+        <div className="mb-4 ">
           <div className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-400 rounded-full flex items-center justify-center">
             <span className="text-white text-xl sm:text-2xl font-bold">!</span>
           </div>
         </div>
 
         {/* 제목 텍스트 */}
-        <div className="absolute top-32 sm:top-36 left-1/2 transform -translate-x-1/2 text-center px-4">
+        <div className="  text-center px-4">
           <h3 className="text-black text-xl sm:text-2xl font-bold font-['Roboto'] leading-7">
-            {title || "삭제 하시겠습니까?"}
+            {title}
           </h3>
+        </div>
+        {/* 메시지 */}
+        <div className="text-center mb-5 sm:mb-6">
+          <p className="text-sm sm:text-base text-gray-600 mb-2">{message}</p>
+          {submessage && (
+            <p className="text-xs sm:text-sm text-gray-500 mt-2">
+              {submessage}
+            </p>
+          )}
         </div>
 
         {/* 버튼들 */}
-        <div className="absolute bottom-14 sm:bottom-16 left-1/2 transform -translate-x-1/2 flex gap-3 sm:gap-4">
+        <div className="  flex gap-3 sm:gap-4">
           {/* 네 버튼 (취소) */}
           <button
             onClick={handleConfirm}
@@ -156,33 +166,12 @@ export function AlertModal({
 type LanguageKey = "korean" | "english";
 
 export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
-  const [copied, setCopied] = useState(false);
   // 'english' 또는 'korean'으로 상태를 설정합니다.
-  const [language, setLanguage] = useState<LanguageKey>("english");
+  const [language, setLanguage] = useState<LanguageKey>("korean");
 
   const currentScriptData: ScriptSection[] =
     language === "korean" ? KOREAN_SCRIPT_EXTENDED : ENGLISH_SCRIPT_EXTENDED;
 
-  const handleCopy = async () => {
-    try {
-      // 복사 로직은 currentScriptData를 사용하여 텍스트 필드를 복사
-      const fullScript = currentScriptData
-        .map((section) =>
-          section.lines
-            .map((line) => {
-              `${line.text}\n${line.pronunciation || ""}`.trim();
-            })
-            .join("\n\n")
-        )
-        .join("\n\n---\n\n");
-
-      await navigator.clipboard.writeText(fullScript);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("복사 실패:", err);
-    }
-  };
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     // select 요소의 value를 LanguageKey 타입으로 변환하여 상태를 업데이트합니다.
     setLanguage(e.target.value as LanguageKey);
@@ -195,18 +184,31 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
       <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] sm:max-h-[85vh] flex flex-col shadow-2xl">
         {/* 헤더 */}
         <div className="flex items-center justify-between p-4 sm:p-5 md:p-6 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-t-2xl">
-          <div>
+          <div className=" flex flex-row gap-4 items-center">
             <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">
               {" "}
               녹음용 대본
             </h3>
+            <div className="flex items-center gap-3 w-full sm:w-auto sm:flex-none">
+              <select
+                id="script-language-select"
+                value={language}
+                onChange={handleLanguageChange}
+                className="py-2 px-3 border-2 border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-colors text-sm sm:text-base w-full sm:w-28"
+              >
+                <option value="korean">한국어</option>
+                <option value="english">English</option>
+              </select>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl sm:text-3xl font-bold leading-none transition-colors"
-          >
-            ×
-          </button>
+          <div className=" flex flex-row gap-4 ">
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl sm:text-3xl font-bold leading-none transition-colors"
+            >
+              ×
+            </button>
+          </div>
         </div>
         <div className="overflow-y-auto">
           {/* 안내 메시지 */}
@@ -302,50 +304,6 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 하단 버튼 */}
-        <div className="justify-between items-center p-4 sm:p-5 md:p-6 border-t border-gray-200 bg-gray-50 flex gap-2 sm:gap-3 rounded-b-2xl">
-          <button
-            onClick={handleCopy}
-            className={` py-2.5 sm:py-3 px-5 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 shadow-sm text-sm sm:text-base ${
-              copied
-                ? "bg-green-500 text-white"
-                : "bg-yellow-400 text-white hover:bg-yellow-500 hover:shadow-md"
-            }`}
-          >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4 sm:w-5 sm:h-5" />
-                복사 완료!
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 sm:w-5 sm:h-5" />
-                전체 대본 복사
-              </>
-            )}
-          </button>
-          <div className="">
-            {/* 언어 선택 드롭다운 */}
-            <div className="flex items-center gap-3 w-full sm:w-auto sm:flex-none">
-              <label
-                htmlFor="script-language-select"
-                className="text-sm font-semibold text-gray-700 whitespace-nowrap"
-              >
-                대본 언어 선택:
-              </label>
-              <select
-                id="script-language-select"
-                value={language}
-                onChange={handleLanguageChange}
-                className="py-2 px-3 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-colors text-sm sm:text-base w-full sm:w-28"
-              >
-                <option value="english">English</option>
-                <option value="korean">한국어</option>
-              </select>
             </div>
           </div>
         </div>

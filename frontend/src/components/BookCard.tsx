@@ -17,8 +17,8 @@ export default function BookCard({
   onDelete,
   onClick,
 }: BookCardProps) {
-  const isProcessing = book.status === "process";
-  const isError = book.status === "error";
+  const isProcessing = book.status === "creating";
+  const isError = book.status === "failed";
 
   const handleClick = () => {
     // process 또는 error 상태일 때는 클릭 불가
@@ -32,18 +32,18 @@ export default function BookCard({
 
   // 책 상태에 따른 이미지 처리
   const getBookImage = (): string => {
-    if (book.status === "process") {
+    if (book.status === "completed") {
       return (
         book.cover_image ||
-        "https://placehold.co/400x600/f3f4f6/9ca3af?text=생성+중..."
+        "https://placehold.co/400x600/f3f4f6/9ca3af?text=No+Image..."
       );
     }
-    if (book.status === "error") {
+    if (book.status === "failed") {
       return "https://placehold.co/400x600/fef2f2/ef4444?text=생성+실패";
     }
     return (
       book.cover_image ||
-      "https://placehold.co/400x600/22c55e/ffffff?text=No+Image"
+      "https://placehold.co/400x600/f3f4f6/9ca3af?text=Creating"
     );
   };
 
@@ -121,21 +121,22 @@ export default function BookCard({
           <p className="text-white font-bold text-base sm:text-lg md:text-xl tracking-wide drop-shadow-md">
             생성 실패
           </p>
-          <p className="text-red-100 text-xs sm:text-sm mt-1.5 sm:mt-2 px-3 sm:px-4 py-1 bg-white/10 rounded-full backdrop-blur-sm">
+          {/* <p className="text-red-100 text-xs sm:text-sm mt-1.5 sm:mt-2 px-3 sm:px-4 py-1 bg-white/10 rounded-full backdrop-blur-sm">
             삭제 후 재시도
-          </p>
+          </p> */}
         </div>
       )}
 
       {/* 편집 모드일 때 삭제 버튼 - 세련된 디자인 */}
-      {isEditing && !isProcessing && onDelete && !book.is_default && (
-        <button
-          onClick={onDelete}
-          className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-full p-1.5 sm:p-2 hover:from-red-600 hover:to-red-700 hover:scale-110 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl z-10 border-2 border-white"
-        >
-          <X className="w-4 h-4 sm:w-5 sm:h-5" />
-        </button>
-      )}
+      {(isEditing && !isProcessing && onDelete && !book.is_default) ||
+        (isError && (
+          <button
+            onClick={onDelete}
+            className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-full p-1.5 sm:p-2 hover:from-red-600 hover:to-red-700 hover:scale-110 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl z-30 border-2 border-white"
+          >
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+        ))}
     </div>
   );
 }

@@ -32,15 +32,8 @@ async def get_current_user(
     Raises:
         HTTPException: 토큰이 유효하지 않거나 만료된 경우
     """
-    # JWT 토큰 검증
+    # JWT 토큰 검증 (실패 시 예외 발생)
     payload = JWTManager.verify_token(credentials.credentials, token_type="access")
-
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
     # user_id 추출
     user_id: Optional[str] = payload.get("sub")
@@ -118,9 +111,6 @@ async def get_optional_user_object(
         # JWT 토큰 검증
         payload = JWTManager.verify_token(credentials.credentials, token_type="access")
         
-        if payload is None:
-            return None
-        
         # user_id 추출
         user_id: Optional[str] = payload.get("sub")
         if user_id is None:
@@ -138,5 +128,6 @@ async def get_optional_user_object(
         except ValueError:
             return None
     except Exception:
-        # 인증 실패 시 None 반환 (공개 파일 접근 허용)
+        # 인증 실패(만료, 위조 등) 시 None 반환 (공개 파일 접근 허용)
+        # TokenExpiredException, InvalidTokenException 등 모든 예외 무시
         return None

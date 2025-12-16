@@ -7,7 +7,7 @@ import asyncio
 import pytest
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 
 from backend.main import app
 from backend.core.database.base import Base
@@ -70,8 +70,11 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
     
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        yield ac
+    # Lifespan 실행 (EventBus 등 전역 의존성 초기화를 위해 필수)
+    # FastAPI/Starlette의 lifespan_context 사용
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            yield ac
     
     app.dependency_overrides.clear()
 
