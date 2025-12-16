@@ -93,6 +93,14 @@ class Settings(BaseSettings):
     tts_default_model_id: str = Field(default="eleven_v3", env="TTS_DEFAULT_MODEL_ID")
     tts_default_language: str = Field(default="en", env="TTS_DEFAULT_LANGUAGE")
 
+    # ElevenLabs Pronunciation Dictionary
+    pronunciation_dictionary_id: Optional[str] = Field(
+        default=None, env="ELEVENLABS_PRONUNCIATION_DICTIONARY_ID"
+    )
+    pronunciation_version_id: Optional[str] = Field(
+        default=None, env="ELEVENLABS_PRONUNCIATION_VERSION_ID"
+    )
+
     # Image Generation
     ai_image_provider: str = Field(default="runware", env="AI_IMAGE_PROVIDER")
 

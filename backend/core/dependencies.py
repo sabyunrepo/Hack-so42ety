@@ -5,12 +5,14 @@ Core Dependencies
 
 from typing import Optional
 from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.config import settings
 from backend.infrastructure.storage.local import LocalStorageService
 from backend.infrastructure.storage.s3 import S3StorageService
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.core.events.redis_streams_bus import RedisStreamsEventBus
 from backend.core.cache.service import CacheService
+from backend.core.database.session import get_db
 
 # 전역 Event Bus 참조 (main.py의 lifespan에서 설정)
 _event_bus: Optional[RedisStreamsEventBus] = None
@@ -58,4 +60,41 @@ def get_ai_factory() -> AIProviderFactory:
         AIProviderFactory: AI Provider Factory 인스턴스
     """
     return AIProviderFactory()
+
+
+async def get_tts_service(
+    db: AsyncSession = Depends(get_db),
+    storage_service = Depends(get_storage_service),
+    cache_service: CacheService = Depends(get_cache_service),
+    ai_factory: AIProviderFactory = Depends(get_ai_factory),
+    event_bus: RedisStreamsEventBus = Depends(get_event_bus),
+):
+    """
+    TTS Service 의존성 주입
+
+    Args:
+        db: 데이터베이스 세션
+        storage_service: 스토리지 서비스
+        cache_service: 캐시 서비스
+        ai_factory: AI Factory
+        event_bus: Event Bus
+
+    Returns:
+        TTSService: TTS Service 인스턴스
+    """
+    from backend.features.tts.service import TTSService
+    from backend.features.tts.repository import AudioRepository, VoiceRepository
+
+    audio_repo = AudioRepository(db)
+    voice_repo = VoiceRepository(db)
+
+    return TTSService(
+        audio_repo=audio_repo,
+        voice_repo=voice_repo,
+        storage_service=storage_service,
+        ai_factory=ai_factory,
+        db_session=db,
+        cache_service=cache_service,
+        event_bus=event_bus,
+    )
 
