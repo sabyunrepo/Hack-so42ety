@@ -289,6 +289,7 @@ class TTSService:
         
         return result
     
+    @cache_result(key="tts:word:{book_id}:{word}", ttl=55)
     async def generate_word_tts(
         self,
         book_id: uuid.UUID,
