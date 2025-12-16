@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database.session import get_db_readonly, get_db_write
 from backend.core.auth import get_current_user
+from backend.core.dependencies import get_cache_service
 from backend.core.auth.jwt_manager import JWTManager
 from backend.core.auth.providers.credentials import CredentialsAuthProvider
 from backend.core.auth.providers.google_oauth import GoogleOAuthProvider
@@ -24,22 +25,29 @@ from backend.features.auth.schemas import (
 )
 from backend.features.auth.service import AuthService
 from backend.features.auth.repository import UserRepository
+from backend.core.events.redis_streams_bus import RedisStreamsEventBus
+from backend.core.cache.service import CacheService
 
 router = APIRouter()
 
 
-def get_auth_service_write(db: AsyncSession = Depends(get_db_write)) -> AuthService:
+def get_auth_service_write(
+    db: AsyncSession = Depends(get_db_write),
+    cache_service: CacheService = Depends(get_cache_service),
+) -> AuthService:
     """AuthService 의존성 주입 (Write용 - 회원가입, 로그인 등)"""
     user_repo = UserRepository(db)
     credentials_provider = CredentialsAuthProvider()
     google_oauth_provider = GoogleOAuthProvider()
     jwt_manager = JWTManager()
+    
     return AuthService(
         user_repo=user_repo,
         credentials_provider=credentials_provider,
         google_oauth_provider=google_oauth_provider,
         jwt_manager=jwt_manager,
         db=db,
+        cache_service=cache_service,
     )
 
 
@@ -188,15 +196,38 @@ async def refresh(
     Returns:
         TokenResponse: 새로운 Access Token
     """
-    access_token = await auth_service.refresh_access_token(
+    new_access_token, new_refresh_token = await auth_service.refresh_access_token(
         refresh_token=request.refresh_token
     )
 
     return TokenResponse(
-        access_token=access_token,
-        refresh_token=request.refresh_token,  # Refresh Token은 그대로 유지
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,  # RTR: 새로운 Refresh Token 반환
         token_type="bearer",
     )
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "로그아웃 성공"},
+        401: {"model": ErrorResponse, "description": "인증 실패"},
+    },
+)
+async def logout(
+    request: RefreshTokenRequest,
+    auth_service: AuthService = Depends(get_auth_service_write),
+):
+    """
+    로그아웃 (Refresh Token 무효화)
+
+    Args:
+        request: 로그아웃 요청 (Refresh Token)
+        auth_service: 인증 서비스
+    """
+    await auth_service.logout(refresh_token=request.refresh_token)
+    return
 
 
 @router.get(

@@ -5,9 +5,11 @@ JWT 토큰 생성 및 검증
 
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from jose import JWTError, jwt
+import uuid
+from jose import JWTError, jwt, ExpiredSignatureError
 
 from ..config import settings
+from .exceptions import TokenExpiredException, InvalidTokenException
 
 
 class JWTManager:
@@ -75,6 +77,9 @@ class JWTManager:
                 days=settings.jwt_refresh_token_expire_days
             )
 
+        if "jti" not in to_encode:
+            to_encode["jti"] = str(uuid.uuid4())
+
         to_encode.update({"exp": expire, "type": "refresh"})
 
         encoded_jwt = jwt.encode(
@@ -103,8 +108,10 @@ class JWTManager:
                 algorithms=[settings.jwt_algorithm],
             )
             return payload
+        except ExpiredSignatureError:
+            raise TokenExpiredException()
         except JWTError:
-            return None
+            raise InvalidTokenException()
 
     @staticmethod
     def verify_token(token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
@@ -120,11 +127,8 @@ class JWTManager:
         """
         payload = JWTManager.decode_token(token)
 
-        if payload is None:
-            return None
-
         # 토큰 타입 검증
         if payload.get("type") != token_type:
-            return None
+            raise InvalidTokenException()
 
         return payload

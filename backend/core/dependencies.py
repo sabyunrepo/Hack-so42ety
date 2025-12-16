@@ -31,11 +31,18 @@ def get_event_bus() -> RedisStreamsEventBus:
     return _event_bus
 
 
+# 전역 CacheService 참조
+_cache_service: Optional[CacheService] = None
+
+
 def get_cache_service(
     event_bus: RedisStreamsEventBus = Depends(get_event_bus)
 ) -> CacheService:
-    """CacheService 의존성 주입"""
-    return CacheService(event_bus=event_bus)
+    """CacheService 의존성 주입 (Singleton)"""
+    global _cache_service
+    if not _cache_service:
+        _cache_service = CacheService(event_bus=event_bus)
+    return _cache_service
 
 
 def get_storage_service():
