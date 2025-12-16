@@ -99,9 +99,9 @@ Use the list below as a guide. You are encouraged to use similar, contextually a
 ### Important Output Format:
 - Respond with a JSON object containing "title" and "stories" fields
 - The "title" field should be the original storybook title (unchanged)
-- The "stories" field must be a 2D array matching the original structure
+- The "stories" field must be a flat 1D array (NOT nested) containing all enhanced dialogues in order
 - Each dialogue line should have audio tags added but preserve the original text
-- Format: {{"title": "Original Title", "stories": [["enhanced dialogue 1", "enhanced dialogue 2"], ["enhanced dialogue 3"]]}}
+- Format: {{"title": "Original Title", "stories": ["enhanced dialogue 1", "enhanced dialogue 2", "enhanced dialogue 3"]}}
 
 Now enhance the following dialogues with expressive audio tags:
 
