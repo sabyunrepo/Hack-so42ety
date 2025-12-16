@@ -6,40 +6,21 @@ interface ClickableTextProps {
   book_id: string;
 }
 
-interface AudioCache {
-  [key: string]: string;
-}
-
 const ClickableText = ({ text, book_id }: ClickableTextProps) => {
   const [playingWord, setPlayingWord] = useState<string | null>(null);
-  const [audioCache, setAudioCache] = useState<AudioCache>({});
 
   const playWord = async (word: string) => {
     try {
       // 특수문자 제거
-      const cleanWord = word.replace(/[^a-zA-Z]/g, "");
+      const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase(); // 소문자로 통일하여 캐시 키 사용
 
       if (!cleanWord) return;
 
       setPlayingWord(cleanWord);
-
-      let filePath: string;
-
-      // 캐시에 있는지 확인
-      if (audioCache[cleanWord]) {
-        console.log(`캐시에서 가져옴: ${cleanWord}`);
-        filePath = audioCache[cleanWord];
-      } else {
-        console.log(`API 호출: ${cleanWord}`);
         // TTS API 호출
         const response = await getWordTTS(cleanWord, book_id);
-        filePath = response.audio_url; // file_path 대신 audio_url 사용
-        // 캐시에 저장
-        setAudioCache((prev) => ({
-          ...prev,
-          [cleanWord]: filePath,
-        }));
-      }
+        const filePath = response.audio_url;
+
 
       // 오디오 재생
       const audio = new Audio(`${filePath}`);
@@ -50,7 +31,7 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
       };
     } catch (error) {
       setPlayingWord(null);
-      console.error(error);
+      console.error("오디오 재생 또는 API 호출 중 오류 발생:", error);
     }
   };
 
