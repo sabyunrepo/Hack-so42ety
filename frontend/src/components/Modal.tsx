@@ -27,6 +27,8 @@ export function ConfirmModal({
   isOpen,
   onClose,
   title,
+  message,
+  submessage,
   onConfirm,
 }: ModalProps) {
   const handleConfirm = () => {
@@ -43,7 +45,7 @@ export function ConfirmModal({
 
   return (
     <div className="fixed inset-0 bg-gray-600/30 bg-opacity-50 flex items-center justify-center z-50 px-4">
-      <div className="w-full max-w-sm sm:w-96 h-72 sm:h-80 relative bg-white rounded-[33px] shadow-xl">
+      <div className="flex flex-col justify-center items-center gap-3 w-full max-w-sm sm:w-96 h-72 sm:h-80 relative bg-white rounded-[33px] shadow-xl">
         {/* X 버튼 */}
         <button
           onClick={onClose}
@@ -53,21 +55,30 @@ export function ConfirmModal({
         </button>
 
         {/* 경고 아이콘 (노란색 원형) */}
-        <div className="absolute top-12 sm:top-14 left-1/2 transform -translate-x-1/2">
+        <div className="mb-4 ">
           <div className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-400 rounded-full flex items-center justify-center">
             <span className="text-white text-xl sm:text-2xl font-bold">!</span>
           </div>
         </div>
 
         {/* 제목 텍스트 */}
-        <div className="absolute top-32 sm:top-36 left-1/2 transform -translate-x-1/2 text-center px-4">
+        <div className="  text-center px-4">
           <h3 className="text-black text-xl sm:text-2xl font-bold font-['Roboto'] leading-7">
-            {title || "삭제 하시겠습니까?"}
+            {title}
           </h3>
+        </div>
+        {/* 메시지 */}
+        <div className="text-center mb-5 sm:mb-6">
+          <p className="text-sm sm:text-base text-gray-600 mb-2">{message}</p>
+          {submessage && (
+            <p className="text-xs sm:text-sm text-gray-500 mt-2">
+              {submessage}
+            </p>
+          )}
         </div>
 
         {/* 버튼들 */}
-        <div className="absolute bottom-14 sm:bottom-16 left-1/2 transform -translate-x-1/2 flex gap-3 sm:gap-4">
+        <div className="  flex gap-3 sm:gap-4">
           {/* 네 버튼 (취소) */}
           <button
             onClick={handleConfirm}
