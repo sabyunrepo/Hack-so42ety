@@ -1,6 +1,6 @@
 import apiClient from "./client";
 
-export type BookStatus = "process" | "success" | "error";
+export type BookStatus = "creating" | "completed" | "failed" | "draft";
 export interface Book {
   id: string;
   title: string;
@@ -117,7 +117,7 @@ export const createVoiceClone = async ({
 
   // ✅ Content-Type을 명시적으로 제거하여 브라우저가 자동으로 multipart/form-data 설정하도록 함
   const response = await apiClient.post<VoiceCloneResponse>(
-    "/tts/voices/clone", 
+    "/tts/voices/clone",
     formData,
     {
       headers: {
