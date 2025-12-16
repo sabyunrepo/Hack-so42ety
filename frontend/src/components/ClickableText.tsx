@@ -17,14 +17,9 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
   const playWord = async (word: string) => {
     try {
       // 특수문자 제거
-      let cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
+      const cleanWord = word.replace(/[^a-zA-Z]/g, "");
 
       if (!cleanWord) return;
-
-      // [ ] I 발음이 "이" 로 나오는 현상 처리
-      if (cleanWord === "i") {
-        cleanWord = "eye";
-      }
 
       setPlayingWord(cleanWord);
 
