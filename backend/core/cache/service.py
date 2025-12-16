@@ -97,25 +97,77 @@ class CacheService:
             )
             return None
     
-    async def set(self, key: str, value: Any, ttl: int = 3600) -> None:
-        """캐시 저장"""
+    async def set(self, key: str, value: Any, ttl: int = 3600, nx: bool = False) -> bool:
+        """
+        캐시 저장
+
+        Args:
+            key: 캐시 키
+            value: 저장할 값
+            ttl: Time-to-live (초)
+            nx: True이면 SET NX (키가 없을 때만 설정)
+
+        Returns:
+            bool: 성공 시 True, nx=True이고 키가 이미 존재하면 False
+        """
         # 이벤트 핸들러 등록 (최초 1회)
         await self._setup_event_handlers()
-        
+
         start = time.time()
         try:
             cache = self._get_cache()
-            await cache.set(key, value, ttl=ttl)
-            duration = time.time() - start
-            cache_metrics.record_set(key, duration)
-            logger.info(
-                f"Cache set: {key}",
-                extra={
-                    "cache_key": key,
-                    "ttl": ttl,
-                    "duration_ms": duration * 1000,
-                }
-            )
+
+            if nx:
+                # SET NX: 키가 없을 때만 설정
+                # aiocache는 SET NX를 직접 지원하지 않으므로 Redis 클라이언트에 직접 접근
+                try:
+                    redis_client = cache.client
+                    # SET key value EX ttl NX
+                    result = await redis_client.set(key, value, ex=ttl, nx=True)
+                    duration = time.time() - start
+
+                    if result:
+                        cache_metrics.record_set(key, duration)
+                        logger.info(
+                            f"Cache set (NX): {key}",
+                            extra={
+                                "cache_key": key,
+                                "ttl": ttl,
+                                "duration_ms": duration * 1000,
+                                "nx": True,
+                            }
+                        )
+                        return True
+                    else:
+                        logger.info(
+                            f"Cache set (NX) failed - key already exists: {key}",
+                            extra={
+                                "cache_key": key,
+                                "ttl": ttl,
+                                "duration_ms": duration * 1000,
+                                "nx": True,
+                            }
+                        )
+                        return False
+                except AttributeError:
+                    # Redis 클라이언트에 접근할 수 없으면 일반 set 사용
+                    logger.warning("Redis client not available, falling back to regular set")
+                    await cache.set(key, value, ttl=ttl)
+                    return True
+            else:
+                # 일반 SET
+                await cache.set(key, value, ttl=ttl)
+                duration = time.time() - start
+                cache_metrics.record_set(key, duration)
+                logger.info(
+                    f"Cache set: {key}",
+                    extra={
+                        "cache_key": key,
+                        "ttl": ttl,
+                        "duration_ms": duration * 1000,
+                    }
+                )
+                return True
         except Exception as e:
             cache_metrics.record_error(key)
             logger.error(
@@ -126,6 +178,7 @@ class CacheService:
                 },
                 exc_info=True
             )
+            return False
     
     async def delete(self, key: str) -> None:
         """캐시 삭제"""
