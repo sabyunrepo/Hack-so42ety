@@ -121,21 +121,22 @@ export default function BookCard({
           <p className="text-white font-bold text-base sm:text-lg md:text-xl tracking-wide drop-shadow-md">
             생성 실패
           </p>
-          <p className="text-red-100 text-xs sm:text-sm mt-1.5 sm:mt-2 px-3 sm:px-4 py-1 bg-white/10 rounded-full backdrop-blur-sm">
+          {/* <p className="text-red-100 text-xs sm:text-sm mt-1.5 sm:mt-2 px-3 sm:px-4 py-1 bg-white/10 rounded-full backdrop-blur-sm">
             삭제 후 재시도
-          </p>
+          </p> */}
         </div>
       )}
 
       {/* 편집 모드일 때 삭제 버튼 - 세련된 디자인 */}
-      {isEditing && !isProcessing && onDelete && !book.is_default && (
-        <button
-          onClick={onDelete}
-          className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-full p-1.5 sm:p-2 hover:from-red-600 hover:to-red-700 hover:scale-110 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl z-10 border-2 border-white"
-        >
-          <X className="w-4 h-4 sm:w-5 sm:h-5" />
-        </button>
-      )}
+      {(isEditing && !isProcessing && onDelete && !book.is_default) ||
+        (isError && (
+          <button
+            onClick={onDelete}
+            className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-full p-1.5 sm:p-2 hover:from-red-600 hover:to-red-700 hover:scale-110 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl z-30 border-2 border-white"
+          >
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+        ))}
     </div>
   );
 }
