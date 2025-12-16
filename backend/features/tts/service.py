@@ -373,12 +373,12 @@ class TTSService:
             raise TTSGenerationFailedException(
                 reason=f"TTS Provider 초기화 실패: {str(e)}"
             )
-        
+
         try:
+            # Provider가 자동으로 모델 선택 및 발음 사전 적용
             audio_bytes = await tts_provider.text_to_speech(
                 text=word,
                 voice_id=voice_id,
-                model_id="eleven_v3",
             )
         except (TTSAPIKeyNotConfiguredException, TTSAPIAuthenticationFailedException):
             raise
