@@ -39,7 +39,7 @@ sentry-sdk==1.40.0         # Sentry integration
 # ==================== AI Providers ====================
 google-generativeai==0.3.1  # Google Gemini
 openai==1.6.1               # OpenAI (GPT) - 추후 사용
-elevenlabs==0.2.26          # ElevenLabs TTS
+elevenlabs>=2.27.0          # ElevenLabs TTS SDK (updated for pronunciation dictionary support)
 google-genai==1.55.0        # Google Gemini SDK (newer API)
 
 # ==================== File Processing ====================
