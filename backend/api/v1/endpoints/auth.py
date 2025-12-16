@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database.session import get_db_readonly, get_db_write
 from backend.core.auth import get_current_user
+from backend.core.dependencies import get_cache_service
 from backend.core.auth.jwt_manager import JWTManager
 from backend.core.auth.providers.credentials import CredentialsAuthProvider
 from backend.core.auth.providers.google_oauth import GoogleOAuthProvider
@@ -30,17 +31,15 @@ from backend.core.cache.service import CacheService
 router = APIRouter()
 
 
-def get_auth_service_write(db: AsyncSession = Depends(get_db_write)) -> AuthService:
+def get_auth_service_write(
+    db: AsyncSession = Depends(get_db_write),
+    cache_service: CacheService = Depends(get_cache_service),
+) -> AuthService:
     """AuthService 의존성 주입 (Write용 - 회원가입, 로그인 등)"""
     user_repo = UserRepository(db)
     credentials_provider = CredentialsAuthProvider()
     google_oauth_provider = GoogleOAuthProvider()
     jwt_manager = JWTManager()
-    
-    # CacheService 주입 (EventBus 필요)
-    # TODO: 의존성 관리 개선 필요 (전역 EventBus/CacheService 인스턴스 사용 권장)
-    event_bus = RedisStreamsEventBus() 
-    cache_service = CacheService(event_bus)
     
     return AuthService(
         user_repo=user_repo,
