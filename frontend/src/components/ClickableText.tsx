@@ -5,18 +5,9 @@ interface ClickableTextProps {
   text: string;
   book_id: string;
 }
-interface CachedAudio {
-  filePath: string;
-  timestamp: number; // 캐시된 시각 (밀리초)
-}
-interface AudioCache {
-  [key: string]: CachedAudio;
-}
-const URL_EXPIRY_MS = 58 * 1000;
 
 const ClickableText = ({ text, book_id }: ClickableTextProps) => {
   const [playingWord, setPlayingWord] = useState<string | null>(null);
-  const [audioCache, setAudioCache] = useState<AudioCache>({});
 
   const playWord = async (word: string) => {
     try {
@@ -26,40 +17,10 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
       if (!cleanWord) return;
 
       setPlayingWord(cleanWord);
-
-      let filePath: string;
-      const now = Date.now(); // 현재 시각
-
-      // 2. 캐시 유효성 검사 로직 추가
-      const cachedItem = audioCache[cleanWord];
-      const isCacheValid =
-        cachedItem && now - cachedItem.timestamp < URL_EXPIRY_MS;
-
-      if (isCacheValid) {
-        // 2-1. 캐시 유효: 캐시된 URL 사용
-        console.log(`캐시(유효)에서 가져옴: ${cleanWord}`);
-        filePath = cachedItem.filePath;
-      } else {
-        // 2-2. 캐시 만료 또는 없음: API 호출하여 새로운 URL 요청
-        if (cachedItem) {
-          console.log(`캐시 만료됨, API 재호출: ${cleanWord}`);
-        } else {
-          console.log(`API 호출: ${cleanWord}`);
-        }
-
         // TTS API 호출
         const response = await getWordTTS(cleanWord, book_id);
-        filePath = response.audio_url;
+        const filePath = response.audio_url;
 
-        // 캐시 갱신 (새로운 URL과 현재 시각 저장)
-        setAudioCache((prev) => ({
-          ...prev,
-          [cleanWord]: {
-            filePath: filePath,
-            timestamp: now,
-          },
-        }));
-      }
 
       // 오디오 재생
       const audio = new Audio(`${filePath}`);
