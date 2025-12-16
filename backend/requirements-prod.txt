@@ -38,7 +38,7 @@ redis[hiredis]==5.0.1
 # ==================== AI Providers ====================
 google-generativeai==0.3.1
 openai==1.6.1
-elevenlabs==0.2.26
+elevenlabs>=2.27.0          # ElevenLabs TTS SDK (updated for pronunciation dictionary support)
 google-genai==1.55.0        # Google Gemini SDK (newer API)
 
 # ==================== File Processing ====================
