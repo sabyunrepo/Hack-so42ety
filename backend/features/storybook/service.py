@@ -22,7 +22,7 @@ from .exceptions import (
     BookQuotaExceededException,
 )
 
-#test
+# test
 from PIL import Image
 from io import BytesIO
 
@@ -43,7 +43,9 @@ class BookOrchestratorService:
         storage_service: AbstractStorageService,
         ai_factory: AIProviderFactory,
         db_session: AsyncSession,
-        tts_producer: Optional[TTSProducer] = None, # Make it optional but we expect it injected
+        tts_producer: Optional[
+            TTSProducer
+        ] = None,  # Make it optional but we expect it injected
     ):
         self.book_repo = book_repo
         self.storage_service = storage_service
@@ -77,8 +79,8 @@ class BookOrchestratorService:
         stories: List[str],
         images: List[bytes],
         voice_id: str,
-        level: int=1,
-
+        level: int,
+        is_default: bool,
     ) -> Book:
         """
         비동기 동화책 생성 (즉시 응답)
@@ -111,7 +113,9 @@ class BookOrchestratorService:
         # write only로 변화 인해 할당량 검사 불화
         # await self._check_book_quota(user_id)
 
-        logger.info("#########################################################################")
+        logger.info(
+            "#########################################################################"
+        )
         logger.info(f"[BookService] Checking book quota {stories}, {len(stories)}")
 
         # 2. 페이지 수 검증
@@ -121,14 +125,15 @@ class BookOrchestratorService:
             raise InvalidPageCountException(
                 page_count=story_page_count, max_pages=settings.max_pages_per_book
             )
-        
+
         # 3. 페이지 수, 이미지 수 검증
-        print(f"[BookService] user_id={user_id} 동화책 페이지 수 및 이미지 수 검사 시작")
+        print(
+            f"[BookService] user_id={user_id} 동화책 페이지 수 및 이미지 수 검사 시작"
+        )
         if story_page_count != len(images):
             raise StoriesImagesMismatchException(
                 stories_count=story_page_count, images_count=len(images)
             )
-
 
         # 3. Book 레코드 즉시 생성 (모니터링용)
         print(f"[BookService] user_id={user_id} 동화책 임시 생성")
@@ -138,6 +143,7 @@ class BookOrchestratorService:
             status=BookStatus.CREATING,
             voice_id=voice_id,
             level=level,
+            is_default=is_default,
             pipeline_stage="init",
         )
 
@@ -183,6 +189,10 @@ class BookOrchestratorService:
         """사용자의 책 목록 조회"""
         return await self.book_repo.get_user_books(user_id)
 
+    async def get_books_summary(self, user_id: uuid.UUID) -> List[Book]:
+        """사용자의 책 목록 조회 (목록용, 페이지 제외)"""
+        return await self.book_repo.get_user_books_summary(user_id)
+
     async def get_book(self, book_id: uuid.UUID, user_id: uuid.UUID = None) -> Book:
         """책 상세 조회"""
         book = await self.book_repo.get_with_pages(book_id)
@@ -217,111 +227,3 @@ class BookOrchestratorService:
         if result:
             await self.db_session.commit()
         return result
-
-
-    def resize_image_for_video(
-        image_data: bytes,
-        max_width: int = 1920,
-        max_height: int = 1080,
-        min_width: int = 512,
-        min_height: int = 512,
-    ) -> bytes:
-        """
-        비디오 생성을 위해 이미지를 리사이징합니다.
-        - aspect ratio 유지
-        - 최소/최대 width/height 제한
-        - 8의 배수로 조정 (video encoding 요구사항)
-        - Runware API 요구사항: width 300-2048 사이
-
-        Args:
-            image_data: 원본 이미지 바이너리 데이터
-            max_width: 최대 너비 (기본값: 1920)
-            max_height: 최대 높이 (기본값: 1080)
-            min_width: 최소 너비 (기본값: 512, Runware는 최소 300)
-            min_height: 최소 높이 (기본값: 512)
-
-        Returns:
-            bytes: 리사이징된 이미지 바이너리 데이터
-
-        사용할 때 'image_base64 = base64.b64encode(resized_image_data).decode('utf-8')'
-
-        이미지 사이즈 확인용 
-        img = Image.open(BytesIO(image_data))
-        width, height = img.size
-        """
-        # PIL Image로 로드
-        img = Image.open(BytesIO(image_data))
-        original_width, original_height = img.size
-
-        print(f"Original image size: {original_width}x{original_height}")
-
-        # Aspect ratio 계산
-        aspect_ratio = original_width / original_height
-
-        # 1단계: 이미지가 너무 작은 경우 키우기
-        if original_width < min_width or original_height < min_height:
-            if aspect_ratio > 1:
-                # 가로가 더 긴 경우
-                new_width = max(min_width, original_width)
-                new_height = int(new_width / aspect_ratio)
-                if new_height < min_height:
-                    new_height = min_height
-                    new_width = int(new_height * aspect_ratio)
-            else:
-                # 세로가 더 긴 경우
-                new_height = max(min_height, original_height)
-                new_width = int(new_height * aspect_ratio)
-                if new_width < min_width:
-                    new_width = min_width
-                    new_height = int(new_width / aspect_ratio)
-            print(f"Image too small, upscaling to: {new_width}x{new_height}")
-        # 2단계: 이미지가 너무 큰 경우 줄이기
-        elif original_width > max_width or original_height > max_height:
-            if aspect_ratio > max_width / max_height:
-                # 너비가 제한 요소
-                new_width = max_width
-                new_height = int(max_width / aspect_ratio)
-            else:
-                # 높이가 제한 요소
-                new_height = max_height
-                new_width = int(max_height * aspect_ratio)
-            print(f"Image too large, downscaling to: {new_width}x{new_height}")
-        else:
-            # 적절한 크기
-            new_width = original_width
-            new_height = original_height
-            print(f"Image size OK, keeping original size")
-
-        # 8의 배수로 조정 (video encoding 요구사항)
-        new_width = (new_width // 8) * 8
-        new_height = (new_height // 8) * 8
-
-        # 최소 크기 재확인 (8의 배수 조정 후에도 최소 크기 보장)
-        if new_width < 304:  # Runware 최소 300, 8의 배수면 304
-            new_width = 304
-        if new_height < 304:
-            new_height = 304
-
-        print(f"Resized image size: {new_width}x{new_height}")
-
-        # 리사이징
-        img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-        # BytesIO로 저장
-        output = BytesIO()
-
-        # 원본 포맷 유지 (RGBA면 RGB로 변환)
-        if img_resized.mode == 'RGBA':
-            # PNG로 저장
-            img_resized.save(output, format='PNG', optimize=True)
-        else:
-            # JPEG로 저장 (더 작은 크기)
-            if img_resized.mode != 'RGB':
-                img_resized = img_resized.convert('RGB')
-            img_resized.save(output, format='JPEG', quality=95, optimize=True)
-
-        resized_data = output.getvalue()
-        print(f"Image size reduced: {len(image_data)} -> {len(resized_data)} bytes "
-                f"({len(resized_data) / len(image_data) * 100:.1f}%)")
-
-        return resized_data

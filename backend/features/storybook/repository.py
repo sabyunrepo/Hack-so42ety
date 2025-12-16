@@ -103,6 +103,42 @@ class BookRepository(AbstractRepository[Book]):
 
         return books
 
+    async def get_user_books_summary(
+        self, user_id: uuid.UUID, skip: int = 0, limit: int = 100
+    ) -> List[Book]:
+        """
+        사용자의 동화책 목록 조회 (목록용, 페이지 정보 제외)
+
+        ✅ Readonly 보장: 세션에서 분리하여 반환 (DB 수정 방지)
+
+        Args:
+            user_id: 사용자 UUID
+            skip: 건너뛸 개수
+            limit: 가져올 개수
+
+        Returns:
+            List[Book]: 동화책 목록 (페이지 정보 미포함)
+        """
+        from sqlalchemy import inspect
+
+        query = (
+            select(Book)
+            .where(or_(Book.user_id == user_id, Book.is_default == True))
+            .order_by(Book.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        books = list(result.scalars().all())
+
+        # ✅ 모든 책을 세션에서 분리 (읽기 전용 보장)
+        # 페이지 정보 없으므로 Book만 분리 (_detach_book_from_session은 pages 접근하여 사용 불가)
+        for book in books:
+            if inspect(book).session is not None:
+                self.session.expunge(book)
+
+        return books
+
     async def add_page(self, book_id: uuid.UUID, page_data: dict) -> Page:
         """
         페이지 추가

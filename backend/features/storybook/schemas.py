@@ -219,6 +219,37 @@ class PageResponse(BaseModel):
             ]
         )
 
+class BookSummaryResponse(BaseModel):
+    """책 목록용 간소화 응답 (페이지 정보 제외)"""
+    id: UUID = Field(..., description="동화책 고유 ID")
+    title: str = Field(..., description="동화책 제목", example="우주를 탐험하는 용감한 고양이")
+    cover_image: Optional[str] = Field(None, description="표지 이미지 URL")
+    status: str = Field(..., description="생성 상태", example="completed")
+    created_at: datetime = Field(..., description="생성 시간")
+    pipeline_stage: Optional[str] = Field(None, description="현재 파이프라인 단계")
+    progress_percentage: int = Field(default=0, description="전체 진행률 (0-100)")
+    error_message: Optional[str] = Field(None, description="에러 메시지 (실패 시)")
+    retry_count: int = Field(default=0, description="재시도 횟수")
+
+    class Config:
+        from_attributes = True
+
+    @classmethod
+    def from_orm_with_urls(cls, book: "Book", storage_service: "AbstractStorageService") -> "BookSummaryResponse":
+        """ORM 모델 → DTO 변환 + URL 변환"""
+        return cls(
+            id=book.id,
+            title=book.title,
+            cover_image=storage_service.get_url(book.cover_image) if book.cover_image else None,
+            status=book.status,
+            created_at=book.created_at,
+            pipeline_stage=book.pipeline_stage,
+            progress_percentage=book.progress_percentage,
+            error_message=book.error_message,
+            retry_count=book.retry_count,
+        )
+
+
 class BookResponse(BaseModel):
     id: UUID = Field(..., description="동화책 고유 ID")
     title: str = Field(..., description="동화책 제목", example="우주를 탐험하는 용감한 고양이")
