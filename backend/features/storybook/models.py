@@ -16,6 +16,7 @@ from backend.core.database.base import Base
 class BookStatus:
     CREATING = "creating"
     COMPLETED = "completed"
+    PARTIALLY_COMPLETED = "partially_completed"
     FAILED = "failed"
     DRAFT = "draft"
 

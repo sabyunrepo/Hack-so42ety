@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import MoriAI_Icon from "../assets/MoriAI_Icon.svg";
-import { Settings, LogOut } from "lucide-react";
+import { LogOut, Mic } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Header() {
@@ -15,10 +15,11 @@ export default function Header() {
         {isAuthenticated && (
           <>
             <Link to="/settings">
-              <Settings className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
+              <Mic className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-[#3D3D3D]" />
+              {/* </div> */}
             </Link>
             <button onClick={logout} title="Logout">
-              <LogOut className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
+              <LogOut className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-[#3D3D3D]" />
             </button>
           </>
         )}

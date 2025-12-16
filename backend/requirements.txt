@@ -61,6 +61,9 @@ black==23.12.1              # Code formatter
 isort==5.13.2               # Import sorter
 mypy==1.7.1                 # Type checker
 
+# ==================== Text Analysis ====================
+textstat>=0.7.3              # Flesch-Kincaid readability analysis
+
 # ==================== Utilities ====================
 python-dateutil==2.8.2
 pytz==2023.3
