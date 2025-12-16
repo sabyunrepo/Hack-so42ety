@@ -5,10 +5,14 @@ interface ClickableTextProps {
   text: string;
   book_id: string;
 }
-
-interface AudioCache {
-  [key: string]: string;
+interface CachedAudio {
+  filePath: string;
+  timestamp: number; // 캐시된 시각 (밀리초)
 }
+interface AudioCache {
+  [key: string]: CachedAudio;
+}
+const URL_EXPIRY_MS = 58 * 1000;
 
 const ClickableText = ({ text, book_id }: ClickableTextProps) => {
   const [playingWord, setPlayingWord] = useState<string | null>(null);
@@ -17,27 +21,43 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
   const playWord = async (word: string) => {
     try {
       // 특수문자 제거
-      const cleanWord = word.replace(/[^a-zA-Z]/g, "");
+      const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase(); // 소문자로 통일하여 캐시 키 사용
 
       if (!cleanWord) return;
 
       setPlayingWord(cleanWord);
 
       let filePath: string;
+      const now = Date.now(); // 현재 시각
 
-      // 캐시에 있는지 확인
-      if (audioCache[cleanWord]) {
-        console.log(`캐시에서 가져옴: ${cleanWord}`);
-        filePath = audioCache[cleanWord];
+      // 2. 캐시 유효성 검사 로직 추가
+      const cachedItem = audioCache[cleanWord];
+      const isCacheValid =
+        cachedItem && now - cachedItem.timestamp < URL_EXPIRY_MS;
+
+      if (isCacheValid) {
+        // 2-1. 캐시 유효: 캐시된 URL 사용
+        console.log(`캐시(유효)에서 가져옴: ${cleanWord}`);
+        filePath = cachedItem.filePath;
       } else {
-        console.log(`API 호출: ${cleanWord}`);
+        // 2-2. 캐시 만료 또는 없음: API 호출하여 새로운 URL 요청
+        if (cachedItem) {
+          console.log(`캐시 만료됨, API 재호출: ${cleanWord}`);
+        } else {
+          console.log(`API 호출: ${cleanWord}`);
+        }
+
         // TTS API 호출
         const response = await getWordTTS(cleanWord, book_id);
-        filePath = response.audio_url; // file_path 대신 audio_url 사용
-        // 캐시에 저장
+        filePath = response.audio_url;
+
+        // 캐시 갱신 (새로운 URL과 현재 시각 저장)
         setAudioCache((prev) => ({
           ...prev,
-          [cleanWord]: filePath,
+          [cleanWord]: {
+            filePath: filePath,
+            timestamp: now,
+          },
         }));
       }
 
@@ -50,7 +70,7 @@ const ClickableText = ({ text, book_id }: ClickableTextProps) => {
       };
     } catch (error) {
       setPlayingWord(null);
-      console.error(error);
+      console.error("오디오 재생 또는 API 호출 중 오류 발생:", error);
     }
   };
 
