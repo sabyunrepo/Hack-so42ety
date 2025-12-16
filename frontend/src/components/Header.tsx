@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import MoriAI_Icon from "../assets/MoriAI_Icon.svg";
-import { Settings, LogOut, Mic } from "lucide-react";
+import { LogOut, Mic } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Header() {

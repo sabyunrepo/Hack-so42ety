@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
 import {
   ENGLISH_SCRIPT_EXTENDED,
   KOREAN_SCRIPT_EXTENDED,
