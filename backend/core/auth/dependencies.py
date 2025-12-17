@@ -3,13 +3,20 @@ Authentication Dependencies
 FastAPI Depends용 인증 의존성
 """
 
+import hashlib
+import logging
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.session import get_db_readonly
+from ..dependencies import get_cache_service
+from ..cache.service import CacheService
 from .jwt_manager import JWTManager
+from ..exceptions import AuthenticationException, ErrorCode
+
+logger = logging.getLogger(__name__)
 
 # HTTP Bearer 토큰 스킴
 security = HTTPBearer()
@@ -18,13 +25,15 @@ security = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db_readonly),
+    cache_service: CacheService = Depends(get_cache_service),
 ) -> dict:
     """
-    현재 인증된 사용자 정보 추출
+    현재 인증된 사용자 정보 추출 (블랙리스트 확인 포함)
 
     Args:
         credentials: HTTP Authorization Bearer 토큰
         db: 데이터베이스 세션
+        cache_service: Redis 캐시 서비스
 
     Returns:
         dict: 사용자 정보 (user_id, email 등)
@@ -32,22 +41,51 @@ async def get_current_user(
     Raises:
         HTTPException: 토큰이 유효하지 않거나 만료된 경우
     """
-    # JWT 토큰 검증 (실패 시 예외 발생)
-    payload = JWTManager.verify_token(credentials.credentials, token_type="access")
+    token = credentials.credentials
+
+    # 1. JWT 토큰 검증
+    payload = JWTManager.verify_token(token, token_type="access")
+
+    if payload is None:
+        logger.warning("❌ [AUTH] Invalid access token")
+        raise AuthenticationException(
+            error_code=ErrorCode.AUTH_TOKEN_INVALID,
+            message="Invalid authentication credentials"
+        )
+
+    # 2. 블랙리스트 확인 (로그아웃된 토큰)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
+    blacklist_key = f"blacklist:access:{token_hash}"
+    is_blacklisted = await cache_service.get(blacklist_key)
+
+    if is_blacklisted:
+        logger.warning(
+            "⚠️ [AUTH] Access token is blacklisted",
+            extra={"user_id": payload.get("sub"), "blacklist_key": blacklist_key}
+        )
+        raise AuthenticationException(
+            error_code=ErrorCode.AUTH_TOKEN_INVALID,
+            message="Token has been revoked"
+        )
 
     # user_id 추출
     user_id: Optional[str] = payload.get("sub")
     if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise AuthenticationException(
+            error_code=ErrorCode.AUTH_TOKEN_INVALID,
+            message="Invalid token payload"
         )
+
+    logger.info(
+        "✅ [AUTH] Access token validated",
+        extra={"user_id": user_id}
+    )
 
     # 사용자 정보 반환 (DB 조회는 Repository에서 수행)
     return {
         "user_id": user_id,
         "email": payload.get("email"),
+        "sub": user_id,  # for consistency
     }
 
 
@@ -89,10 +127,16 @@ async def get_current_user_object(
         user_id = uuid.UUID(current_user["user_id"])
         user = await user_repo.get(user_id)
         if user is None:
-             raise HTTPException(status_code=401, detail="User not found")
+             raise AuthenticationException(
+                 error_code=ErrorCode.AUTH_INVALID_CREDENTIALS,
+                 message="User not found"
+             )
         return user
     except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid user ID format")
+        raise AuthenticationException(
+            error_code=ErrorCode.AUTH_TOKEN_INVALID,
+            message="Invalid user ID format"
+        )
 
 
 async def get_optional_user_object(
