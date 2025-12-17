@@ -3,6 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 // import { GoogleLogin } from "@react-oauth/google";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
+import { usePostHog } from "@posthog/react";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -12,6 +13,7 @@ const LoginPage = () => {
   const [passwordError, setPasswordError] = useState("");
   const { login } = useAuth();
   const navigate = useNavigate();
+  const posthog = usePostHog();
 
   // 이메일 형식 검증
   const validateEmail = (email: string): boolean => {
@@ -76,6 +78,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     try {
       await login({ email, password });
+      posthog?.capture("login_success", { method: "email" });
       navigate("/");
     } catch (err) {
 
