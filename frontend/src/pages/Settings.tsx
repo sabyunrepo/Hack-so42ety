@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { createVoiceClone, getVoices } from "../api/index";
 import { AlertModal, ScriptModal } from "../components/Modal";
 import type { VoiceResponse } from "./Creator";
+import { usePostHog } from "@posthog/react";
 
 // 허용되는 오디오 파일 확장자
 const ALLOWED_AUDIO_TYPES = [".mp3", ".wav", ".m4a", ".flac", ".ogg"];
@@ -34,6 +35,7 @@ export default function Settings() {
   });
   const [showScriptModal, setShowScriptModal] = useState<boolean>(false);
   const navigate = useNavigate();
+  const posthog = usePostHog();
 
   useEffect(() => {
     // 생성된 목소리가 하나라도 있다면 true
@@ -108,6 +110,12 @@ export default function Settings() {
 
     setFile(selectedFile);
     setError("");
+
+    // 파일 업로드 성공 이벤트
+    posthog?.capture("voice_file_uploaded", {
+      file_type: fileExt,
+      file_size_mb: (selectedFile.size / (1024 * 1024)).toFixed(2),
+    });
   };
 
   // 오디오 파일의 길이를 가져오는 헬퍼 함수
@@ -155,6 +163,7 @@ export default function Settings() {
         description: description.trim() || undefined, // 빈 문자열이면 undefined로
       });
 
+      posthog?.capture("voice_creation_requested", { voice_name: name });
       // 성공 시 모달 표시
       setShowModal(true);
       setModalProps({
