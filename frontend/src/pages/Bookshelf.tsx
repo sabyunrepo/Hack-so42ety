@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react"; // useMemo 추가
 import { deleteBook, getAllStorybooks } from "../api/index";
 import { ConfirmModal } from "../components/Modal";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
+import { usePostHog } from "@posthog/react";
 
 /**
  * 화면 너비에 따라 선반당 표시할 책의 컬럼 수를 반환합니다.
@@ -69,6 +70,7 @@ export default function Bookshelf() {
   const [error, setError] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [bookToDelete, setBookToDelete] = useState<string | null>(null);
+  const posthog = usePostHog();
 
   // ⭐️ 새로 추가된 반응형 컬럼 수
   const columnsPerShelf = useResponsiveColumns();
@@ -108,6 +110,7 @@ export default function Bookshelf() {
     setBooks((prev) => prev.filter((book) => book.id !== bookToDelete));
     try {
       await deleteBook(bookToDelete);
+      posthog?.capture("book_deleted", { book_id: bookToDelete });
     } catch (err) {
       setError(getUserFriendlyErrorMessage(err));
       setBooks(previous);
