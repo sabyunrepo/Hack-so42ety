@@ -27,13 +27,21 @@ class GenerateImagePrompt:
 
         return f"""
 Create a whimsical, storybook-style illustration in the style of {STYLE_PROMPTS[self.style_keyword]} based on the story: {diary_text}.
-Depict the main human characters as they are, and transform all other characters or background figures into animals appropriate for the scene.
-Show characters and key elements in dynamic motion, illustrating their actions and interactions with lively expressions and gestures.
+
+Depict the main human characters as they are.
+If there are any minor background figures, represent them as a small number of simple, animal-like characters appropriate for the scene.
+
+Show the main characters and key elements in gentle, expressive motion, focusing on their actions and emotions with lively but clear gestures.
+
 Do not include any text, letters, numbers, captions, speech bubbles, or signs in the image.
-Use vivid, magical, and charming details to enhance the fairy tale atmosphere.
-Focus on composition, lighting, and perspective as if using a low-angle or wide-angle camera to make the scene more immersive.
-Optionally, generate the illustration step by step: first background, then main characters, then additional animal characters, and finally magical effects or props.
-only one image per story.
+
+Use vivid, magical, and charming details to enhance the fairy tale atmosphere, while keeping the scene simple and readable.
+
+Focus on composition, lighting, and perspective to create an immersive but calm storybook illustration.
+
+Generate only one complete illustration per story.
+
+지브리풍
 """
 
 

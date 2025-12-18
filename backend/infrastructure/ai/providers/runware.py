@@ -16,6 +16,7 @@ from ....core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
     """
     Runware Video Provider
@@ -30,7 +31,9 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         """
         self.api_key = api_key or settings.runware_api_key
         self.base_url = settings.runware_api_url
-        self.timeout = httpx.Timeout(settings.http_timeout, read=settings.http_read_timeout)
+        self.timeout = httpx.Timeout(
+            settings.http_timeout, read=settings.http_read_timeout
+        )
 
     async def generate_image(
         self,
@@ -68,7 +71,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "width": width,
                 "height": height,
                 "model": settings.runware_img2img_model,
-                "numberResults": 1
+                "numberResults": 1,
             }
         ]
 
@@ -77,9 +80,9 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 self.base_url,
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 },
-                json=payload
+                json=payload,
             )
             response.raise_for_status()
 
@@ -88,7 +91,9 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             # 에러 체크
             if "error" in result:
                 error_msg = result.get("error", "Unknown error")
-                logger.error(f"[Image Task] Runware image generation failed: {error_msg}")
+                logger.error(
+                    f"[Image Task] Runware image generation failed: {error_msg}"
+                )
                 raise Exception(f"Runware API error: {error_msg}")
 
             # 응답에서 이미지 URL 추출
@@ -106,9 +111,6 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             # 이미지 다운로드
             image_response = await client.get(image_url)
             image_response.raise_for_status()
-
-
-
 
             return image_response.content
 
@@ -168,12 +170,16 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             Exception: 응답 형식 오류 또는 API 에러
         """
         task_uuid = str(uuid.uuid4())
-        image_base64 = base64.b64encode(image_data).decode('utf-8')
+        image_base64 = base64.b64encode(image_data).decode("utf-8")
         result = None  # ✅ 무조건 초기화
 
         # 설정에서 기본값 가져오기 (없으면 전달된 인자 사용)
-        strength = strength if strength is not None else settings.runware_img2img_strength
-        cfg_scale = cfg_scale if cfg_scale is not None else settings.runware_img2img_cfg_scale
+        strength = (
+            strength if strength is not None else settings.runware_img2img_strength
+        )
+        cfg_scale = (
+            cfg_scale if cfg_scale is not None else settings.runware_img2img_cfg_scale
+        )
         steps = steps if steps is not None else settings.runware_img2img_steps
 
         # REST API 페이로드 (배열 형태)
@@ -186,10 +192,10 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 # "width": width,
                 # "height": height,
                 "model": settings.runware_img2img_model,
-                "numberResults": 1
+                "numberResults": 1,
             }
         ]
-    # "seedImage": f"data:image/png;base64,{image_base64}",  # 이미지를 seedImage로 사용
+        # "seedImage": f"data:image/png;base64,{image_base64}",  # 이미지를 seedImage로 사용
         # "strength": strength,          # 변환 강도 (0.0-1.0)
         # "CFGScale": cfg_scale,         # 프롬프트 가이드 스케일
         # "steps": steps,                # 디노이징 스텝 수
@@ -199,9 +205,9 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 self.base_url,
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 },
-                json=payload
+                json=payload,
             )
             if response.status_code >= 400:
                 logger.error("[Image Task] Runware API ERROR")
@@ -214,7 +220,9 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                     logger.error("[Image Task] Response is not JSON")
                     response.raise_for_status()
                     result = response.json()
-                    logger.info(f"[Image Task] Runware image generation response: {result}")
+                    logger.info(
+                        f"[Image Task] Runware image generation response: {result}"
+                    )
             response.raise_for_status()
             result = response.json()
 
@@ -260,61 +268,64 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         """
         # 파라미터 검증
         if width % 8 != 0 or height % 8 != 0:
-            raise ValueError(f"width and height must be multiples of 8. Got: {width}x{height}")
+            raise ValueError(
+                f"width and height must be multiples of 8. Got: {width}x{height}"
+            )
 
         if not (1 <= duration <= 10):
-            raise ValueError(f"duration must be between 1 and 10 seconds. Got: {duration}")
+            raise ValueError(
+                f"duration must be between 1 and 10 seconds. Got: {duration}"
+            )
 
         if fps is not None and not (15 <= fps <= 60):
             raise ValueError(f"fps must be between 15 and 60. Got: {fps}")
 
         if output_quality < 20 or output_quality > 99:
-            raise ValueError(f"output_quality must be between 20 and 99. Got: {output_quality}")
+            raise ValueError(
+                f"output_quality must be between 20 and 99. Got: {output_quality}"
+            )
 
         task_uuid = str(uuid.uuid4())
 
-        # model = 'klingai:6@0'
-        payload = [{
-            "taskType": "videoInference",
-            "taskUUID": task_uuid,
-            "positivePrompt": prompt or "animate this image naturally with smooth motion",
-            "model": settings.runware_video_model,
-            "duration": duration,
-
-            "outputFormat": output_format,
-            "outputQuality": output_quality,
-            "deliveryMethod": "async",
-            "includeCost": True,
-            "numberResults": 1,
-        }]
+        payload = [
+            {
+                "taskType": "videoInference",
+                "taskUUID": task_uuid,
+                "positivePrompt": prompt
+                or "animate this image naturally with smooth motion",
+                "model": settings.runware_video_model,
+                "duration": duration,
+                "outputFormat": output_format,
+                "outputQuality": output_quality,
+                "deliveryMethod": "async",
+                "includeCost": True,
+                "numberResults": 1,
+            }
+        ]
 
         # 이미지가 제공된 경우: Image-to-Video (frameImages 추가)
         if image_data is not None:
             payload[0]["frameImages"] = [
                 {
                     "inputImage": f"data:image/png;base64,{image_data}",
-                    "frame": "first"  # 첫 프레임에 이미지 배치
+                    "frame": "first",  # 첫 프레임에 이미지 배치
                 }
             ]
-            logger.info(f"[Video Task] Mode: Image-to-Video (frameImages included, resized)")
+            logger.info(
+                f"[Video Task] Mode: Image-to-Video (frameImages included, resized)"
+            )
         else:
             # 이미지가 없는 경우: Text-to-Video
             logger.info(f"[Video Task] Mode: Text-to-Video (no frameImages)")
 
         if image_uuid is not None:
-            payload[0]["frameImages"] = [
-                {
-                    "inputImage": image_uuid,
-                    "frame": "first"
-                }
-            ]
-            logger.info(f"[Video Task] Mode: Image-to-Video (existing image UUID: {image_uuid})")
+            payload[0]["frameImages"] = [{"inputImage": image_uuid, "frame": "first"}]
+            logger.info(
+                f"[Video Task] Mode: Image-to-Video (existing image UUID: {image_uuid})"
+            )
         elif image_data is not None:
             payload[0]["frameImages"] = [
-                {
-                    "inputImage": f"data:image/png;base64,{image_data}",
-                    "frame": "first"
-                }
+                {"inputImage": f"data:image/png;base64,{image_data}", "frame": "first"}
             ]
             logger.info("[Video Task] Mode: Image-to-Video (frameImages included)")
         # Existing Image-to-Video: image_uuid 제공
@@ -332,9 +343,9 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                     self.base_url,
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
                     },
-                    json=payload
+                    json=payload,
                 )
                 response.raise_for_status()
 
@@ -348,19 +359,27 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                     error_code = error.get("code", "unknown")
                     error_param = error.get("parameter", "unknown")
 
-                    logger.error(f"[Video Task] Runware video generation failed: [{error_code}] {error_msg} (parameter: {error_param})")
+                    logger.error(
+                        f"[Video Task] Runware video generation failed: [{error_code}] {error_msg} (parameter: {error_param})"
+                    )
                     logger.error(f"[Video Task] Full error object: {error}")
-                    raise Exception(f"Runware API error [{error_code}]: {error_msg} (parameter: {error_param})")
+                    raise Exception(
+                        f"Runware API error [{error_code}]: {error_msg} (parameter: {error_param})"
+                    )
 
             except httpx.HTTPStatusError as e:
                 # HTTP 에러 발생 시 응답 본문 출력
                 error_detail = e.response.text
-                logger.error(f"[Video Task] HTTP Status Error: {e.response.status_code}")
+                logger.error(
+                    f"[Video Task] HTTP Status Error: {e.response.status_code}"
+                )
                 logger.error(f"[Video Task] Error Response Body: {error_detail}")
                 raise Exception(f"HTTP {e.response.status_code}: {error_detail}")
 
-        logger.info(f"[Video Task] Runware video generation started: task_uuid={task_uuid}, "
-                   f"duration={duration}s, size={width}x{height}")
+        logger.info(
+            f"[Video Task] Runware video generation started: task_uuid={task_uuid}, "
+            f"duration={duration}s, size={width}x{height}"
+        )
         return task_uuid
 
     async def check_video_status(self, task_id: str) -> Dict[str, Any]:
@@ -378,10 +397,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "error": Optional[str]
             }
         """
-        payload = [{
-            "taskType": "getResponse",
-            "taskUUID": task_id
-        }]
+        payload = [{"taskType": "getResponse", "taskUUID": task_id}]
 
         logger.info(f"[Video Task] Checking status for task_id: {task_id}")
 
@@ -391,9 +407,9 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                     self.base_url,
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
                     },
-                    json=payload
+                    json=payload,
                 )
                 response.raise_for_status()
 
@@ -402,28 +418,37 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
 
             except httpx.HTTPStatusError as e:
                 error_detail = e.response.text
-                logger.error(f"[Video Task] HTTP Status Error: {e.response.status_code}")
+                logger.error(
+                    f"[Video Task] HTTP Status Error: {e.response.status_code}"
+                )
                 logger.error(f"[Video Task] Error Response Body: {error_detail}")
                 # 에러 발생 시에도 processing으로 반환 (재시도 허용)
                 return {
                     "status": "processing",
                     "progress": 50,
                     "video_url": None,
-                    "error": None
+                    "error": None,
                 }
             except Exception as e:
-                logger.error(f"[Video Task] Unexpected error: {type(e).__name__}: {str(e)}")
+                logger.error(
+                    f"[Video Task] Unexpected error: {type(e).__name__}: {str(e)}"
+                )
                 return {
                     "status": "processing",
                     "progress": 50,
                     "video_url": None,
-                    "error": None
+                    "error": None,
                 }
 
         # Response 파싱 - Runware API는 {"data": [...]} 형태로 응답
         if not result:
             logger.info(f"[Video Task] Empty result, status: processing")
-            return {"status": "processing", "progress": 50, "video_url": None, "error": None}
+            return {
+                "status": "processing",
+                "progress": 50,
+                "video_url": None,
+                "error": None,
+            }
 
         # 에러 체크
         if "errors" in result and len(result["errors"]) > 0:
@@ -435,13 +460,18 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "status": "failed",
                 "progress": 0,
                 "video_url": None,
-                "error": f"[{error_code}] {error_msg}"
+                "error": f"[{error_code}] {error_msg}",
             }
 
         # data 배열 확인
         if "data" not in result or len(result["data"]) == 0:
             logger.info(f"[Video Task] No data in result, status: processing")
-            return {"status": "processing", "progress": 50, "video_url": None, "error": None}
+            return {
+                "status": "processing",
+                "progress": 50,
+                "video_url": None,
+                "error": None,
+            }
 
         task_result = result["data"][0]
         logger.info(f"[Video Task] Task result: {task_result}")
@@ -454,30 +484,45 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "status": "completed",
                 "progress": 100,
                 "video_url": video_url,
-                "error": None
+                "error": None,
             }
         # status 필드 체크 (processing 중일 때)
         elif "status" in task_result:
             status = task_result["status"]
             logger.info(f"[Video Task] Task status: {status}")
             if status == "processing":
-                return {"status": "processing", "progress": 50, "video_url": None, "error": None}
+                return {
+                    "status": "processing",
+                    "progress": 50,
+                    "video_url": None,
+                    "error": None,
+                }
             elif status == "failed":
                 error_msg = task_result.get("error", "Unknown error")
                 return {
                     "status": "failed",
                     "progress": 0,
                     "video_url": None,
-                    "error": error_msg
+                    "error": error_msg,
                 }
             else:
                 # 알 수 없는 상태
                 logger.info(f"[Video Task] Unknown status: {status}")
-                return {"status": "processing", "progress": 50, "video_url": None, "error": None}
+                return {
+                    "status": "processing",
+                    "progress": 50,
+                    "video_url": None,
+                    "error": None,
+                }
         else:
             # status도 videoURL도 없으면 아직 처리 중
             logger.info(f"[Video Task] No status or videoURL, assuming processing...")
-            return {"status": "processing", "progress": 50, "video_url": None, "error": None}
+            return {
+                "status": "processing",
+                "progress": 50,
+                "video_url": None,
+                "error": None,
+            }
 
     async def download_video(self, video_url: str) -> bytes:
         """
@@ -494,5 +539,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             response = await client.get(video_url)
             response.raise_for_status()
             video_size = len(response.content)
-            logger.info(f"[Video Task] Video downloaded successfully (size: {video_size} bytes)")
+            logger.info(
+                f"[Video Task] Video downloaded successfully (size: {video_size} bytes)"
+            )
             return response.content
