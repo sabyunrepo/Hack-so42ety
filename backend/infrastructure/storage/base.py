@@ -35,6 +35,20 @@ class AbstractStorageService(ABC):
         pass
 
     @abstractmethod
+    def get_url(self, path: str, bypass_cdn: bool = False) -> str:
+        """
+        파일 접근 URL 반환
+
+        Args:
+            path: 파일 경로
+            bypass_cdn: CDN을 거치지 않고 직접 접근할 수 있는 URL 반환 여부 (On-demand 생성 등)
+
+        Returns:
+            str: 접근 URL
+        """
+        pass
+
+    @abstractmethod
     async def get(self, path: str) -> bytes:
         """
         파일 조회
@@ -74,12 +88,13 @@ class AbstractStorageService(ABC):
         pass
 
     @abstractmethod
-    def get_url(self, path: str) -> str:
+    def get_url(self, path: str, bypass_cdn: bool = False) -> str:
         """
         파일 접근 URL 반환
 
         Args:
             path: 파일 경로
+            bypass_cdn: CDN을 거치지 않고 직접 접근할 수 있는 URL 반환 여부 (On-demand 생성 등)
 
         Returns:
             str: 접근 URL
