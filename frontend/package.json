@@ -10,11 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@posthog/react": "^1.5.2",
     "@react-oauth/google": "^0.12.2",
     "axios": "^1.13.1",
     "browser-image-compression": "^2.0.2",
     "heic2any": "^0.0.4",
     "lucide-react": "^0.547.0",
+    "posthog-js": "^1.309.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-pageflip": "^2.0.3",

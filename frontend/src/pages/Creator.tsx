@@ -4,6 +4,7 @@ import StoryInput from "../components/StoryInput";
 import BackButton from "../components/BackButton";
 import { AlertModal } from "../components/Modal";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
+import { usePostHog } from "@posthog/react";
 
 interface Page {
   id: number;
@@ -40,6 +41,7 @@ export default function Creator() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const posthog = usePostHog();
 
   // 음성 목록 가져오기
   useEffect(() => {
@@ -121,6 +123,7 @@ export default function Creator() {
         voice_id: selectedVoice,
       });
 
+      posthog?.capture("book_creation_requested", { page_count: pages.length });
       setShowSuccessModal(true);
     } catch (error) {
       setErrorMessage(getUserFriendlyErrorMessage(error));
