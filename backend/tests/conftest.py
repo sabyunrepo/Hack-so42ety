@@ -36,9 +36,9 @@ TestSessionLocal = async_sessionmaker(
 )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def event_loop():
-    """이벤트 루프 픽스처 (세션 단위)"""
+    """이벤트 루프 픽스처 (함수 단위)"""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
