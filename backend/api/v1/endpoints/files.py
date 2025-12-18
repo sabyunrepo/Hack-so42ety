@@ -9,8 +9,17 @@ File Access API Endpoints
 import logging
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.core.config import settings
+from backend.core.exceptions import (
+    NotFoundException, 
+    AuthorizationException, 
+    InternalServerException, 
+    ErrorCode
+)
 
 from backend.core.database.session import get_db_readonly
 from backend.core.auth.dependencies import get_optional_user_object
@@ -171,6 +180,13 @@ async def head_file(
     Returns:
         Response: 파일 메타데이터 (헤더만, 본문 없음)
     """
+    # 보안: 운영 환경(R2/S3)에서는 로컬 파일 엔드포인트 접근 차단
+    if settings.storage_provider != "local":
+        raise NotFoundException(
+            error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+            message=f"File not found: {file_path}"
+        )
+
     current_user_id = current_user.id if current_user else None
     
     try:
@@ -198,13 +214,13 @@ async def head_file(
             }
         )
     
-    except HTTPException:
+    except NotFoundException:
         raise
     except Exception as e:
         logger.error(f"HEAD request error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error"
+        raise InternalServerException(
+            error_code=ErrorCode.SYS_INTERNAL_ERROR,
+            message="Internal server error"
         )
 
 
@@ -246,6 +262,14 @@ async def get_file(
     Returns:
         Response: 파일 데이터 또는 304 Not Modified
     """
+    # 보안: 운영 환경(R2/S3)에서는 로컬 파일 엔드포인트 접근 차단
+    # Exception: Word Audio (On-demand generation 때문에 허용)
+    if settings.storage_provider != "local" and not is_word_audio_path(file_path):
+        raise NotFoundException(
+            error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+            message=f"File not found: {file_path}"
+        )
+
     current_user_id = current_user.id if current_user else None
     
     try:
@@ -294,6 +318,11 @@ async def get_file(
         
         # 4. 스토리지에서 파일 읽기
         try:
+            # Smart Redirect: R2 사용 시 파일이 존재하면 바로 CDN으로 리다이렉트 (Zero Egress)
+            if settings.storage_provider != "local" and await storage_service.exists(file_path):
+                 cdn_url = storage_service.get_url(file_path, bypass_cdn=False)
+                 return RedirectResponse(url=cdn_url, status_code=307)
+
             file_data = await storage_service.get(file_path)
         except FileNotFoundError:
             # 단어 오디오 파일이면 자동 생성 시도
@@ -307,9 +336,9 @@ async def get_file(
 
                     if not word:
                         logger.error(f"Failed to extract word from path: {file_path}")
-                        raise HTTPException(
-                            status_code=404,
-                            detail=f"Invalid word audio path: {file_path}"
+                        raise NotFoundException(
+                            error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+                            message=f"Invalid word audio path: {file_path}"
                         )
 
                     if not voice_id:
@@ -334,7 +363,13 @@ async def get_file(
 
                     logger.info(f"Successfully generated word audio on-demand: {file_path}, word={word}")
 
-                    # 생성된 파일 반환
+                    # Smart Redirect: 생성된 파일을 CDN에서 다운로드하도록 리다이렉트 (Zero Egress)
+                    if settings.storage_provider != "local":
+                        # CDN URL 생성 (bypass_cdn=False)
+                        cdn_url = storage_service.get_url(file_path, bypass_cdn=False)
+                        return RedirectResponse(url=cdn_url, status_code=307)
+                    
+                    # Local 환경이면 파일 반환
                     etag = FileCacheService(cache_service).get_etag(file_data)
                     cache_control = (
                         "private, max-age=3600, must-revalidate"
@@ -359,15 +394,15 @@ async def get_file(
                 except Exception as e:
                     logger.error(f"Failed to generate word audio on-demand: {file_path}, error: {e}", exc_info=True)
                     # TTS 생성 실패 시에도 404가 아닌 500 에러 반환
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to generate audio: {str(e)}"
+                    raise InternalServerException(
+                        error_code=ErrorCode.BIZ_TTS_GENERATION_FAILED,
+                        message=f"Failed to generate audio: {str(e)}"
                     )
 
             # 단어 오디오가 아니면 404 반환
-            raise HTTPException(
-                status_code=404,
-                detail=f"File not found: {file_path}"
+            raise NotFoundException(
+                error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+                message=f"File not found: {file_path}"
             )
         
         # 5. Redis 캐시에 저장 (공개 파일만)
@@ -412,20 +447,20 @@ async def get_file(
     
     except PermissionError as e:
         logger.warning(f"File access denied: {file_path}, user: {current_user_id}, error: {e}")
-        raise HTTPException(
-            status_code=403,
-            detail=str(e)
+        raise AuthorizationException(
+            error_code=ErrorCode.authz_forbidden,
+            message=str(e)
         )
     except FileNotFoundError as e:
         logger.warning(f"File not found: {file_path}, error: {e}")
-        raise HTTPException(
-            status_code=404,
-            detail=str(e)
+        raise NotFoundException(
+            error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+            message=str(e)
         )
     except Exception as e:
         logger.error(f"File access error: {file_path}, error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error"
+        raise InternalServerException(
+            error_code=ErrorCode.SYS_INTERNAL_ERROR,
+            message="Internal server error"
         )
 
