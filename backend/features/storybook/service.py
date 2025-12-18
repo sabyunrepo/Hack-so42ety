@@ -81,6 +81,7 @@ class BookOrchestratorService:
         voice_id: str,
         level: int,
         is_default: bool,
+        is_shared: bool = False,
     ) -> Book:
         """
         비동기 동화책 생성 (즉시 응답)
