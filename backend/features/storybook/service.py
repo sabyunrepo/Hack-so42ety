@@ -145,6 +145,7 @@ class BookOrchestratorService:
             voice_id=voice_id,
             level=level,
             is_default=is_default,
+            is_shared=is_shared,
             pipeline_stage="init",
         )
 
@@ -200,10 +201,15 @@ class BookOrchestratorService:
         if not book:
             raise StorybookNotFoundException(storybook_id=str(book_id))
 
-        # 권한 체크 (user_id가 제공된 경우)
-        if user_id and book.user_id != user_id:
+        # 권한 체크
+        # 1. 공유된 책은 무조건 접근 허용
+        if book.is_shared:
+            return book
+
+        # 2. 비공개 책: 로그인 필요 & 소유자 확인
+        if not user_id or book.user_id != user_id:
             raise StorybookUnauthorizedException(
-                storybook_id=str(book_id), user_id=str(user_id)
+                storybook_id=str(book_id), user_id=str(user_id) if user_id else "anonymous"
             )
 
         return book
