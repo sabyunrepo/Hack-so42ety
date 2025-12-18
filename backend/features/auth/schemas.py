@@ -66,6 +66,19 @@ class RefreshTokenRequest(BaseModel):
         }
 
 
+class LogoutRequest(BaseModel):
+    """로그아웃 요청"""
+
+    refresh_token: str = Field(..., description="Refresh Token", example="eyJhbGciOiJIUzI1NiIsInR5cCI6...")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            }
+        }
+
+
 # ==================== Response Schemas ====================
 
 
@@ -129,6 +142,19 @@ class AuthResponse(BaseModel):
                     "is_active": True,
                     "created_at": "2024-11-30T12:00:00Z"
                 }
+            }
+        }
+
+
+class LogoutResponse(BaseModel):
+    """로그아웃 응답"""
+
+    message: str = Field(default="Logout successful", description="응답 메시지", example="Logout successful")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "Logout successful"
             }
         }
 
