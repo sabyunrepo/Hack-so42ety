@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends, status, Form, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 import logging
 
 from backend.core.database.session import get_db_readonly, get_db_write
-from backend.core.auth.dependencies import get_current_user_object as get_current_user
+from backend.core.auth.dependencies import (
+    get_current_user_object as get_current_user,
+    get_optional_user_object
+)
+from backend.features.auth.models import User
 from backend.core.dependencies import (
     get_storage_service,
     get_ai_factory,
@@ -319,6 +323,7 @@ async def generate_word_tts(
     book_id: UUID,
     word: str,
     service: TTSService = Depends(get_tts_service_write),
+    current_user: Optional[User] = Depends(get_optional_user_object),
 ):
     """
     Book별 단어 TTS 생성 (캐싱 지원)
