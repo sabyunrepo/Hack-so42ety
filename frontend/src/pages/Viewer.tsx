@@ -10,6 +10,7 @@ import AudioPlayer from "../components/AudioPlayer";
 import type { BookData, PageData, Dialogue } from "../types/book";
 import { getDialogueText, getDialogueAudioUrl } from "../types/book";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
+import { usePostHog } from "@posthog/react";
 
 // --- 타입 정의 ---
 
@@ -56,6 +57,7 @@ const Viewer: React.FC = () => {
 
   const bookRef = useRef<HTMLFlipBookRef | null>(null);
   const navigate = useNavigate();
+  const posthog = usePostHog();
 
   useEffect(() => {
     if (!bookId) {
@@ -69,6 +71,10 @@ const Viewer: React.FC = () => {
         setErrorMessage("");
         const data: BookData = await getStorybookById(bookId);
         setBook(data);
+        posthog?.capture("book_viewed", {
+          book_id: bookId,
+          page_count: data.pages?.length || 0,
+        });
       } catch (error) {
         setErrorMessage(getUserFriendlyErrorMessage(error));
       } finally {
@@ -77,7 +83,7 @@ const Viewer: React.FC = () => {
     };
 
     fetchBook();
-  }, [bookId]);
+  }, [bookId, posthog]);
 
   // 반응형 플립북 크기 조정
   useEffect(() => {
@@ -237,6 +243,10 @@ const Viewer: React.FC = () => {
         onFlip={(e: number | { data: number }) => {
           const pageNum = typeof e === "object" ? e.data : e;
           setCurrentPage(pageNum);
+          posthog?.capture("page_turned", {
+            book_id: bookId,
+            page_number: pageNum,
+          });
         }}
       >
         {/* 첫 번째 페이지: 커버 이미지 */}

@@ -410,11 +410,11 @@ class TTSExpressionResponse(BaseModel):
 
     Attributes:
         title: 동화책 제목
-        stories: 감정 태그가 추가된 스토리 대사 목록 (2차원 리스트)
+        stories: 감정 태그가 추가된 스토리 대사 목록 (1차원 리스트)
     """
 
     title: str = Field(..., description="동화책 제목")
-    stories: List[List[str]] = Field(
+    stories: List[str] = Field(
         ...,
-        description="감정 태그가 추가된 스토리 대사 목록 (각 페이지는 여러 대사를 포함)",
+        description="감정 태그가 추가된 스토리 대사 목록 (평탄화된 리스트)",
     )
