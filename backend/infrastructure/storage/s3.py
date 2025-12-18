@@ -153,7 +153,7 @@ class S3StorageService(AbstractStorageService):
         except ClientError:
             return False
 
-    def get_url(self, path: str, expires_in: Optional[int] = None) -> str:
+    def get_url(self, path: str, expires_in: Optional[int] = None, bypass_cdn: bool = False) -> str:
         """
         Pre-signed URL 생성
         
@@ -162,6 +162,7 @@ class S3StorageService(AbstractStorageService):
         Args:
             path: 파일 경로 (예: "/api/v1/files/shared/books/{id}/videos/page_1.mp4" 또는 "shared/books/{id}/videos/page_1.mp4")
             expires_in: URL 만료 시간 (초). None이면 settings에서 가져옴
+            bypass_cdn: S3에서는 CDN을 사용하지 않으므로 무시됨 (호환성 유지)
         
         Returns:
             str: Pre-signed URL (만료 시간 포함)

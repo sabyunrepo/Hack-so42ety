@@ -86,7 +86,7 @@ class LocalStorageService(AbstractStorageService):
         full_path = self.base_path / path
         return full_path.exists()
 
-    def get_url(self, path: str) -> str:
+    def get_url(self, path: str, bypass_cdn: bool = False) -> str:
         """
         파일 접근 URL 반환
         
@@ -95,6 +95,7 @@ class LocalStorageService(AbstractStorageService):
         
         Args:
             path: 파일 경로
+            bypass_cdn: (Local에서는 무시됨)
         
         Returns:
             str: /api/v1/files/{path} 형식의 상대 URL
