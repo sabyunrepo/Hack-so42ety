@@ -7,7 +7,7 @@ import Creator from "./pages/Creator";
 import Viewer from "./pages/Viewer";
 import LoginPage from "./pages/LoginPage";
 // import RegisterPage from "./pages/RegisterPage";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider } from "./components/AuthProvider";
 import RequireAuth from "./components/RequireAuth";
 
 function App() {

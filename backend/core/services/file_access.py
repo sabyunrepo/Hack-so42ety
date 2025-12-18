@@ -120,7 +120,7 @@ class FileAccessService:
             raise FileNotFoundError(f"Book not found: {book_id}")
         
         # 공개 책: 모든 사용자 접근 가능
-        if book.is_public or book.visibility == "public":
+        if book.is_shared or book.visibility == "public":
             return True
         
         # 비공개 책: 소유자만 접근 가능
