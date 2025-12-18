@@ -297,6 +297,38 @@ async def get_book(
     return BookResponse.from_orm_with_urls(book, storage_service)
 
 
+@router.patch(
+    "/books/{book_id}/share",
+    response_model=BookResponse,
+    status_code=status.HTTP_200_OK,
+    summary="동화책 공유 설정 변경",
+    responses={
+        200: {"description": "변경 성공"},
+        401: {"description": "인증 실패"},
+        403: {"description": "권한 없음"},
+        404: {"description": "동화책을 찾을 수 없음"},
+    },
+)
+async def toggle_book_sharing(
+    book_id: UUID,
+    is_shared: bool = Body(..., embed=True, description="공유 여부 (True/False)"),
+    current_user: User = Depends(get_current_user),
+    service: BookOrchestratorService = Depends(get_book_service_write),
+    storage_service: AbstractStorageService = Depends(get_storage_service),
+):
+    """
+
+    동화책 공유 설정 변경 (Toggle Sharing)
+
+    - is_shared=True: 공유 (누구나 접근 가능)
+    - is_shared=False: 비공개 (소유자만 접근 가능)
+    """
+    book = await service.update_book_sharing(book_id, is_shared, current_user.id)
+
+    # ✅ ORM → DTO 변환 + URL 변환
+    return BookResponse.from_orm_with_urls(book, storage_service)
+
+
 @router.delete(
     "/books/{book_id}",
     status_code=status.HTTP_204_NO_CONTENT,
