@@ -3,6 +3,7 @@ JWT Manager
 JWT 토큰 생성 및 검증
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import uuid
@@ -10,6 +11,8 @@ from jose import JWTError, jwt, ExpiredSignatureError
 
 from ..config import settings
 from .exceptions import TokenExpiredException, InvalidTokenException
+
+logger = logging.getLogger(__name__)
 
 
 class JWTManager:
@@ -44,6 +47,16 @@ class JWTManager:
             )
 
         to_encode.update({"exp": expire, "type": "access"})
+
+        logger.info(
+            "🔑 [ACCESS TOKEN] Created",
+            extra={
+                "user_id": data.get("sub"),
+                "email": data.get("email"),
+                "expires_at": expire.isoformat(),
+                "ttl_minutes": settings.jwt_access_token_expire_minutes,
+            }
+        )
 
         encoded_jwt = jwt.encode(
             to_encode,
@@ -81,6 +94,16 @@ class JWTManager:
             to_encode["jti"] = str(uuid.uuid4())
 
         to_encode.update({"exp": expire, "type": "refresh"})
+
+        logger.info(
+            "🔄 [REFRESH TOKEN] Created",
+            extra={
+                "user_id": data.get("sub"),
+                "email": data.get("email"),
+                "expires_at": expire.isoformat(),
+                "ttl_days": settings.jwt_refresh_token_expire_days,
+            }
+        )
 
         encoded_jwt = jwt.encode(
             to_encode,
@@ -127,8 +150,33 @@ class JWTManager:
         """
         payload = JWTManager.decode_token(token)
 
+        if payload is None:
+            logger.warning(
+                "❌ [TOKEN VERIFY] Decode failed",
+                extra={"expected_type": token_type}
+            )
+            return None
+
         # 토큰 타입 검증
         if payload.get("type") != token_type:
-            raise InvalidTokenException()
+            logger.warning(
+                "❌ [TOKEN VERIFY] Type mismatch",
+                extra={
+                    "expected_type": token_type,
+                    "actual_type": payload.get("type"),
+                    "user_id": payload.get("sub"),
+                }
+            )
+            return None
+
+        logger.info(
+            "✅ [TOKEN VERIFY] Success",
+            extra={
+                "token_type": token_type,
+                "user_id": payload.get("sub"),
+                "email": payload.get("email"),
+                "expires_at": datetime.fromtimestamp(payload.get("exp")).isoformat() if payload.get("exp") else None,
+            }
+        )
 
         return payload
