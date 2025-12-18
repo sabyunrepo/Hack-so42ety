@@ -3,7 +3,6 @@ Core Configuration Module
 환경변수 및 애플리케이션 설정 중앙 관리
 """
 
-import json
 from typing import List, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -126,22 +125,6 @@ class Settings(BaseSettings):
         default="google:4@1", env="RUNWARE_IMG2IMG_MODEL"
     )
     # runware_img2img_model: str = Field(default="civitai:102438@133677", env="RUNWARE_IMG2IMG_MODEL")
-
-    @property
-    def kling_access_keys(self) -> List[str]:
-        """Kling Access Keys를 JSON 파싱하여 리스트로 반환"""
-        try:
-            return json.loads(self.kling_access_key)
-        except json.JSONDecodeError:
-            return []
-
-    @property
-    def kling_secret_keys(self) -> List[str]:
-        """Kling Secret Keys를 JSON 파싱하여 리스트로 반환"""
-        try:
-            return json.loads(self.kling_secret_key)
-        except json.JSONDecodeError:
-            return []
 
     # ==================== Storage ====================
     storage_provider: str = Field(default="local", env="STORAGE_PROVIDER")
