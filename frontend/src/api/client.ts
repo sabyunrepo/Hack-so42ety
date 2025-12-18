@@ -40,7 +40,9 @@ apiClient.interceptors.response.use(
       const refreshToken = localStorage.getItem("refresh_token");
 
       // Auth endpoints should not retry, EXCEPT /auth/logout
-      const isAuthEndpoint = originalRequest?.url?.includes("/auth/");
+      const isAuthEndpoint =
+        originalRequest?.url?.includes("/auth/") &&
+        !originalRequest?.url?.includes("/auth/logout");
 
       if (isAuthEndpoint) {
         console.log(
