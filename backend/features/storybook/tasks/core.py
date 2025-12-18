@@ -94,9 +94,9 @@ async def generate_story_task(
     response_schema = create_stories_response_schema(
         max_pages=num_pages,
         # max_dialogues_per_page는 프론트 최대 허용치보다 작게 제한 필요
-        max_dialogues_per_page=5,  # 프론트 허용 최대 개수
-        max_chars_per_dialogue=85,  # 프론트 허용 최대 개수
-        max_title_length=20,
+        max_dialogues_per_page=settings.max_dialogues_per_page,  # 프론트 허용 최대 개수
+        max_chars_per_dialogue=settings.max_chars_per_dialogue,  # 프론트 허용 최대 개수
+        max_title_length=settings.max_title_length,
     )
 
     # 레벨이 적용된 프롬프트 생성
@@ -542,8 +542,21 @@ async def generate_tts_task(
             # === Phase 2: Build Task List ===
             tasks_to_generate = []
             tasks_to_enqueue = []
+
+            # Redis에서 감정 포함 대화 텍스트 가져오기
+            dialogues_with_emotion = (
+                story_data.get("dialogues", []) if story_data else []
+            )
+            logger.info(f"[TTS Task] dialogues_with_emotion: {dialogues_with_emotion}")
+            logger.info(
+                f"[TTS Task] [Book: {book_id}] Loaded {len(dialogues_with_emotion)} pages with emotion from Redis"
+            )
+
             for page in book.pages:
+                page_idx = page.sequence - 1  # 0-indexed
                 for dialogue in page.dialogues:
+                    dialogue_idx = dialogue.sequence - 1  # 0-indexed
+
                     primary_translation = next(
                         (t for t in dialogue.translations if t.is_primary), None
                     )
@@ -559,6 +572,20 @@ async def generate_tts_task(
                             f"[TTS Task] [Book: {book_id}] Empty text for dialogue {dialogue.id}, skipping"
                         )
                         continue
+
+                    # 감정 포함 텍스트 가져오기 (fallback: DB 원본 텍스트)
+                    try:
+                        emotion_text = dialogues_with_emotion[page_idx][dialogue_idx]
+                        if not emotion_text or not emotion_text.strip():
+                            raise ValueError("Empty emotion text")
+                        logger.info(
+                            f"[TTS Task] [Book: {book_id}] Using emotion text for page {page_idx + 1}, dialogue {dialogue_idx + 1}"
+                        )
+                    except (IndexError, TypeError, ValueError) as e:
+                        emotion_text = primary_translation.text
+                        logger.warning(
+                            f"[TTS Task] [Book: {book_id}] Fallback to DB text for page {page_idx + 1}, dialogue {dialogue_idx + 1}: {e}"
+                        )
 
                     # file_name = f"users/{book.user_id}/audios/standalone/{uuid.uuid4()}.mp3"
                     audio_uuid = uuid.uuid4()
@@ -578,17 +605,16 @@ async def generate_tts_task(
                             f"[TTS Task] Failed to create DialogueAudio record for dialogue {dialogue.id}, skipping"
                         )
                         continue
-
                     logger.info(
                         f"[TTS Task] [Book: {book_id}] Enqueuing TTS for dialogue {dialogue.id}, audio_id={audio.id}"
                     )
                     logger.info(
-                        f"[TTS Task] [Book: {book_id}] Text: {primary_translation.text}"
+                        f"[TTS Task] [Book: {book_id}] Text (with emotion): {emotion_text}"
                     )
                     tasks_to_enqueue.append(
                         {
                             "audio_id": audio.id,
-                            "text": primary_translation.text,
+                            "text": emotion_text,
                             "dialogue_id": dialogue.id,
                         }
                     )

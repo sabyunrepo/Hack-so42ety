@@ -3,10 +3,16 @@ Auth API Endpoints (v1)
 인증 관련 API 라우터
 """
 
+import logging
 from fastapi import APIRouter, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database.session import get_db_readonly, get_db_write
+from backend.core.dependencies import get_cache_service
+from backend.core.cache.service import CacheService
+
+logger = logging.getLogger(__name__)
 from backend.core.auth import get_current_user
 from backend.core.dependencies import get_cache_service
 from backend.core.auth.jwt_manager import JWTManager
@@ -18,9 +24,11 @@ from backend.features.auth.schemas import (
     UserLoginRequest,
     GoogleOAuthRequest,
     RefreshTokenRequest,
+    LogoutRequest,
     AuthResponse,
     TokenResponse,
     UserResponse,
+    LogoutResponse,
     ErrorResponse,
 )
 from backend.features.auth.service import AuthService
@@ -29,6 +37,7 @@ from backend.core.events.redis_streams_bus import RedisStreamsEventBus
 from backend.core.cache.service import CacheService
 
 router = APIRouter()
+security = HTTPBearer()
 
 
 def get_auth_service_write(
@@ -196,38 +205,77 @@ async def refresh(
     Returns:
         TokenResponse: 새로운 Access Token
     """
-    new_access_token, new_refresh_token = await auth_service.refresh_access_token(
-        refresh_token=request.refresh_token
+    logger.info(
+        "🔄 [ENDPOINT] /auth/refresh called",
+        extra={"refresh_token_length": len(request.refresh_token)}
     )
 
-    return TokenResponse(
-        access_token=new_access_token,
-        refresh_token=new_refresh_token,  # RTR: 새로운 Refresh Token 반환
-        token_type="bearer",
-    )
+    try:
+        access_token, new_refresh_token = await auth_service.refresh_access_token(
+            refresh_token=request.refresh_token
+        )
+
+        logger.info("✅ [ENDPOINT] Token refresh successful")
+
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=new_refresh_token,
+            token_type="bearer",
+        )
+    except Exception as e:
+        logger.error(f"❌ [ENDPOINT] Token refresh failed: {str(e)}", exc_info=True)
+        raise
 
 
 @router.post(
     "/logout",
-    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=LogoutResponse,
     responses={
-        204: {"description": "로그아웃 성공"},
+        200: {"description": "로그아웃 성공"},
         401: {"model": ErrorResponse, "description": "인증 실패"},
     },
 )
 async def logout(
-    request: RefreshTokenRequest,
+    request: LogoutRequest,
+    current_user: dict = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
-    로그아웃 (Refresh Token 무효화)
+    로그아웃 - 토큰 무효화
 
     Args:
         request: 로그아웃 요청 (Refresh Token)
+        current_user: 현재 사용자 (JWT에서 추출)
+        credentials: Authorization Bearer 토큰
         auth_service: 인증 서비스
+
+    Returns:
+        LogoutResponse: 로그아웃 성공 메시지
     """
-    await auth_service.logout(refresh_token=request.refresh_token)
-    return
+    logger.info(
+        "🚪 [ENDPOINT] /auth/logout called",
+        extra={"user_id": current_user["user_id"]}
+    )
+
+    try:
+        access_token = credentials.credentials
+
+        await auth_service.logout(
+            user_id=current_user["user_id"],
+            access_token=access_token,
+            refresh_token=request.refresh_token,
+        )
+
+        logger.info("✅ [ENDPOINT] Logout successful")
+
+        return LogoutResponse(message="Logout successful")
+    except Exception as e:
+        logger.error(f"❌ [ENDPOINT] Logout failed: {str(e)}", exc_info=True)
+        raise
+
+
+
 
 
 @router.get(
