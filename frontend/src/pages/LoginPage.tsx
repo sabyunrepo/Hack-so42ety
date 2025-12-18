@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/use-auth";
 import { useNavigate } from "react-router-dom";
 // import { GoogleLogin } from "@react-oauth/google";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
@@ -61,7 +61,7 @@ const LoginPage = () => {
     }
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // ✅ 폼 제출 시 이전 에러를 초기화 (필수)
@@ -75,16 +75,12 @@ const handleSubmit = async (e: React.FormEvent) => {
       return;
     }
 
-
     try {
       await login({ email, password });
       posthog?.capture("login_success", { method: "email" });
       navigate("/");
     } catch (err) {
-
-
       setError(getUserFriendlyErrorMessage(err));
-
     }
   };
 
@@ -110,21 +106,21 @@ const handleSubmit = async (e: React.FormEvent) => {
           </div>
         )} */}
 
-{error && (
-  <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 shadow-sm">
-    <div className="flex items-start gap-2">
-      <span className="text-lg flex-shrink-0">⚠️</span>
-      <span className="flex-1 text-sm leading-snug">{error}</span>
-      <button
-        onClick={() => setError("")}
-        className="ml-4 p-0.5 text-red-700 hover:text-red-900 transition-colors flex-shrink-0"
-        aria-label="닫기"
-      >
-        &times;
-      </button>
-    </div>
-  </div>
-)}
+        {error && (
+          <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 shadow-sm">
+            <div className="flex items-start gap-2">
+              <span className="text-lg flex-shrink-0">⚠️</span>
+              <span className="flex-1 text-sm leading-snug">{error}</span>
+              <button
+                onClick={() => setError("")}
+                className="ml-4 p-0.5 text-red-700 hover:text-red-900 transition-colors flex-shrink-0"
+                aria-label="닫기"
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label

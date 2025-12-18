@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/use-auth";
 import { useNavigate, Link } from "react-router-dom";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 
