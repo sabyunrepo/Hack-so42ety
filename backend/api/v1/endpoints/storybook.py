@@ -142,7 +142,7 @@ async def create_book(
         num_pages=request.num_pages,
         target_age=request.target_age,
         theme=request.theme,
-        is_public=request.is_public,  # 기본값 False
+        is_shared=request.is_shared,
         visibility=request.visibility,  # 기본값 "private"
     )
 
