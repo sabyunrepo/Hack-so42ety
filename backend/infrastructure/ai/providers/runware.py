@@ -142,13 +142,13 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         self,
         image_data: bytes,
         prompt: str,
-        width: int = 1024,
-        height: int = 1024,
+        width: int = 864,
+        height: int = 1184,
         style: Optional[str] = None,
         strength: Optional[float] = None,
         cfg_scale: Optional[float] = None,
         steps: Optional[int] = None,
-    ) -> bytes:
+    ) -> Dict[str, Any]:
         """
         이미지-to-이미지 생성 (Runware Image-to-Image API)
 
@@ -163,7 +163,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             steps: 디노이징 스텝 (기본값: 30, 범위: 1-50)
 
         Returns:
-            bytes: 생성된 이미지 바이너리 데이터
+            Dict[str, Any]: Runware API 응답 (data[0].imageUUID, data[0].imageURL 포함)
 
         Raises:
             httpx.HTTPStatusError: API 요청 실패
@@ -189,8 +189,8 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "taskUUID": task_uuid,
                 "positivePrompt": prompt,
                 "referenceImages": [f"data:image/png;base64,{image_base64}"],
-                # "width": width,
-                # "height": height,
+                "width": width,
+                "height": height,
                 "model": settings.runware_img2img_model,
                 "numberResults": 1,
             }
@@ -231,7 +231,19 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 logger.error(f"[Image Task] Runware image-to-image failed: {error_msg}")
                 raise Exception(f"Runware API error: {error_msg}")
 
+            # 응답에서 이미지 데이터 확인
+            if "data" not in result or len(result["data"]) == 0:
+                raise Exception("No image data in response")
+
+            image_url = result["data"][0].get("imageURL")
+            image_uuid = result["data"][0].get("imageUUID")
+
+            logger.info(
+                f"[Image Task] Runware image-to-image generated: {image_url}, UUID: {image_uuid}"
+            )
             logger.info(f"[Image Task] Image-to-image generation successful")
+
+            # JSON 응답 반환 (core.py에서 imageUUID, imageURL 사용)
             return result
 
     async def generate_video(
@@ -239,25 +251,27 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         image_data: Optional[bytes] = None,
         image_uuid: Optional[str] = None,
         prompt: Optional[str] = None,
-        duration: int = 5,
-        width: int = 720,
-        height: int = 720,
-        fps: Optional[int] = None,
+        duration: float = 4.0,
+        width: int = 832,
+        height: int = 1120,
+        fps: int = 24,
         output_format: str = "mp4",
         output_quality: int = 95,
+        camera_fixed: bool = True,
     ) -> str:
         """
-        비디오 생성 작업 시작 (Image-to-Video)
+        비디오 생성 작업 시작 (Image-to-Video) - Seedance 1.0 Pro Fast
 
         Args:
             image_data: 입력 이미지 바이너리 데이터
-            prompt: 비디오 생성 프롬프트 (옵션)
-            duration: 비디오 길이 (초, 기본값: 5, 범위: 1-10)
-            width: 비디오 너비 (기본값: 1920, 8의 배수 필수)
-            height: 비디오 높이 (기본값: 1080, 8의 배수 필수)
-            fps: 프레임률 (옵션, 모델 기본값 사용, 범위: 15-60)
+            prompt: 비디오 생성 프롬프트 (옵션, 2-3000자)
+            duration: 비디오 길이 (초, 기본값: 5.0, 범위: 1.2-12, 0.1초 단위)
+            width: 비디오 너비 (기본값: 544, 3:4 비율 720p)
+            height: 비디오 높이 (기본값: 736, 3:4 비율 720p)
+            fps: 프레임률 (기본값: 24, Seedance 고정값)
             output_format: 출력 형식 (mp4, webm)
             output_quality: 출력 품질 (20-99, 기본값: 95)
+            camera_fixed: 카메라 고정 여부 (기본값: True)
 
         Returns:
             str: task_uuid (Runware task ID)
@@ -266,19 +280,10 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             ValueError: 파라미터 검증 실패
             Exception: API 에러
         """
-        # 파라미터 검증
-        if width % 8 != 0 or height % 8 != 0:
+        if not (1.2 <= duration <= 12):
             raise ValueError(
-                f"width and height must be multiples of 8. Got: {width}x{height}"
+                f"duration must be between 1.2 and 12 seconds. Got: {duration}"
             )
-
-        if not (1 <= duration <= 10):
-            raise ValueError(
-                f"duration must be between 1 and 10 seconds. Got: {duration}"
-            )
-
-        if fps is not None and not (15 <= fps <= 60):
-            raise ValueError(f"fps must be between 15 and 60. Got: {fps}")
 
         if output_quality < 20 or output_quality > 99:
             raise ValueError(
@@ -286,6 +291,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             )
 
         task_uuid = str(uuid.uuid4())
+        model = "bytedance:2@2"
 
         payload = [
             {
@@ -293,8 +299,11 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "taskUUID": task_uuid,
                 "positivePrompt": prompt
                 or "animate this image naturally with smooth motion",
-                "model": settings.runware_video_model,
+                "fps": fps,
+                "model": model,
                 "duration": duration,
+                "width": width,
+                "height": height,
                 "outputFormat": output_format,
                 "outputQuality": output_quality,
                 "deliveryMethod": "async",
@@ -302,6 +311,12 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "numberResults": 1,
             }
         ]
+
+        # bytedance 모델인 경우에만 providerSettings 추가
+        if "bytedance" in settings.runware_video_model:
+            payload[0]["providerSettings"] = {
+                "bytedance": {"cameraFixed": camera_fixed}
+            }
 
         # 이미지가 제공된 경우: Image-to-Video (frameImages 추가)
         if image_data is not None:
@@ -318,6 +333,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             # 이미지가 없는 경우: Text-to-Video
             logger.info(f"[Video Task] Mode: Text-to-Video (no frameImages)")
 
+        # image_uuid가 있으면 우선 사용 (기존 이미지 UUID)
         if image_uuid is not None:
             payload[0]["frameImages"] = [{"inputImage": image_uuid, "frame": "first"}]
             logger.info(
@@ -328,11 +344,6 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 {"inputImage": f"data:image/png;base64,{image_data}", "frame": "first"}
             ]
             logger.info("[Video Task] Mode: Image-to-Video (frameImages included)")
-        # Existing Image-to-Video: image_uuid 제공
-
-        # FPS가 지정된 경우 추가
-        if fps is not None:
-            payload[0]["fps"] = fps
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             logger.info(f"[Video Task] Sending request to {self.base_url}")
