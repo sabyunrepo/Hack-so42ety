@@ -94,9 +94,9 @@ async def generate_story_task(
     response_schema = create_stories_response_schema(
         max_pages=num_pages,
         # max_dialogues_per_page는 프론트 최대 허용치보다 작게 제한 필요
-        max_dialogues_per_page=5,  # 프론트 허용 최대 개수
-        max_chars_per_dialogue=85,  # 프론트 허용 최대 개수
-        max_title_length=20,
+        max_dialogues_per_page=settings.max_dialogues_per_page,  # 프론트 허용 최대 개수
+        max_chars_per_dialogue=settings.max_chars_per_dialogue,  # 프론트 허용 최대 개수
+        max_title_length=settings.max_title_length,
     )
 
     # 레벨이 적용된 프롬프트 생성

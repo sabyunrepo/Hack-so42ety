@@ -169,6 +169,13 @@ class Settings(BaseSettings):
     max_books_per_user: int = Field(default=3, env="MAX_BOOKS_PER_USER")
     max_pages_per_book: int = Field(default=5, env="MAX_PAGES_PER_BOOK")
     max_voice_clones_per_user: int = Field(default=1, env="MAX_VOICE_CLONES_PER_USER")
+    max_dialogues_per_page: int = Field(
+        default=4, env="MAX_DIALOGUES_PER_PAGE"
+    )  # 프론트 허용 최대 개수
+    max_chars_per_dialogue: int = Field(
+        default=85, env="MAX_CHARS_PER_DIALOGUE"
+    )  # 프론트 허용 최대 개수
+    max_title_length: int = Field(default=20, env="MAX_TITLE_LENGTH")
 
     # ==================== Difficulty Validation ====================
     # 스토리 난이도 검증을 위한 Flesch-Kincaid Grade Level 허용 오차 값 (임시로 10.0 설정)
