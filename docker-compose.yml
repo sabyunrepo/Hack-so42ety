@@ -97,39 +97,39 @@ services:
       start_period: 40s
 
   # ==================== Frontend (Nginx + Static Files) ====================
-  frontend:
-    build:
-      context: .
-      dockerfile: docker/frontend/Dockerfile
-      args:
-        APP_ENV: dev
-    image: moriai-frontend:dev
-    container_name: moriai-frontend
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - app-data:/app/data:ro
-    environment:
-      - BACKEND_PORT=${BACKEND_PORT:-8000}
-    networks:
-      - moriai-network
-    depends_on:
-      backend:
-        condition: service_healthy
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/frontend/Dockerfile
+  #     args:
+  #       APP_ENV: dev
+  #   image: moriai-frontend:dev
+  #   container_name: moriai-frontend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #   volumes:
+  #     - app-data:/app/data:ro
+  #   environment:
+  #     - BACKEND_PORT=${BACKEND_PORT:-8000}
+  #   networks:
+  #     - moriai-network
+  #   depends_on:
+  #     backend:
+  #       condition: service_healthy
 
   # ==================== Cloudflare Tunnel ====================
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: moriai-cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    networks:
-      - moriai-network
-    depends_on:
-      - frontend
-    profiles:
-      - production  # Only run in production
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: moriai-cloudflared
+  #   restart: unless-stopped
+  #   command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+  #   networks:
+  #     - moriai-network
+  #   depends_on:
+  #     - frontend
+  #   profiles:
+  #     - production  # Only run in production
 
 # ==================== Networks ====================
 networks:
