@@ -208,6 +208,35 @@ class BookOrchestratorService:
 
         return book
 
+    async def update_book_sharing(self, book_id: uuid.UUID, is_shared: bool, user_id: uuid.UUID) -> Book:
+        """책 공유 상태 업데이트"""
+        # 1. 책 조회 (권한 체크 포함)
+        # get_book calls repo.get_with_pages which detaches.
+        # But we need to verify ownership.
+        # However, update() in repo will fetch again attached.
+        
+        # Verify ownership simply via get (attached) or query.
+        # Efficient way: Use repo.get() which returns attached object?
+        # AbstractRepository.get() usually returns scalar.
+        # But let's check repo implementation. Repository inherits AbstractRepository.
+        # AbstractRepository implementation typically: session.get(Model, id).
+        
+        # Safe way:
+        book = await self.book_repo.get(book_id)
+        if not book:
+             raise StorybookNotFoundException(storybook_id=str(book_id))
+        
+        if book.user_id != user_id:
+             raise StorybookUnauthorizedException(storybook_id=str(book_id), user_id=str(user_id))
+        
+        # Update
+        book.is_shared = is_shared
+        self.db_session.add(book)
+        await self.db_session.commit()
+        
+        # Reload with pages for response schema
+        return await self.book_repo.get_with_pages(book_id)
+
     async def delete_book(self, book_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """책 삭제"""
         # 본인 책인지 확인 로직은 Repository나 Service 레벨에서 수행
