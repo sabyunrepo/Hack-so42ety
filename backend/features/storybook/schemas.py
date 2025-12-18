@@ -40,9 +40,9 @@ class CreateBookRequest(BaseModel):
         description="동화 테마 (adventure, education, fantasy, friendship 등)",
         example="adventure"
     )
-    is_public: bool = Field(
+    is_shared: bool = Field(
         default=False,
-        description="공개 여부 (기본값: False)",
+        description="공유 여부 (기본값: False)",
         example=False
     )
     visibility: str = Field(
@@ -230,6 +230,7 @@ class BookSummaryResponse(BaseModel):
     progress_percentage: int = Field(default=0, description="전체 진행률 (0-100)")
     error_message: Optional[str] = Field(None, description="에러 메시지 (실패 시)")
     retry_count: int = Field(default=0, description="재시도 횟수")
+    is_shared: bool = Field(default=False, description="공유 여부")
 
     class Config:
         from_attributes = True
@@ -264,6 +265,7 @@ class BookResponse(BaseModel):
     progress_percentage: int = Field(default=0, description="전체 진행률 (0-100)", example=0)
     error_message: Optional[str] = Field(None, description="에러 메시지 (실패 시)")
     retry_count: int = Field(default=0, description="재시도 횟수", example=0)
+    is_shared: bool = Field(default=False, description="공유 여부", example=False)
 
     class Config:
         from_attributes = True
@@ -325,6 +327,7 @@ class BookResponse(BaseModel):
             progress_percentage=book.progress_percentage,
             error_message=book.error_message,
             retry_count=book.retry_count,
+            is_shared=book.is_shared,
         )
 
 class BookListResponse(BaseModel):

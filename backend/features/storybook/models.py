@@ -98,7 +98,7 @@ class Book(Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # 공개/비공개 설정
-    is_public: Mapped[bool] = mapped_column(
+    is_shared: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         server_default="false",
