@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, status, File, Form, UploadFile
-from typing import List
+from fastapi import APIRouter, Depends, status, File, Form, UploadFile, Body
+from typing import List, Optional
 from uuid import UUID
 
-from backend.core.auth.dependencies import get_current_user_object as get_current_user
+from backend.core.auth.dependencies import (
+    get_current_user_object as get_current_user,
+    get_optional_user_object,
+)
 from backend.core.dependencies import get_storage_service
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.features.auth.models import User
@@ -269,53 +272,26 @@ async def list_books(
     summary="동화책 상세 조회",
     responses={
         200: {"description": "조회 성공"},
-        401: {"description": "인증 실패"},
-        403: {"description": "권한 없음"},
+        401: {"description": "인증 실패 (비공개 책 접근 시)"},
+        403: {"description": "권한 없음 (다른 사용자의 비공개 책)"},
         404: {"description": "동화책을 찾을 수 없음"},
     },
 )
 async def get_book(
     book_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_user_object),
     service: BookOrchestratorService = Depends(get_book_service_readonly),
     storage_service: AbstractStorageService = Depends(get_storage_service),
 ):
     """
     동화책 상세 조회
-
-    특정 동화책의 전체 정보를 조회합니다 (페이지, 대화문, 이미지 포함).
-
-    Args:
-        book_id (UUID): 조회할 동화책의 고유 ID
-        current_user: 인증된 사용자 정보
-        service: BookOrchestratorService (의존성 주입)
-        storage_service: Storage Service (URL 변환용)
-
-    Returns:
-        BookResponse: 동화책 상세 정보
-            - pages: 모든 페이지 정보 (순서대로 정렬)
-            - dialogues: 각 페이지의 대화문 (영어/한국어, 음성 URL)
-            - images: 각 페이지의 이미지 URL
-
-    Raises:
-        HTTPException 401: 인증 실패
-        HTTPException 403: 다른 사용자의 동화책 접근 시도
-        HTTPException 404: 동화책을 찾을 수 없음
-
-    Note:
-        - 본인이 생성한 동화책만 조회 가능
-        - is_default=true인 샘플 동화책은 모두 조회 가능
+    
+    특정 동화책의 전체 정보를 조회합니다.
+    - 공유된 책(is_shared=True)은 누구나 조회 가능
+    - 비공개 책은 소유자만 조회 가능
     """
-    book = await service.get_book(book_id)
-
-    # RLS가 있지만, 서비스 레벨에서도 한 번 더 체크하는 것이 안전 (또는 RLS가 처리)
-    # Service에서 StorybookUnauthorizedException을 발생시키도록 변경 필요
-    from backend.features.storybook.exceptions import StorybookUnauthorizedException
-
-    if book.user_id != current_user.id and not book.is_default:
-        raise StorybookUnauthorizedException(
-            storybook_id=str(book_id), user_id=str(current_user.id)
-        )
+    user_id = current_user.id if current_user else None
+    book = await service.get_book(book_id, user_id)
 
     # ✅ ORM → DTO 변환 + URL 변환 (ORM 객체 직접 수정하지 않음)
     return BookResponse.from_orm_with_urls(book, storage_service)
