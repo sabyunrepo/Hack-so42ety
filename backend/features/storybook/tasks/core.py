@@ -189,11 +189,25 @@ async def generate_story_task(
     logger.info(f"[Story Task] Generating story with emotions: {response_with_emotion}")
     dialogues_with_emotions = response_with_emotion.stories
 
+    # 페이지 구조 복원: dialogues의 페이지별 대사 수에 맞춰 재구성
+    page_sizes = [len(page) for page in dialogues]
+    flat_emotions = dialogues_with_emotions if dialogues_with_emotions else []
+
+    restructured_dialogues = []
+    idx = 0
+    for size in page_sizes:
+        restructured_dialogues.append(flat_emotions[idx : idx + size])
+        idx += size
+
+    logger.info(
+        f"[Story Task] Restructured dialogues: {len(restructured_dialogues)} pages"
+    )
+
     # === Phase 3: Redis 저장 - 세션 밖에서 실행 ===
     task_store = TaskStore()
     story_key = f"story:{book_id}"
     await task_store.set(
-        story_key, {"dialogues": dialogues_with_emotions, "title": book_title}, ttl=3600
+        story_key, {"dialogues": restructured_dialogues, "title": book_title}, ttl=3600
     )
 
     # === Phase 4: DB 작업만 세션 안에서 실행 ===
