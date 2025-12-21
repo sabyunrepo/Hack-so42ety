@@ -7,14 +7,88 @@ import uuid
 import base64
 import logging
 from typing import Optional, Dict, Any
-from io import BytesIO
 import httpx
-from PIL import Image
 
 from ..base import VideoGenerationProvider, ImageGenerationProvider
 from ....core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# Model Configuration Dictionaries
+# ============================================================
+
+IMAGE_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
+    "google": {
+        "default_width": 896,
+        "default_height": 1152,
+        "reference_key": "referenceImages",  # Top-level
+        "provider_settings": None,
+        "output_type": ["dataURI", "URL"],
+        "output_format": "PNG",
+        "include_cost": True,
+        "output_quality": 85,
+    },
+    "openai:1@2": {  # GPT Image 1 Mini
+        "default_width": 1024,
+        "default_height": 1024,
+        "reference_key": "inputs.referenceImages",  # Nested
+        "provider_settings": {"openai": {"quality": "auto", "background": "opaque"}},
+        "output_type": ["dataURI", "URL"],
+        "output_format": "PNG",
+        "include_cost": True,
+        "output_quality": 85,
+    },
+    "openai:4@1": {  # GPT Image 1.5
+        "default_width": 1024,
+        "default_height": 1536,
+        "reference_key": "inputs.referenceImages",
+        "provider_settings": {"openai": {"quality": "low", "background": "opaque"}},
+        "output_type": ["dataURI", "URL"],
+        "output_format": "PNG",
+        "include_cost": True,
+        "output_quality": 85,
+    },
+}
+
+VIDEO_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
+    "klingai": {
+        "default_duration": 5,
+        "supports_dimensions": False,
+        "provider_settings": None,
+    },
+    "bytedance": {
+        "default_duration": 4.0,
+        "default_fps": 24,
+        "default_width": 832,
+        "default_height": 1120,
+        "supports_dimensions": True,
+        "provider_settings_key": "bytedance",
+    },
+}
+
+
+def get_image_config(model_id: str) -> Dict[str, Any]:
+    """모델 ID에서 이미지 설정 조회 (부분 매칭 지원)"""
+    # 정확한 매칭 먼저
+    if model_id in IMAGE_MODEL_CONFIGS:
+        return IMAGE_MODEL_CONFIGS[model_id]
+
+    # 부분 매칭
+    for key in IMAGE_MODEL_CONFIGS:
+        if key in model_id:
+            return IMAGE_MODEL_CONFIGS[key]
+
+    # 기본값: google
+    return IMAGE_MODEL_CONFIGS["google"]
+
+
+def get_video_config(model_id: str) -> Dict[str, Any]:
+    """모델 ID에서 비디오 설정 조회 (부분 매칭 지원)"""
+    for key in VIDEO_MODEL_CONFIGS:
+        if key in model_id:
+            return VIDEO_MODEL_CONFIGS[key]
+    return VIDEO_MODEL_CONFIGS["klingai"]
 
 
 class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
@@ -40,8 +114,8 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         prompt: str,
         width: int = 512,
         height: int = 512,
-        quality: str = "standard",
-        style: Optional[str] = None,
+        quality: str = "standard",  # noqa: ARG002 - kept for API compatibility
+        style: Optional[str] = None,  # noqa: ARG002 - kept for API compatibility
     ) -> bytes:
         """
         이미지 생성 (Runware REST API)
@@ -142,25 +216,34 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         self,
         image_data: bytes,
         prompt: str,
-        width: int = 864,
-        height: int = 1184,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
         style: Optional[str] = None,
         strength: Optional[float] = None,
         cfg_scale: Optional[float] = None,
         steps: Optional[int] = None,
+        quality: Optional[str] = None,
+        background: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        이미지-to-이미지 생성 (Runware Image-to-Image API)
+        이미지-to-이미지 생성 (Runware Image-to-Image API) - 모델별 동적 설정 지원
+
+        지원 모델:
+            - google:4@1 (Google): referenceImages 최상위 레벨, 864x1184
+            - openai:1@2 (GPT Image 1 Mini): inputs.referenceImages, 1024x1024, providerSettings
+            - openai:4@1 (GPT Image 1.5): inputs.referenceImages, 1024x1024, providerSettings
 
         Args:
             image_data: 입력 이미지 바이너리
             prompt: 이미지 생성 프롬프트
-            width: 너비 (기본값: 1024)
-            height: 높이 (기본값: 1024)
+            width: 너비 (None이면 모델별 기본값: google=864, openai=1024)
+            height: 높이 (None이면 모델별 기본값: google=1184, openai=1024)
             style: 스타일 (현재 미사용)
-            strength: 변환 강도 (0.0-1.0, 기본값: 0.7, 권장: 0.7-0.9)
-            cfg_scale: 프롬프트 가이드 강도 (기본값: 7.0, 범위: 1.0-20.0)
-            steps: 디노이징 스텝 (기본값: 30, 범위: 1-50)
+            strength: 변환 강도 (0.0-1.0, 기본값: 0.7, 권장: 0.7-0.9) - google만
+            cfg_scale: 프롬프트 가이드 강도 (기본값: 7.0, 범위: 1.0-20.0) - google만
+            steps: 디노이징 스텝 (기본값: 30, 범위: 1-50) - google만
+            quality: 품질 설정 (openai만: "auto", "high")
+            background: 배경 설정 (openai만: "opaque", "auto", "transparent")
 
         Returns:
             Dict[str, Any]: Runware API 응답 (data[0].imageUUID, data[0].imageURL 포함)
@@ -169,36 +252,54 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             httpx.HTTPStatusError: API 요청 실패
             Exception: 응답 형식 오류 또는 API 에러
         """
+        # Unused parameters kept for backward compatibility
+        _ = (strength, cfg_scale, steps, style, quality, background)
+
         task_uuid = str(uuid.uuid4())
         image_base64 = base64.b64encode(image_data).decode("utf-8")
-        result = None  # ✅ 무조건 초기화
+        result = None
 
-        # 설정에서 기본값 가져오기 (없으면 전달된 인자 사용)
-        strength = (
-            strength if strength is not None else settings.runware_img2img_strength
-        )
-        cfg_scale = (
-            cfg_scale if cfg_scale is not None else settings.runware_img2img_cfg_scale
-        )
-        steps = steps if steps is not None else settings.runware_img2img_steps
+        model = settings.runware_img2img_model
+        config = get_image_config(model)
 
-        # REST API 페이로드 (배열 형태)
+        # Base payload (common fields)
         payload = [
             {
                 "taskType": "imageInference",
                 "taskUUID": task_uuid,
                 "positivePrompt": prompt,
-                "referenceImages": [f"data:image/png;base64,{image_base64}"],
-                "width": width,
-                "height": height,
-                "model": settings.runware_img2img_model,
+                "model": model,
                 "numberResults": 1,
             }
         ]
-        # "seedImage": f"data:image/png;base64,{image_base64}",  # 이미지를 seedImage로 사용
-        # "strength": strength,          # 변환 강도 (0.0-1.0)
-        # "CFGScale": cfg_scale,         # 프롬프트 가이드 스케일
-        # "steps": steps,                # 디노이징 스텝 수
+
+        # Apply config-based settings
+        payload[0]["width"] = width if width is not None else config["default_width"]
+        payload[0]["height"] = height if height is not None else config["default_height"]
+
+        # Reference images (nested or top-level based on config)
+        if config["reference_key"] == "inputs.referenceImages":
+            payload[0]["inputs"] = {
+                "referenceImages": [f"data:image/png;base64,{image_base64}"]
+            }
+        else:
+            payload[0]["referenceImages"] = [f"data:image/png;base64,{image_base64}"]
+
+        # Provider settings
+        if config.get("provider_settings"):
+            payload[0]["providerSettings"] = config["provider_settings"]
+
+        # Optional output settings (OpenAI specific)
+        if config.get("output_type"):
+            payload[0]["outputType"] = config["output_type"]
+        if config.get("output_format"):
+            payload[0]["outputFormat"] = config["output_format"]
+        if config.get("include_cost"):
+            payload[0]["includeCost"] = config["include_cost"]
+        if config.get("output_quality"):
+            payload[0]["outputQuality"] = config["output_quality"]
+
+        logger.info(f"[Image Task] Using model: {model}, size: {payload[0]['width']}x{payload[0]['height']}")
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
@@ -235,13 +336,14 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             if "data" not in result or len(result["data"]) == 0:
                 raise Exception("No image data in response")
 
-            image_url = result["data"][0].get("imageURL")
             image_uuid = result["data"][0].get("imageUUID")
+            actual_width = payload[0].get("width")
+            actual_height = payload[0].get("height")
 
             logger.info(
-                f"[Image Task] Runware image-to-image generated: {image_url}, UUID: {image_uuid}"
+                f"[Image Task] Image-to-image completed: model={model}, "
+                f"size={actual_width}x{actual_height}, UUID={image_uuid}"
             )
-            logger.info(f"[Image Task] Image-to-image generation successful")
 
             # JSON 응답 반환 (core.py에서 imageUUID, imageURL 사용)
             return result
@@ -251,27 +353,32 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         image_data: Optional[bytes] = None,
         image_uuid: Optional[str] = None,
         prompt: Optional[str] = None,
-        duration: float = 4.0,
-        width: int = 832,
-        height: int = 1120,
-        fps: int = 24,
+        duration: Optional[float] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        fps: Optional[int] = None,
         output_format: str = "mp4",
         output_quality: int = 95,
         camera_fixed: bool = True,
     ) -> str:
         """
-        비디오 생성 작업 시작 (Image-to-Video) - Seedance 1.0 Pro Fast
+        비디오 생성 작업 시작 (Image-to-Video) - 모델별 동적 설정 지원
+
+        지원 모델:
+            - klingai:6@0 (Kling AI): duration만 사용, fps/width/height 미사용
+            - bytedance:2@2 (ByteDance Seedance): 모든 파라미터 사용
 
         Args:
-            image_data: 입력 이미지 바이너리 데이터
+            image_data: 입력 이미지 바이너리 데이터 (base64 인코딩됨)
+            image_uuid: Runware 이미지 UUID (image_data보다 우선)
             prompt: 비디오 생성 프롬프트 (옵션, 2-3000자)
-            duration: 비디오 길이 (초, 기본값: 5.0, 범위: 1.2-12, 0.1초 단위)
-            width: 비디오 너비 (기본값: 544, 3:4 비율 720p)
-            height: 비디오 높이 (기본값: 736, 3:4 비율 720p)
-            fps: 프레임률 (기본값: 24, Seedance 고정값)
+            duration: 비디오 길이 (초, None이면 모델별 기본값: klingai=5, bytedance=4)
+            width: 비디오 너비 (bytedance만 사용, 기본값: 832)
+            height: 비디오 높이 (bytedance만 사용, 기본값: 1120)
+            fps: 프레임률 (bytedance만 사용, 기본값: 24)
             output_format: 출력 형식 (mp4, webm)
             output_quality: 출력 품질 (20-99, 기본값: 95)
-            camera_fixed: 카메라 고정 여부 (기본값: True)
+            camera_fixed: 카메라 고정 여부 (bytedance만 사용, 기본값: True)
 
         Returns:
             str: task_uuid (Runware task ID)
@@ -280,7 +387,8 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             ValueError: 파라미터 검증 실패
             Exception: API 에러
         """
-        if not (1.2 <= duration <= 12):
+        # Validation
+        if duration is not None and not (1.2 <= duration <= 12):
             raise ValueError(
                 f"duration must be between 1.2 and 12 seconds. Got: {duration}"
             )
@@ -291,19 +399,17 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             )
 
         task_uuid = str(uuid.uuid4())
-        model = "bytedance:2@2"
+        model = settings.runware_video_model
+        config = get_video_config(model)
 
+        # Base payload (common fields)
         payload = [
             {
                 "taskType": "videoInference",
                 "taskUUID": task_uuid,
                 "positivePrompt": prompt
                 or "animate this image naturally with smooth motion",
-                "fps": fps,
                 "model": model,
-                "duration": duration,
-                "width": width,
-                "height": height,
                 "outputFormat": output_format,
                 "outputQuality": output_quality,
                 "deliveryMethod": "async",
@@ -312,26 +418,20 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             }
         ]
 
-        # bytedance 모델인 경우에만 providerSettings 추가
-        if "bytedance" in settings.runware_video_model:
-            payload[0]["providerSettings"] = {
-                "bytedance": {"cameraFixed": camera_fixed}
-            }
+        # Apply config-based settings
+        payload[0]["duration"] = duration if duration is not None else config["default_duration"]
 
-        # 이미지가 제공된 경우: Image-to-Video (frameImages 추가)
-        if image_data is not None:
-            payload[0]["frameImages"] = [
-                {
-                    "inputImage": f"data:image/png;base64,{image_data}",
-                    "frame": "first",  # 첫 프레임에 이미지 배치
-                }
-            ]
-            logger.info(
-                f"[Video Task] Mode: Image-to-Video (frameImages included, resized)"
-            )
-        else:
-            # 이미지가 없는 경우: Text-to-Video
-            logger.info(f"[Video Task] Mode: Text-to-Video (no frameImages)")
+        # Dimensions (only for models that support it)
+        if config.get("supports_dimensions"):
+            payload[0]["fps"] = fps if fps is not None else config.get("default_fps", 24)
+            payload[0]["width"] = width if width is not None else config.get("default_width")
+            payload[0]["height"] = height if height is not None else config.get("default_height")
+
+        # Provider settings
+        if config.get("provider_settings_key"):
+            payload[0]["providerSettings"] = {
+                config["provider_settings_key"]: {"cameraFixed": camera_fixed}
+            }
 
         # image_uuid가 있으면 우선 사용 (기존 이미지 UUID)
         if image_uuid is not None:
@@ -344,6 +444,9 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 {"inputImage": f"data:image/png;base64,{image_data}", "frame": "first"}
             ]
             logger.info("[Video Task] Mode: Image-to-Video (frameImages included)")
+        else:
+            # 이미지가 없는 경우: Text-to-Video
+            logger.info("[Video Task] Mode: Text-to-Video (no frameImages)")
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             logger.info(f"[Video Task] Sending request to {self.base_url}")
@@ -387,9 +490,12 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 logger.error(f"[Video Task] Error Response Body: {error_detail}")
                 raise Exception(f"HTTP {e.response.status_code}: {error_detail}")
 
+        actual_duration = payload[0].get("duration")
+        actual_width = payload[0].get("width", "N/A")
+        actual_height = payload[0].get("height", "N/A")
         logger.info(
-            f"[Video Task] Runware video generation started: task_uuid={task_uuid}, "
-            f"duration={duration}s, size={width}x{height}"
+            f"[Video Task] Runware video generation started: model={model}, "
+            f"task_uuid={task_uuid}, duration={actual_duration}s, size={actual_width}x{actual_height}"
         )
         return task_uuid
 
