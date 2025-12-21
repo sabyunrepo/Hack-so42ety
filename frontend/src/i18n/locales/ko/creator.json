@@ -1,0 +1,33 @@
+{
+  "voice": "음성:",
+  "voicePreview": "음성 미리듣기",
+  "voicePreviewNotAvailable": "프리뷰 음성이 만들어지지 않았지만 동화 생성은 가능합니다",
+  "noVoice": "음성 없음",
+  "noVoiceWarning": "준비된 음성이 없습니다. 목소리를 등록해주세요",
+  "goToSettings": "목소리 설정하러 가기",
+  "creationComplete": "생성 완료",
+  "creating": "만드는 중...",
+  "modals": {
+    "pageLimit": {
+      "title": "페이지 제한",
+      "maxPages": "동화는 최대 5 페이지까지 만들 수 있어요.",
+      "minPages": "최소 한 페이지는 있어야 해요."
+    },
+    "bookLimit": {
+      "title": "책 권수 제한",
+      "message": "동화책은 최대 5권까지 만들 수 있어요. 기존 책을 삭제한 후 다시 시도해주세요."
+    },
+    "validation": {
+      "title": "입력 확인",
+      "message": "모든 페이지에 이미지와 이야기를 채워주세요."
+    },
+    "success": {
+      "title": "동화책 생성",
+      "message": "생성 완료까지 10분 걸림"
+    },
+    "error": {
+      "title": "오류 발생",
+      "message": "오류가 발생했어요. 다시 시도해주세요."
+    }
+  }
+}

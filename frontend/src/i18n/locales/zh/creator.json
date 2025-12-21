@@ -1,0 +1,7 @@
+{
+  "voice": "语音：",
+  "noVoice": "无语音",
+  "noVoiceWarning": "没有可用的语音。请注册您的声音。",
+  "creationComplete": "创建完成",
+  "creating": "创建中..."
+}

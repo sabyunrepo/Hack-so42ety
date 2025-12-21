@@ -1,0 +1,32 @@
+{
+  "confirm": {
+    "yes": "Có",
+    "no": "Không"
+  },
+  "alert": {
+    "defaultTitle": "Yêu cầu hoàn tất!",
+    "defaultMessage": "Yêu cầu của bạn đã được xử lý thành công.",
+    "defaultButton": "OK"
+  },
+  "script": {
+    "title": "Kịch bản ghi âm",
+    "languageSelect": {
+      "korean": "한국어",
+      "english": "English"
+    },
+    "instructions": {
+      "title": "Hướng dẫn",
+      "emotionLabel": "Tham khảo cảm xúc/âm điệu:",
+      "emotion": "Đọc mỗi câu một cách rõ ràng và tự nhiên, theo cảm xúc và âm điệu được cung cấp. (Kịch bản chỉ để tham khảo; bạn không cần phải đọc chính xác như được viết.)",
+      "languageLabel": "Lựa chọn ngôn ngữ:",
+      "language": "Bạn có thể ghi âm bằng tiếng Hàn hoặc tiếng Anh, tùy theo bạn cảm thấy thoải mái hơn.",
+      "lengthLabel": "Yêu cầu về độ dài:",
+      "length": "Nếu bản ghi âm ngắn hơn 2 phút 30 giây, việc tạo TTS sẽ không thể thực hiện được.",
+      "lengthRecommendation": "(Thời gian ghi âm được khuyến nghị: từ 2 phút 30 giây đến 3 phút.)",
+      "retryLabel": "Ghi âm lại/Tiếp tục:",
+      "retry": "Nếu bạn hoàn thành đọc kịch bản nhưng chưa đạt 2 phút 30 giây, bạn có thể tiếp tục đọc từ đầu.",
+      "silenceLabel": "Phần im lặng:",
+      "silence": "Các phần im lặng trong quá trình ghi âm sẽ tự động bị xóa, vì vậy hãy từ từ thực hiện."
+    }
+  }
+}

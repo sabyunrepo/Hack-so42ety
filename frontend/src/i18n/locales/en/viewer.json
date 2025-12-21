@@ -1,0 +1,8 @@
+{
+  "loading": "Loading book...",
+  "error": "An error occurred",
+  "backToBookshelf": "Back to Bookshelf",
+  "notFound": "Book not found",
+  "noTitle": "No title",
+  "coverAlt": "Cover"
+}

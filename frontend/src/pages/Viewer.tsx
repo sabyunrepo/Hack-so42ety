@@ -11,6 +11,7 @@ import type { BookData, PageData, Dialogue } from "../types/book";
 import { getDialogueText, getDialogueAudioUrl } from "../types/book";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 import { usePostHog } from "@posthog/react";
+import { useTranslation } from "react-i18next";
 
 // --- 타입 정의 ---
 
@@ -47,6 +48,7 @@ const Page = React.forwardRef<HTMLDivElement, PageProps>(
 // --- 컴포넌트 ---
 
 const Viewer: React.FC = () => {
+  const { t } = useTranslation('viewer');
   const { bookId } = useParams<{ bookId: string }>();
 
   const [book, setBook] = useState<BookData | null>(null);
@@ -158,7 +160,7 @@ const Viewer: React.FC = () => {
             <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 sm:h-18 sm:w-18 md:h-20 md:w-20 border-2 border-amber-400/40"></div>
           </div>
           <div className="text-lg sm:text-xl md:text-2xl font-bold text-amber-900 tracking-wide text-center px-4">
-            책을 불러오는 중...
+            {t('loading')}
           </div>
         </div>
       </div>
@@ -173,7 +175,7 @@ const Viewer: React.FC = () => {
             ⚠️
           </div>
           <div className="text-xl sm:text-2xl font-bold text-red-600 mb-2">
-            오류가 발생했습니다
+            {t('error')}
           </div>
           <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
             {errorMessage}
@@ -182,7 +184,7 @@ const Viewer: React.FC = () => {
             onClick={() => navigate("/")}
             className="px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
           >
-            책장으로 돌아가기
+            {t('backToBookshelf')}
           </button>
         </div>
       </div>
@@ -197,13 +199,13 @@ const Viewer: React.FC = () => {
             📚
           </div>
           <div className="text-xl sm:text-2xl font-bold text-amber-900 mb-2">
-            책을 찾을 수 없습니다
+            {t('notFound')}
           </div>
           <button
             onClick={() => navigate("/")}
             className="mt-3 sm:mt-4 px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
           >
-            책장으로 돌아가기
+            {t('backToBookshelf')}
           </button>
         </div>
       </div>
@@ -215,7 +217,7 @@ const Viewer: React.FC = () => {
       {/* Header with title and close button */}
       <div className="relative flex items-center justify-center w-full mb-3 sm:mb-4 md:mb-5 px-2">
         <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-amber-900 tracking-tight drop-shadow-sm text-center">
-          {book.title || "제목 없음"}
+          {book.title || t('noTitle')}
         </h1>
         <button
           onClick={() => navigate("/")}
@@ -256,7 +258,7 @@ const Viewer: React.FC = () => {
         >
           <img
             src={book.cover_image}
-            alt="커버"
+            alt={t('coverAlt')}
             className="w-full h-full object-cover"
           />
         </Page>

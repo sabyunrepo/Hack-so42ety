@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ENGLISH_SCRIPT_EXTENDED,
   KOREAN_SCRIPT_EXTENDED,
@@ -30,6 +31,8 @@ export function ConfirmModal({
   submessage,
   onConfirm,
 }: ModalProps) {
+  const { t } = useTranslation('modal');
+
   const handleConfirm = () => {
     // 추가 동작이 있으면 실행
     if (onConfirm) {
@@ -84,7 +87,7 @@ export function ConfirmModal({
             className="w-24 h-11 sm:w-28 sm:h-12 bg-white rounded-xl border-[3px] border-amber-400 flex items-center justify-center hover:bg-gray-50 transition-colors"
           >
             <span className="text-black text-lg sm:text-xl font-normal font-['Roboto']">
-              네
+              {t('confirm.yes')}
             </span>
           </button>
 
@@ -94,7 +97,7 @@ export function ConfirmModal({
             className="w-24 h-11 sm:w-28 sm:h-12 bg-amber-400 rounded-xl border-[3px] border-amber-400 flex items-center justify-center hover:bg-amber-500 transition-colors"
           >
             <span className="text-black text-lg sm:text-xl font-normal font-['Roboto']">
-              아니오
+              {t('confirm.no')}
             </span>
           </button>
         </div>
@@ -106,13 +109,14 @@ export function ConfirmModal({
 export function AlertModal({
   isOpen,
   onClose,
-  title = "요청 완료!",
-  message = "요청이 성공적으로 처리되었습니다.",
+  title,
+  message,
   submessage,
-  buttonText = "확인",
+  buttonText,
   redirectTo,
   onConfirm,
 }: ModalProps) {
+  const { t } = useTranslation('modal');
   const navigate = useNavigate();
 
   const handleConfirm = () => {
@@ -137,12 +141,12 @@ export function AlertModal({
       <div className="bg-white rounded-xl p-6 sm:p-8 max-w-md mx-4 w-full shadow-2xl">
         {/* 제목 */}
         <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 text-center">
-          {title}
+          {title || t('alert.defaultTitle')}
         </h3>
 
         {/* 메시지 */}
         <div className="text-center mb-5 sm:mb-6">
-          <p className="text-sm sm:text-base text-gray-600 mb-2">{message}</p>
+          <p className="text-sm sm:text-base text-gray-600 mb-2">{message || t('alert.defaultMessage')}</p>
           {submessage && (
             <p className="text-xs sm:text-sm text-gray-500 mt-2">
               {submessage}
@@ -155,7 +159,7 @@ export function AlertModal({
           onClick={handleConfirm}
           className="w-full py-2.5 sm:py-3 bg-yellow-400 text-white font-semibold rounded-lg hover:bg-yellow-500 transition-colors text-sm sm:text-base"
         >
-          {buttonText}
+          {buttonText || t('alert.defaultButton')}
         </button>
       </div>
     </div>
@@ -166,6 +170,7 @@ export function AlertModal({
 type LanguageKey = "korean" | "english";
 
 export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
+  const { t } = useTranslation('modal');
   // 'english' 또는 'korean'으로 상태를 설정합니다.
   const [language, setLanguage] = useState<LanguageKey>("korean");
 
@@ -187,7 +192,7 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
           <div className=" flex flex-row gap-4 items-center">
             <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">
               {" "}
-              녹음용 대본
+              {t('script.title')}
             </h3>
             <div className="flex items-center gap-3 w-full sm:w-auto sm:flex-none">
               <select
@@ -196,8 +201,8 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
                 onChange={handleLanguageChange}
                 className="py-2 px-3 border-2 border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-colors text-sm sm:text-base w-full sm:w-28"
               >
-                <option value="korean">한국어</option>
-                <option value="english">English</option>
+                <option value="korean">{t('script.languageSelect.korean')}</option>
+                <option value="english">{t('script.languageSelect.english')}</option>
               </select>
             </div>
           </div>
@@ -216,44 +221,30 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
             <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 sm:p-4">
               <ul className="text-xs sm:text-sm text-gray-700 leading-relaxed mt-2">
                 <li>
-                  <strong className="text-blue-600">감정/톤 참고:</strong> 각
-                  문장의 감정 및 톤을 참고하여 또렷하고 자연스럽게 읽어주세요.
-                  (대본은 참고용이며, 반드시 그대로 읽을 필요는 없습니다.)
+                  <strong className="text-blue-600">{t('script.instructions.emotionLabel')}</strong> {t('script.instructions.emotion')}
                 </li>
 
                 <li>
                   <p className="mt-1">
-                    <strong className="text-blue-600">언어 선택 :</strong>
-                    {/* <strong className="text-red-700">
-                      {" "}
-                      영어 대본으로 녹음 시 음성 생성 퀄리티가 가장 높습니다.
-                      {" "}
-                    </strong>
-                    (한국어 녹음도 가능하지만, 최종 음성 품질을 위해 영어 녹음을
-                    강력히 권장합니다.) */}{" "}
-                    한국어, 영어 상관없이 편한 언어로 녹음을 진행해 주세요.
+                    <strong className="text-blue-600">{t('script.instructions.languageLabel')}</strong>{" "}
+                    {t('script.instructions.language')}
                   </p>
                 </li>
 
                 <li>
-                  <strong className="text-blue-600">길이 제한 준수 :</strong>{" "}
-                  녹음 길이가{" "}
-                  <strong className="text-red-700">2분 30초 미만</strong>일 경우
-                  TTS 생성이 불가합니다. (권장 녹음 시간은{" "}
-                  <strong className="text-red-700">2분 30초 초과 ~ 3분</strong>
-                  입니다.)
+                  <strong className="text-blue-600">{t('script.instructions.lengthLabel')}</strong>{" "}
+                  {t('script.instructions.length')}{" "}
+                  {t('script.instructions.lengthRecommendation')}
                 </li>
 
                 <li>
-                  <strong className="text-blue-600">재녹음/이어 읽기 :</strong>{" "}
-                  대본을 모두 읽었는데도 2분 30초가 되지 않으면, 대본 처음부터
-                  다시 읽어 이어서 녹음하셔도 괜찮습니다.
+                  <strong className="text-blue-600">{t('script.instructions.retryLabel')}</strong>{" "}
+                  {t('script.instructions.retry')}
                 </li>
 
                 <li>
-                  <strong className="text-blue-600">무음 구간 :</strong> 녹음
-                  중에 발생하는 무음 구간은 자동으로 삭제되므로, 여유 있게
-                  진행하시는 게 좋습니다.
+                  <strong className="text-blue-600">{t('script.instructions.silenceLabel')}</strong>{" "}
+                  {t('script.instructions.silence')}
                 </li>
               </ul>
             </div>
