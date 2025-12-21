@@ -1,0 +1,33 @@
+{
+  "voice": "Voice:",
+  "voicePreview": "Voice Preview",
+  "voicePreviewNotAvailable": "Preview voice not available yet, but storybook creation is possible",
+  "noVoice": "No Voice",
+  "noVoiceWarning": "No voice available. Please register your voice.",
+  "goToSettings": "Go to Voice Settings",
+  "creationComplete": "Creation Complete",
+  "creating": "Creating...",
+  "modals": {
+    "pageLimit": {
+      "title": "Page Limit",
+      "maxPages": "Storybooks can have up to 5 pages maximum.",
+      "minPages": "At least one page is required."
+    },
+    "bookLimit": {
+      "title": "Book Limit",
+      "message": "You can create up to 5 storybooks. Please delete an existing book and try again."
+    },
+    "validation": {
+      "title": "Input Required",
+      "message": "Please fill in images and stories for all pages."
+    },
+    "success": {
+      "title": "Storybook Creation",
+      "message": "Creation will take about 10 minutes"
+    },
+    "error": {
+      "title": "Error Occurred",
+      "message": "An error occurred. Please try again."
+    }
+  }
+}

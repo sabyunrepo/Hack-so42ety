@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import MoriAI_Icon from "../assets/MoriAI_Icon.svg";
 import { LogOut, Mic } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
+import LanguageSelector from "./LanguageSelector";
 
 export default function Header() {
   const { isAuthenticated, logout } = useAuth();
@@ -16,6 +17,9 @@ export default function Header() {
         />
       </Link>
       <div className="absolute right-2 sm:right-4 md:right-7 top-1/2 -translate-y-1/2 flex items-center gap-2 sm:gap-3 md:gap-4">
+        {/* Language Selector */}
+        <LanguageSelector />
+
         {isAuthenticated && (
           <>
             <Link to="/settings">

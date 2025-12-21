@@ -1,0 +1,49 @@
+{
+  "title": "Cài đặt giọng nói",
+  "description": "Tải lên tệp âm thanh để tạo giọng nói tùy chỉnh.",
+  "viewScript": "Xem kịch bản ghi âm",
+  "voiceName": "Tên giọng nói",
+  "voiceNamePlaceholder": "VD: Giọng của mẹ, Giọng của bố",
+  "audioFile": "Tệp âm thanh",
+  "fileSizeError": "Kích thước tệp vượt quá 30MB.",
+  "fileTypeError": "Định dạng tệp không được hỗ trợ. Cho phép: {{types}}",
+  "audioLoadError": "Lỗi khi đọc thông tin tệp âm thanh.",
+  "audioMetadataError": "Không thể tải tệp âm thanh.",
+  "audioDurationCheckError": "Lỗi khi kiểm tra thời lượng âm thanh:",
+  "nameRequired": "Vui lòng nhập tên giọng nói.",
+  "fileRequired": "Vui lòng chọn tệp âm thanh.",
+  "unknownError": "Đã xảy ra lỗi không xác định.",
+  "submitting": "Đang tải lên...",
+  "submit": "Yêu cầu tạo",
+  "reset": "Đặt lại",
+  "fileInfo": {
+    "allowedFormats": "• Định dạng hỗ trợ: mp3, wav, m4a, flac, ogg",
+    "maxSize": "• Kích thước tối đa: 30MB",
+    "duration": "• Thời lượng: 2:30 ~ 3:00 (Tự động cắt nếu quá 3 phút)",
+    "durationDetail": "• Thời lượng âm thanh: 2 phút 30 giây ~ 3 phút (Sẽ tự động cắt nếu dài hơn 3 phút)"
+  },
+  "notice": {
+    "title": "Thông báo",
+    "duration": "🟡 Mất khoảng 3 phút để hoàn tất tạo giọng nói.",
+    "minDuration": "🟡 Âm thanh dưới 2 phút 30 giây sẽ bị từ chối.",
+    "trimming": "🟡 Âm thanh trên 3 phút sẽ được tự động cắt còn 2 phút 59 giây.",
+    "restrictions": "🟡 Để ngăn chặn lạm dụng, việc tạo giọng nói của người nổi tiếng hoặc công chúng có thể bị hạn chế."
+  },
+  "modals": {
+    "voiceLimit": {
+      "title": "Thông báo giới hạn tạo giọng nói",
+      "message": "Bạn không thể tạo thêm giọng nói nào nữa.",
+      "submessage": "Theo chính sách hiện tại, bạn chỉ có thể sở hữu tối đa 1 giọng nói."
+    },
+    "audioDuration": {
+      "title": "Thời lượng âm thanh không đủ",
+      "message": "Tệp âm thanh tải lên quá ngắn.",
+      "submessage": "Thời lượng hiện tại: {{minutes}} phút {{seconds}} giây. Cần tối thiểu 2 phút 30 giây."
+    },
+    "success": {
+      "title": "Thông báo",
+      "message": "Yêu cầu tạo giọng nói đã được tiếp nhận thành công.",
+      "submessage": "Mất khoảng 3 phút để hoàn tất. Hệ thống đang xử lý trong nền, bạn có thể tiếp tục các công việc khác."
+    }
+  }
+}

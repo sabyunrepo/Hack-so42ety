@@ -1,0 +1,16 @@
+{
+  "network": {
+    "timeout": "Request timed out. Please try again.",
+    "connectionFailed": "Cannot connect to the server. Please check your network."
+  },
+  "http": {
+    "badRequest": "Bad request.",
+    "unauthorized": "Authentication required. Please log in again.",
+    "forbidden": "Access denied.",
+    "notFound": "The requested resource was not found.",
+    "serverError": "A server error occurred. Please try again later.",
+    "serviceUnavailable": "Service is temporarily unavailable.",
+    "default": "An error occurred. ({{status}})",
+    "unknown": "An unexpected error occurred."
+  }
+}
