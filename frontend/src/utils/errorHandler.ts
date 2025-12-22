@@ -5,6 +5,7 @@
 
 import { AxiosError } from 'axios';
 import type { BackendError, ValidationError } from '../types/error';
+import i18n from '../i18n/config';
 
 /**
  * Type guard for AxiosError
@@ -81,40 +82,40 @@ export const getUserFriendlyErrorMessage = (error: unknown): string => {
   if (isAxiosError(error)) {
     // 타임아웃
     if (error.code === 'ECONNABORTED') {
-      return '요청 시간이 초과되었습니다. 다시 시도해주세요.';
+      return i18n.t('error:network.timeout');
     }
 
     // 네트워크 에러
     if (!error.response) {
-      return '서버와 연결할 수 없습니다. 네트워크를 확인해주세요.';
+      return i18n.t('error:network.connectionFailed');
     }
 
     // HTTP 상태 코드별 기본 메시지
     const status = error.response.status;
     switch (status) {
       case 400:
-        return '잘못된 요청입니다.';
+        return i18n.t('error:http.badRequest');
       case 401:
-        return '인증이 필요합니다. 다시 로그인해주세요.';
+        return i18n.t('error:http.unauthorized');
       case 403:
-        return '접근 권한이 없습니다.';
+        return i18n.t('error:http.forbidden');
       case 404:
-        return '요청하신 리소스를 찾을 수 없습니다.';
+        return i18n.t('error:http.notFound');
       case 500:
-        return '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+        return i18n.t('error:http.serverError');
       case 503:
-        return '서비스를 일시적으로 사용할 수 없습니다.';
+        return i18n.t('error:http.serviceUnavailable');
       default:
-        return `오류가 발생했습니다. (${status})`;
+        return i18n.t('error:http.default', { status });
     }
   }
 
   // 4. 기본 에러 메시지
   if (error instanceof Error) {
-    return error.message || '예상치 못한 오류가 발생했습니다.';
+    return error.message || i18n.t('error:unknown');
   }
 
-  return '예상치 못한 오류가 발생했습니다.';
+  return i18n.t('error:unknown');
 };
 
 /**

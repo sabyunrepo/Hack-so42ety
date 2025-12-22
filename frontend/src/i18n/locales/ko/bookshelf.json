@@ -1,0 +1,9 @@
+{
+  "loading": "책장을 불러오는 중...",
+  "remainingCreations": "생성 가능한 횟수 {{count}}회",
+  "emptyTitle": "아직 책이 없습니다",
+  "emptySubtitle": "첫 번째 동화책을 만들어보세요!",
+  "createBook": "새 책 만들기",
+  "deleteBook": "책 삭제",
+  "deleteConfirm": "삭제 하시겠습니까?"
+}
