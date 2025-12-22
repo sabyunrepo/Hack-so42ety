@@ -61,6 +61,7 @@ export interface BookData {
   status: string;
   created_at: string;
   pages: PageData[];
+  is_shared?: boolean; // 공유 상태
 }
 
 /**

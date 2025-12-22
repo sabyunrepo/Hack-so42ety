@@ -1,0 +1,38 @@
+{
+  "confirm": {
+    "yes": "Yes",
+    "no": "No"
+  },
+  "alert": {
+    "defaultTitle": "Request Complete!",
+    "defaultMessage": "Your request has been processed successfully.",
+    "defaultButton": "OK"
+  },
+  "script": {
+    "title": "Recording Script",
+    "languageSelect": {
+      "korean": "한국어",
+      "english": "English"
+    },
+    "instructions": {
+      "title": "Instructions",
+      "emotionLabel": "Emotion/Tone Reference:",
+      "emotion": "Read each sentence clearly and naturally, following the emotion and tone provided. (The script is for reference; you don't have to read it exactly as written.)",
+      "languageLabel": "Language Selection:",
+      "language": "Feel free to record in either Korean or English, whichever is more comfortable for you.",
+      "lengthLabel": "Length Requirement:",
+      "length": "If the recording is less than 2 minutes and 30 seconds, TTS generation will not be possible.",
+      "lengthRecommendation": "(Recommended recording time: 2 minutes 30 seconds to 3 minutes.)",
+      "retryLabel": "Re-recording/Continuation:",
+      "retry": "If you finish reading the script but haven't reached 2 minutes 30 seconds, you can continue reading from the beginning.",
+      "silenceLabel": "Silent Sections:",
+      "silence": "Silent sections during recording will be automatically removed, so feel free to take your time."
+    }
+  },
+  "share": {
+    "title": "Share Storybook",
+    "message": "Copy the link below and share it with your friends!",
+    "copyButton": "Copy Link",
+    "copied": "Copied!"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "button": {
+    "confirm": "확인",
+    "cancel": "취소",
+    "yes": "네",
+    "no": "아니오",
+    "delete": "삭제",
+    "close": "닫기"
+  }
+}

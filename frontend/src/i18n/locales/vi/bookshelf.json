@@ -1,0 +1,9 @@
+{
+  "loading": "Đang tải giá sách...",
+  "remainingCreations": "Còn lại {{count}} lần tạo",
+  "emptyTitle": "Chưa có sách nào",
+  "emptySubtitle": "Tạo truyện cổ tích đầu tiên của bạn!",
+  "createBook": "Tạo sách mới",
+  "deleteBook": "Xóa sách",
+  "deleteConfirm": "Bạn có chắc chắn muốn xóa không?"
+}
