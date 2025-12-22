@@ -1,0 +1,10 @@
+{
+  "button": {
+    "confirm": "Xác nhận",
+    "cancel": "Hủy",
+    "yes": "Có",
+    "no": "Không",
+    "delete": "Xóa",
+    "close": "Đóng"
+  }
+}

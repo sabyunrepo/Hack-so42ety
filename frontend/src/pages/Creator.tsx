@@ -5,6 +5,7 @@ import BackButton from "../components/BackButton";
 import { AlertModal } from "../components/Modal";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 import { usePostHog } from "@posthog/react";
+import { useTranslation } from "react-i18next";
 
 interface Page {
   id: number;
@@ -27,12 +28,14 @@ export interface VoiceResponse {
 }
 
 export default function Creator() {
+  const { t } = useTranslation("creator");
   const [pages, setPages] = useState<Page[]>([
     { id: 1, image: null, story: "" },
   ]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [voices, setVoices] = useState<VoiceResponse[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<string>("");
+  const [selectedLevel, setSelectedLevel] = useState<string>("1");
   const [showVoiceWarningModal, setShowVoiceWarningModal] = useState(false);
   const [showMaxPageModal, setShowMaxPageModal] = useState(false);
   const [showMinPageModal, setShowMinPageModal] = useState(false);
@@ -121,6 +124,7 @@ export default function Creator() {
         stories,
         images,
         voice_id: selectedVoice,
+        level: selectedLevel,
       });
 
       posthog?.capture("book_creation_requested", { page_count: pages.length });
@@ -153,7 +157,7 @@ export default function Creator() {
                 htmlFor="voice-select"
                 className="text-gray-700 font-medium text-sm sm:text-base whitespace-nowrap"
               >
-                음성:
+                {t("voice")}
               </label>
               <select
                 id="voice-select"
@@ -202,8 +206,8 @@ export default function Creator() {
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800 text-white text-xs sm:text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-50 transition-opacity pointer-events-none whitespace-nowrap z-10">
                     {voices.find((v) => v.voice_id === selectedVoice)
                       ?.preview_url
-                      ? "음성 미리듣기"
-                      : "프리뷰 음성이 만들어지지 않았지만 동화 생성은 가능합니다"}
+                      ? t("voicePreview")
+                      : t("voicePreviewNotAvailable")}
                     {/* 툴팁 화살표 */}
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-800"></div>
                   </div>
@@ -211,6 +215,27 @@ export default function Creator() {
               )}
             </div>
           )}
+          {/* 레벨 설정 */}
+          <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+            <label
+              htmlFor="voice-select"
+              className="text-gray-700 font-medium text-sm sm:text-base whitespace-nowrap"
+            >
+              {t("level")}
+            </label>
+            <select
+              id="voice-select"
+              value={selectedLevel}
+              onChange={(e) => {
+                setSelectedLevel(e.target.value);
+              }}
+              className="bg-white border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-amber-300 flex-1 sm:flex-initial"
+            >
+              <option value={1}>{t("levelOption1")}</option>
+              <option value={2}>{t("levelOption2")}</option>
+              <option value={3}>{t("levelOption3")}</option>
+            </select>
+          </div>
 
           {/* 생성 완료 버튼 */}
           <button
@@ -218,7 +243,7 @@ export default function Creator() {
             disabled={isSubmitting}
             className="bg-amber-300 text-gray-800 font-semibold px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-base rounded-full shadow-sm hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
           >
-            {isSubmitting ? "만드는 중..." : "생성 완료"}
+            {isSubmitting ? t("creating") : t("creationComplete")}
           </button>
         </div>
 
@@ -293,9 +318,9 @@ export default function Creator() {
       <AlertModal
         isOpen={showVoiceWarningModal}
         onClose={() => setShowVoiceWarningModal(false)}
-        title="음성 없음"
-        message="준비된 음성이 없습니다. 목소리를 등록해주세요"
-        buttonText="목소리 설정하러 가기"
+        title={t("noVoice")}
+        message={t("noVoiceWarning")}
+        buttonText={t("goToSettings")}
         redirectTo="/settings"
       />
 
@@ -303,45 +328,45 @@ export default function Creator() {
       <AlertModal
         isOpen={showMaxPageModal}
         onClose={() => setShowMaxPageModal(false)}
-        title="페이지 제한"
-        message="동화는 최대 5 페이지까지 만들 수 있어요."
-        buttonText="확인"
+        title={t("modals.pageLimit.title")}
+        message={t("modals.pageLimit.maxPages")}
+        buttonText={t("common:button.confirm")}
       />
 
       {/* 최소 페이지 제한 모달 */}
       <AlertModal
         isOpen={showMinPageModal}
         onClose={() => setShowMinPageModal(false)}
-        title="페이지 제한"
-        message="최소 한 페이지는 있어야 해요."
-        buttonText="확인"
+        title={t("modals.pageLimit.title")}
+        message={t("modals.pageLimit.minPages")}
+        buttonText={t("common:button.confirm")}
       />
 
       {/* 최대 책 권수 제한 모달 */}
       <AlertModal
         isOpen={showMaxBooksModal}
         onClose={() => setShowMaxBooksModal(false)}
-        title="책 권수 제한"
-        message="동화책은 최대 5권까지 만들 수 있어요. 기존 책을 삭제한 후 다시 시도해주세요."
-        buttonText="확인"
+        title={t("modals.bookLimit.title")}
+        message={t("modals.bookLimit.message")}
+        buttonText={t("common:button.confirm")}
       />
 
       {/* 검증 실패 모달 */}
       <AlertModal
         isOpen={showValidationModal}
         onClose={() => setShowValidationModal(false)}
-        title="입력 확인"
-        message="모든 페이지에 이미지와 이야기를 채워주세요."
-        buttonText="확인"
+        title={t("modals.validation.title")}
+        message={t("modals.validation.message")}
+        buttonText={t("common:button.confirm")}
       />
 
       {/* 성공 모달 */}
       <AlertModal
         isOpen={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
-        title="동화책 생성"
-        message="생성 완료까지 10분 걸림"
-        buttonText="확인"
+        title={t("modals.success.title")}
+        message={t("modals.success.message")}
+        buttonText={t("common:button.confirm")}
         redirectTo="/"
       />
 
@@ -349,9 +374,9 @@ export default function Creator() {
       <AlertModal
         isOpen={showErrorModal}
         onClose={() => setShowErrorModal(false)}
-        title="오류 발생"
-        message={errorMessage || "오류가 발생했어요. 다시 시도해주세요."}
-        buttonText="확인"
+        title={t("modals.error.title")}
+        message={errorMessage || t("modals.error.message")}
+        buttonText={t("common:button.confirm")}
       />
     </div>
   );
