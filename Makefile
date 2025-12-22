@@ -55,10 +55,15 @@ dev: ## 개발 모드 실행 (Hot Reload)
 	@echo "$(YELLOW)-------------------------------------------$(NC)"
 	@echo "$(YELLOW)Frontend is NOT running in Docker!$(NC)"
 	@echo "$(BLUE)Please run the following in a new terminal:$(NC)"
-	@echo "$(GREEN)  cd frontend && npm run dev$(NC)"
+	@echo "$(GREEN)  cd frontend && infisical run -- npm run dev$(NC)"
 	@echo "$(YELLOW)-------------------------------------------$(NC)"
 
+dev-secret: ## Infisical + 개발 모드 실행 (Auto-inject secrets)
+	@echo "$(BLUE)Starting development environment with Infisical...$(NC)"
+	infisical run -- $(MAKE) dev
+
 dev-build: ## 개발 모드 이미지 빌드
+
 	@echo "$(BLUE)Building development images...$(NC)"
 	$(DOCKER_COMPOSE_DEV) build
 
