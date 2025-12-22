@@ -5,6 +5,7 @@ import { createVoiceClone, getVoices } from "../api/index";
 import { AlertModal, ScriptModal } from "../components/Modal";
 import type { VoiceResponse } from "./Creator";
 import { usePostHog } from "@posthog/react";
+import { useTranslation } from "react-i18next";
 
 // 허용되는 오디오 파일 확장자
 const ALLOWED_AUDIO_TYPES = [".mp3", ".wav", ".m4a", ".flac", ".ogg"];
@@ -19,6 +20,7 @@ interface ModalProps {
 }
 
 export default function Settings() {
+  const { t } = useTranslation('settings');
   const [name, setName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
@@ -50,11 +52,10 @@ export default function Settings() {
       if (result) {
         setShowModal(true);
         setModalProps({
-          title: "음성 생성 제한 안내",
-          message: "더 이상 목소리를 생성하실 수 없습니다.",
-          submessage:
-            "현재 정책에 따라 고객님께서는 최대 1개의 목소리만 보유하실 수 있습니다.",
-          buttonText: "확인",
+          title: t('modals.voiceLimit.title'),
+          message: t('modals.voiceLimit.message'),
+          submessage: t('modals.voiceLimit.submessage'),
+          buttonText: t('common:button.confirm'),
           redirectTo: "/",
         });
       }
@@ -68,7 +69,7 @@ export default function Settings() {
 
     // 파일 크기 체크
     if (selectedFile.size > MAX_FILE_SIZE) {
-      setError("파일 크기가 30MB를 초과합니다.");
+      setError(t('fileSizeError'));
       setFile(null);
       return;
     }
@@ -77,7 +78,7 @@ export default function Settings() {
     const fileExt = "." + selectedFile.name.split(".").pop()?.toLowerCase();
     if (!ALLOWED_AUDIO_TYPES.includes(fileExt || "")) {
       setError(
-        `지원하지 않는 파일 형식입니다. 허용: ${ALLOWED_AUDIO_TYPES.join(", ")}`
+        t('fileTypeError', { types: ALLOWED_AUDIO_TYPES.join(", ") })
       );
       setFile(null);
       return;
@@ -89,10 +90,13 @@ export default function Settings() {
       if (duration < 150) { // 2분 30초 = 150초
         setShowModal(true);
         setModalProps({
-          title: "오디오 길이 부족",
-          message: "업로드한 오디오 파일이 너무 짧습니다.",
-          submessage: `현재 오디오 길이: ${Math.floor(duration / 60)}분 ${Math.floor(duration % 60)}초. 최소 2분 30초 이상의 오디오가 필요합니다.`,
-          buttonText: "확인",
+          title: t('modals.audioDuration.title'),
+          message: t('modals.audioDuration.message'),
+          submessage: t('modals.audioDuration.submessage', {
+            minutes: Math.floor(duration / 60),
+            seconds: Math.floor(duration % 60)
+          }),
+          buttonText: t('common:button.confirm'),
           redirectTo: "",
         });
         setFile(null);
@@ -102,8 +106,8 @@ export default function Settings() {
         return;
       }
     } catch (err) {
-      console.error("오디오 길이 확인 중 오류:", err);
-      setError("오디오 파일 정보를 읽는 중 오류가 발생했습니다.");
+      console.error(t('audioDurationCheckError'), err);
+      setError(t('audioLoadError'));
       setFile(null);
       return;
     }
@@ -131,7 +135,7 @@ export default function Settings() {
 
       audio.addEventListener("error", () => {
         URL.revokeObjectURL(objectUrl);
-        reject(new Error("오디오 파일을 로드할 수 없습니다."));
+        reject(new Error(t('audioMetadataError')));
       });
 
       audio.src = objectUrl;
@@ -142,12 +146,12 @@ export default function Settings() {
     e.preventDefault();
 
     if (!name.trim()) {
-      setError("목소리 이름을 입력하세요.");
+      setError(t('nameRequired'));
       return;
     }
 
     if (!file) {
-      setError("오디오 파일을 선택하세요.");
+      setError(t('fileRequired'));
       return;
     }
 
@@ -167,18 +171,17 @@ export default function Settings() {
       // 성공 시 모달 표시
       setShowModal(true);
       setModalProps({
-        title: "안내",
-        message: "목소리 생성 요청이 성공적으로 접수되었습니다.",
-        submessage:
-          "생성완료까지 약 3분 소요됩니다. 백그라운드에서 처리 중이므로 다른 작업을 계속하셔도 됩니다.",
-        buttonText: "확인",
+        title: t('modals.success.title'),
+        message: t('modals.success.message'),
+        submessage: t('modals.success.submessage'),
+        buttonText: t('common:button.confirm'),
         redirectTo: "/",
       });
       // 폼 초기화
       handleReset();
     } catch (err: unknown) {
       // Axios 에러 처리
-      let errorMessage = "알 수 없는 오류가 발생했습니다.";
+      let errorMessage = t('unknownError');
 
       if (err && typeof err === "object" && "response" in err) {
         const axiosError = err as { response?: { data?: { detail?: string } } };
@@ -236,10 +239,10 @@ export default function Settings() {
 
         {/* 제목 */}
         <h1 className="text-2xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 text-center">
-          목소리 설정
+          {t('title')}
         </h1>
         <p className="text-xs sm:text-sm text-gray-600 text-center mb-6 sm:mb-8 px-2">
-          오디오 파일을 업로드하여 맞춤형 목소리를 생성합니다.
+          {t('description')}
         </p>
         {/* 녹음용 대본 보기 버튼 */}
         <div className="flex justify-center mb-4 sm:mb-0">
@@ -249,7 +252,7 @@ export default function Settings() {
             className="flex items-center gap-2 px-4 sm:px-5 md:px-6 py-2.5 sm:py-3 bg-yellow-50 border-2 border-yellow-400 text-yellow-700 rounded-lg font-semibold hover:bg-yellow-100 transition-all text-sm sm:text-base"
           >
             <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-            녹음용 대본 보기
+            {t('viewScript')}
           </button>
         </div>
 
@@ -258,13 +261,13 @@ export default function Settings() {
           {/* 이름 입력 */}
           <div className="space-y-2">
             <label className="text-xs sm:text-sm font-semibold text-gray-700">
-              목소리 이름 <span className="text-red-600">*</span>
+              {t('voiceName')} <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="예: 엄마 목소리, 아빠 목소리"
+              placeholder={t('voiceNamePlaceholder')}
               className="w-full p-2.5 sm:p-3 text-sm sm:text-base border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all disabled:opacity-60"
               disabled={loading}
             />
@@ -273,12 +276,13 @@ export default function Settings() {
           {/* 오디오 파일 업로드 */}
           <div className="space-y-2">
             <label className="text-xs sm:text-sm font-semibold text-gray-700">
-              오디오 파일 <span className="text-red-600">*</span>
+              {t('audioFile')} <span className="text-red-600">*</span>
             </label>
             <input
               id="fileInput"
               type="file"
               accept=".mp3,.wav,.m4a,.flac,.ogg"
+              placeholder={""}
               onChange={handleFileChange}
               className="w-full p-2 sm:p-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg cursor-pointer focus:ring-2 focus:ring-yellow-400 focus:border-transparent disabled:opacity-60"
               disabled={loading}
@@ -293,12 +297,12 @@ export default function Settings() {
 
             {/* 파일 안내 */}
             <div className="text-xs text-gray-600 leading-relaxed">
-              • 허용 형식: mp3, wav, m4a, flac, ogg
+              {t('fileInfo.allowedFormats')}
               <br />
-              • 최대 크기: 30MB
-              <br />• 오디오 길이: 2분 30초 ~ 3분 (3분 초과 시 자동 트리밍)
+              {t('fileInfo.maxSize')}
+              <br />{t('fileInfo.duration')}
               <p>
-                • 오디오 길이 : 2분 30초 이상 ~ 3분 (3분 초과 시 자동으로 잘림)
+                {t('fileInfo.durationDetail')}
               </p>
             </div>
           </div>
@@ -314,7 +318,7 @@ export default function Settings() {
               }`}
               disabled={loading}
             >
-              {loading ? "업로드 중..." : "생성 요청"}
+              {loading ? t('submitting') : t('submit')}
             </button>
             <button
               type="button"
@@ -322,7 +326,7 @@ export default function Settings() {
               className="flex-1 py-3 sm:py-3.5 text-sm sm:text-base font-semibold bg-gray-200 text-gray-700 border-none rounded-lg hover:bg-gray-300 transition-all disabled:opacity-60"
               disabled={loading}
             >
-              초기화
+              {t('reset')}
             </button>
           </div>
         </form>
@@ -344,15 +348,14 @@ export default function Settings() {
         {/* 안내 사항 */}
         <div className="mt-6 sm:mt-8 p-4 sm:p-5 bg-yellow-50 border border-yellow-300 rounded-lg">
           <h3 className="text-sm sm:text-base font-semibold text-black mb-2 sm:mb-3">
-            안내사항
+            {t('notice.title')}
           </h3>
           <ul className="m-0 pl-4 sm:pl-5 text-xs text-gray-800 leading-loose space-y-1">
-            <li>🟡 목소리 생성 완료까지 약 3분 소요됩니다.</li>
-            <li>🟡 2분 30초 미만의 오디오는 거부됩니다.</li>
-            <li>🟡 3분 이상의 오디오는 자동으로 2분 59초로 트리밍됩니다.</li>
+            <li>{t('notice.duration')}</li>
+            <li>{t('notice.minDuration')}</li>
+            <li>{t('notice.trimming')}</li>
             <li>
-              🟡 음성 학습 기능의 악용 사례를 방지하기 위해, 공인 또는 특정
-              유명인의 목소리는 생성이 제한될 수 있습니다.
+              {t('notice.restrictions')}
             </li>
           </ul>
         </div>

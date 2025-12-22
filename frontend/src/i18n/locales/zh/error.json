@@ -1,0 +1,16 @@
+{
+  "network": {
+    "timeout": "请求超时。请重试。",
+    "connectionFailed": "无法连接到服务器。请检查您的网络。"
+  },
+  "http": {
+    "badRequest": "错误的请求。",
+    "unauthorized": "需要身份验证。请重新登录。",
+    "forbidden": "访问被拒绝。",
+    "notFound": "未找到请求的资源。",
+    "serverError": "发生服务器错误。请稍后重试。",
+    "serviceUnavailable": "服务暂时不可用。",
+    "default": "发生错误。({{status}})",
+    "unknown": "发生意外错误。"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "level": "难度设置",
+  "levelOption1": "3岁 ~ 5岁",
+  "levelOption2": "5岁 ~ 7岁",
+  "levelOption3": "7岁 ~ 9岁",
+  "voice": "声音：",
+  "voicePreview": "声音预览",
+  "voicePreviewNotAvailable": "预览声音尚未生成，但仍可以创建故事书。",
+  "noVoice": "无声音",
+  "noVoiceWarning": "没有准备好的声音。请先注册声音。",
+  "goToSettings": "前往声音设置",
+  "creationComplete": "生成完成",
+  "creating": "生成中...",
+  "modals": {
+    "pageLimit": {
+      "title": "页面限制",
+      "maxPages": "故事书最多可以创建 5 页。",
+      "minPages": "至少需要有一个页面。"
+    },
+    "bookLimit": {
+      "title": "册数限制",
+      "message": "故事书最多只能创建 5 本。请删除现有的书籍后重试。"
+    },
+    "validation": {
+      "title": "确认输入",
+      "message": "请为所有页面添加图片和故事内容。"
+    },
+    "success": {
+      "title": "创建故事书",
+      "message": "完成生成大约需要 10 分钟。"
+    },
+    "error": {
+      "title": "发生错误",
+      "message": "发生错误，请稍后再试。"
+    }
+  }
+}
