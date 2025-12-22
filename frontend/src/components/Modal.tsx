@@ -23,6 +23,12 @@ interface ScriptModalProps {
   onClose: () => void;
 }
 
+interface ShareModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  shareUrl: string;
+}
+
 export function ConfirmModal({
   isOpen,
   onClose,
@@ -297,6 +303,68 @@ export function ScriptModal({ isOpen, onClose }: ScriptModalProps) {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ShareModal({ isOpen, onClose, shareUrl }: ShareModalProps) {
+  const { t } = useTranslation('modal');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-amber-50 to-orange-50 rounded-t-2xl">
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-800">
+            {t('share.title')}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-3xl font-bold leading-none transition-colors"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* 내용 */}
+        <div className="p-5 sm:p-6">
+          <p className="text-sm sm:text-base text-gray-600 mb-4">
+            {t('share.message')}
+          </p>
+
+          {/* 링크 표시 */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 sm:p-4 mb-4 break-all">
+            <code className="text-xs sm:text-sm text-gray-800">
+              {shareUrl}
+            </code>
+          </div>
+
+          {/* 복사 버튼 */}
+          <button
+            onClick={handleCopy}
+            className={`w-full py-3 sm:py-3.5 font-semibold rounded-lg transition-all ${
+              copied
+                ? 'bg-green-500 text-white'
+                : 'bg-amber-400 text-gray-900 hover:bg-amber-500'
+            }`}
+          >
+            {copied ? t('share.copied') : t('share.copyButton')}
+          </button>
         </div>
       </div>
     </div>

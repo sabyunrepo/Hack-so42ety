@@ -28,5 +28,11 @@
       "silenceLabel": "Silent Sections:",
       "silence": "Silent sections during recording will be automatically removed, so feel free to take your time."
     }
+  },
+  "share": {
+    "title": "Share Storybook",
+    "message": "Copy the link below and share it with your friends!",
+    "copyButton": "Copy Link",
+    "copied": "Copied!"
   }
 }

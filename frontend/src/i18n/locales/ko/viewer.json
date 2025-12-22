@@ -4,5 +4,8 @@
   "backToBookshelf": "책장으로 돌아가기",
   "notFound": "책을 찾을 수 없습니다",
   "noTitle": "제목 없음",
-  "coverAlt": "커버"
+  "coverAlt": "커버",
+  "shareButton": "공유하기",
+  "shareToggleOn": "공유중",
+  "shareToggleOff": "비공개"
 }

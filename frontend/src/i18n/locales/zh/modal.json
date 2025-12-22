@@ -28,5 +28,11 @@
       "silenceLabel": "静音部分：",
       "silence": "录音期间的静音部分将自动删除，因此请慢慢来。"
     }
+  },
+  "share": {
+    "title": "分享故事书",
+    "message": "复制下方链接进行分享吧！",
+    "copyButton": "复制链接",
+    "copied": "已复制！"
   }
 }

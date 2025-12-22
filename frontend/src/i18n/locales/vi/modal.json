@@ -28,5 +28,11 @@
       "silenceLabel": "Phần im lặng:",
       "silence": "Các phần im lặng trong quá trình ghi âm sẽ tự động bị xóa, vì vậy hãy từ từ thực hiện."
     }
+  },
+  "share": {
+    "title": "Chia sẻ truyện",
+    "message": "Hãy sao chép liên kết bên dưới để chia sẻ nhé!",
+    "copyButton": "Sao chép liên kết",
+    "copied": "Đã sao chép!"
   }
 }
