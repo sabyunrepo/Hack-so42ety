@@ -1,0 +1,49 @@
+{
+  "title": "声音设置",
+  "description": "通过上传音频文件创建自定义声音。",
+  "viewScript": "查看录音脚本",
+  "voiceName": "声音名称",
+  "voiceNamePlaceholder": "例如：妈妈的声音、爸爸的声音",
+  "audioFile": "音频文件",
+  "fileSizeError": "文件大小超过 30MB。",
+  "fileTypeError": "不支持的文件格式。允许格式：{{types}}",
+  "audioLoadError": "读取音频文件信息时出错。",
+  "audioMetadataError": "无法加载音频文件。",
+  "audioDurationCheckError": "检查音频长度时出错：",
+  "nameRequired": "请输入声音名称。",
+  "fileRequired": "请选择音频文件。",
+  "unknownError": "发生未知错误。",
+  "submitting": "上传中...",
+  "submit": "请求创建",
+  "reset": "重置",
+  "fileInfo": {
+    "allowedFormats": "• 允许格式：mp3, wav, m4a, flac, ogg",
+    "maxSize": "• 最大大小：30MB",
+    "duration": "• 音频长度：2:30 ~ 3:00 (超过3分钟将自动裁剪)",
+    "durationDetail": "• 音频长度：2分30秒 ~ 3分钟 (超过3分钟将自动裁剪)"
+  },
+  "notice": {
+    "title": "注意事项",
+    "duration": "🟡 完成声音创建大约需要 3 分钟。",
+    "minDuration": "🟡 时长短于 2 分 30 秒的音频将被拒绝。",
+    "trimming": "🟡 超过 3 分钟的音频将自动裁剪至 2 分 59 秒。",
+    "restrictions": "🟡 为防止语音克隆功能的滥用，公职人员或特定名人的声音创建可能会受到限制。"
+  },
+  "modals": {
+    "voiceLimit": {
+      "title": "声音创建限制说明",
+      "message": "您无法再创建更多声音。",
+      "submessage": "根据当前政策，您最多只能拥有一种声音。"
+    },
+    "audioDuration": {
+      "title": "音频长度不足",
+      "message": "上传的音频文件太短。",
+      "submessage": "当前长度：{{minutes}}分{{seconds}}秒。至少需要 2 分 30 秒的音频。"
+    },
+    "success": {
+      "title": "提示",
+      "message": "声音创建请求已成功提交。",
+      "submessage": "创建完成大约需要 3 分钟。系统正在后台处理，您可以继续进行其他操作。"
+    }
+  }
+}

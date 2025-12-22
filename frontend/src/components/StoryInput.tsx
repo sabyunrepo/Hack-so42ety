@@ -221,7 +221,7 @@ export default function StoryInput({ page, updatePage }: StoryInputProps) {
             <textarea
               value={page.story}
               onChange={handleStoryChange}
-              placeholder="여기에 이야기를 입력하세요..."
+              // placeholder="여기에 이야기를 입력하세요..."
               className="w-full h-20 sm:h-24 md:h-28 lg:h-32 border border-gray-200 rounded-lg p-2 sm:p-2.5 md:p-3 pr-12 sm:pr-14 md:pr-16 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm sm:text-base"
               maxLength={100}
             />
