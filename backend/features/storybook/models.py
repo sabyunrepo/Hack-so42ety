@@ -181,6 +181,7 @@ class Page(Base):
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
 
     image_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    storybook_image_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     image_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
