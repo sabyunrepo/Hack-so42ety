@@ -26,22 +26,7 @@ class GenerateImagePrompt:
         diary_text = "\n".join(f"* {entry}" for entry in self.stories)
 
         return f"""
-Create a whimsical, storybook-style illustration in the style of {STYLE_PROMPTS[self.style_keyword]} based on the story: {diary_text}.
-
-Depict the main human characters as they are.
-If there are any minor background figures, represent them as a small number of simple, animal-like characters appropriate for the scene.
-
-Show the main characters and key elements in gentle, expressive motion, focusing on their actions and emotions with lively but clear gestures.
-
-Do not include any text, letters, numbers, captions, speech bubbles, or signs in the image.
-
-Use vivid, magical, and charming details to enhance the fairy tale atmosphere, while keeping the scene simple and readable.
-
-Focus on composition, lighting, and perspective to create an immersive but calm storybook illustration.
-
-Generate only one complete illustration per story.
-
-지브리풍
+Transform the provided image into a children’s picture book illustration. Reference Image Rule: - Use the provided image as the single and exact reference. - Do not introduce new characters, objects, or background elements. Subject Preservation: - If a person is present, preserve the same facial features, hairstyle, proportions, pose, and expression. - Maintain the same clothing, accessories, and overall silhouette. - Do not redesign, idealize, or stylize the face beyond simplification. Style Transformation: - Change only the illustration style to a children’s storybook aesthetic. - Simplified shapes and forms - Flat or minimally layered perspective - Bold, clean outlines - Soft, warm, symbolic color palette - Gentle and calm mood suitable for a children’s book Cultural & Artistic Direction: - Soft, hand-painted picture-book illustration with a gentle, nostalgic warmth, designed for modern children’s books - Decorative composition with balanced visual rhythm - Avoid realism; favor illustrative clarity and warmth Background Treatment: - Keep the original background structure, but simplify details - Lower contrast and saturation in the background so the main subject stands out Constraints: - Do not change the scene composition - Do not alter facial identity - No photorealism - No text - No watermarks
 """
 
 

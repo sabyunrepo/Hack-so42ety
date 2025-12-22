@@ -27,6 +27,7 @@ from backend.features.storybook.prompts.generate_tts_expression_prompt import (
     EnhanceAudioPrompt,
 )
 from backend.features.storybook.prompts.generate_image_prompt import GenerateImagePrompt
+from backend.features.storybook.prompts.generate_video_prompt import GenerateVideoPrompt
 from backend.features.storybook.prompts.difficulty_settings import (
     get_difficulty_settings,
 )
@@ -789,11 +790,11 @@ async def generate_video_task(
     task_store = TaskStore()
     story_key = f"story:{book_id}"
     story_data = await task_store.get(story_key)
-    prompts = []
     dialogues = story_data.get("dialogues", []) if story_data else []
-    for dialogue in dialogues:
-        prompt = " ".join(dialogue)
-        prompts.append(prompt)
+    prompts = [
+        GenerateVideoPrompt(dialogues=page_dialogues).render()
+        for page_dialogues in dialogues
+    ]
 
     image_key = f"images:{book_id}"
     image_data = await task_store.get(image_key)
@@ -1000,6 +1001,7 @@ async def generate_video_task(
                     )
                     continue
                 page.image_url = video_url
+                page.video_prompt = prompts[page_idx]
                 session.add(page)
 
             # task_metadata 업데이트
