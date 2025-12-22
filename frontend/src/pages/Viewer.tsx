@@ -1,10 +1,10 @@
 // src/pages/Viewer.tsx
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import HTMLFlipBook from "react-pageflip";
-import { X } from "lucide-react";
+import { X, Share2 } from "lucide-react";
 import MoriAI_Icon from "../assets/MoriAI_Icon.svg";
-import { getStorybookById } from "../api/index";
+import { getStorybookById, toggleBookShare } from "../api/index";
 import ClickableText from "../components/ClickableText";
 import AudioPlayer from "../components/AudioPlayer";
 import type { BookData, PageData, Dialogue } from "../types/book";
@@ -12,7 +12,7 @@ import { getDialogueText, getDialogueAudioUrl } from "../types/book";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 import { usePostHog } from "@posthog/react";
 import { useTranslation } from "react-i18next";
-
+import { ShareModal } from "../components/Modal";
 // --- 타입 정의 ---
 
 // 5. react-pageflip 라이브러리의 ref가 노출하는 API 타입
@@ -48,18 +48,28 @@ const Page = React.forwardRef<HTMLDivElement, PageProps>(
 // --- 컴포넌트 ---
 
 const Viewer: React.FC = () => {
-  const { t } = useTranslation('viewer');
+  const { t } = useTranslation("viewer");
   const { bookId } = useParams<{ bookId: string }>();
+  const location = useLocation();
 
   const [book, setBook] = useState<BookData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [flipbookSize, setFlipbookSize] = useState({ width: 400, height: 550 });
+  const [showShareModal, setShowShareModal] = useState<boolean>(false);
+  const [isShared, setIsShared] = useState<boolean>(false);
+  const [isTogglingShare, setIsTogglingShare] = useState<boolean>(false);
 
   const bookRef = useRef<HTMLFlipBookRef | null>(null);
   const navigate = useNavigate();
   const posthog = usePostHog();
+
+  // 공유 페이지 여부 확인
+  const isSharedPage = location.pathname.startsWith("/shared/");
+
+  // 공유 링크 생성
+  const shareUrl = `${window.location.origin}/shared/${bookId}`;
 
   useEffect(() => {
     if (!bookId) {
@@ -73,6 +83,7 @@ const Viewer: React.FC = () => {
         setErrorMessage("");
         const data: BookData = await getStorybookById(bookId);
         setBook(data);
+        setIsShared(data.is_shared || false); // 초기 공유 상태 설정
         posthog?.capture("book_viewed", {
           book_id: bookId,
           page_count: data.pages?.length || 0,
@@ -134,6 +145,33 @@ const Viewer: React.FC = () => {
     }
   };
 
+  const handleToggleShare = async () => {
+    if (!bookId || isTogglingShare) return;
+
+    try {
+      setIsTogglingShare(true);
+      const newSharedState = !isShared;
+
+      await toggleBookShare(bookId, newSharedState);
+      setIsShared(newSharedState);
+
+      // 공유 상태로 변경했을 때만 모달 표시
+      if (newSharedState) {
+        setShowShareModal(true);
+      }
+
+      posthog?.capture("book_share_toggled", {
+        book_id: bookId,
+        is_shared: newSharedState,
+      });
+    } catch (error) {
+      console.error("Failed to toggle share:", error);
+      // 에러 발생 시 상태 복구는 하지 않음 (API 호출이 실패했으므로)
+    } finally {
+      setIsTogglingShare(false);
+    }
+  };
+
   // Helper to check if url is video
   const isVideo = (url?: string) => {
     if (!url) return false;
@@ -160,7 +198,7 @@ const Viewer: React.FC = () => {
             <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 sm:h-18 sm:w-18 md:h-20 md:w-20 border-2 border-amber-400/40"></div>
           </div>
           <div className="text-lg sm:text-xl md:text-2xl font-bold text-amber-900 tracking-wide text-center px-4">
-            {t('loading')}
+            {t("loading")}
           </div>
         </div>
       </div>
@@ -175,7 +213,7 @@ const Viewer: React.FC = () => {
             ⚠️
           </div>
           <div className="text-xl sm:text-2xl font-bold text-red-600 mb-2">
-            {t('error')}
+            {t("error")}
           </div>
           <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
             {errorMessage}
@@ -184,7 +222,7 @@ const Viewer: React.FC = () => {
             onClick={() => navigate("/")}
             className="px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
           >
-            {t('backToBookshelf')}
+            {t("backToBookshelf")}
           </button>
         </div>
       </div>
@@ -199,13 +237,13 @@ const Viewer: React.FC = () => {
             📚
           </div>
           <div className="text-xl sm:text-2xl font-bold text-amber-900 mb-2">
-            {t('notFound')}
+            {t("notFound")}
           </div>
           <button
             onClick={() => navigate("/")}
             className="mt-3 sm:mt-4 px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
           >
-            {t('backToBookshelf')}
+            {t("backToBookshelf")}
           </button>
         </div>
       </div>
@@ -216,15 +254,41 @@ const Viewer: React.FC = () => {
     <div className="p-3 sm:p-4 md:p-6 flex flex-col items-center bg-gradient-to-br from-orange-50 via-amber-50/50 to-orange-50 min-h-full min-w-3xl ">
       {/* Header with title and close button */}
       <div className="relative flex items-center justify-center w-full mb-3 sm:mb-4 md:mb-5 px-2">
+        {!isSharedPage && (
+          <div className="absolute left-2 sm:left-4 md:left-8 lg:left-10">
+            <button
+              onClick={handleToggleShare}
+              disabled={isTogglingShare}
+              className={`
+                flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5
+                text-xs sm:text-sm font-semibold rounded-full shadow-md
+                transition-all duration-300 ease-in-out
+                disabled:opacity-50 disabled:cursor-not-allowed
+                ${
+                  isShared
+                    ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white hover:from-green-500 hover:to-emerald-600"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }
+              `}
+            >
+              <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>
+                {isShared ? t("shareToggleOn") : t("shareToggleOff")}
+              </span>
+            </button>
+          </div>
+        )}
         <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-amber-900 tracking-tight drop-shadow-sm text-center">
-          {book.title || t('noTitle')}
+          {book.title || t("noTitle")}
         </h1>
-        <button
-          onClick={() => navigate("/")}
-          className="absolute right-1 sm:right-2 md:right-4 lg:right-6 bg-white rounded-full p-2 sm:p-2.5 md:p-3 shadow-xl hover:scale-110 hover:bg-gradient-to-br hover:from-amber-400 hover:to-amber-500 hover:text-white transition-all duration-300 border-2 border-amber-200/50"
-        >
-          <X className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
-        </button>
+        {!isSharedPage && (
+          <button
+            onClick={() => navigate("/")}
+            className="absolute right-1 sm:right-2 md:right-4 lg:right-6 bg-white rounded-full p-2 sm:p-2.5 md:p-3 shadow-xl hover:scale-110 hover:bg-gradient-to-br hover:from-amber-400 hover:to-amber-500 hover:text-white transition-all duration-300 border-2 border-amber-200/50"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
+          </button>
+        )}
       </div>
 
       <HTMLFlipBook
@@ -258,7 +322,7 @@ const Viewer: React.FC = () => {
         >
           <img
             src={book.cover_image}
-            alt={t('coverAlt')}
+            alt={t("coverAlt")}
             className="w-full h-full object-cover"
           />
         </Page>
@@ -392,6 +456,13 @@ const Viewer: React.FC = () => {
           </svg>
         </button>
       </div>
+
+      {/* 공유 모달 */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        shareUrl={shareUrl}
+      />
     </div>
   );
 };

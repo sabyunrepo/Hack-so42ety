@@ -65,7 +65,7 @@ const groupBooksIntoShelves = (
 };
 
 export default function Bookshelf() {
-  const { t } = useTranslation('bookshelf');
+  const { t } = useTranslation("bookshelf");
   const navigate = useNavigate();
   const [books, setBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -136,7 +136,7 @@ export default function Bookshelf() {
             <div className="absolute inset-0 animate-ping rounded-full h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 border-2 border-amber-400/40"></div>
           </div>
           <div className="text-lg sm:text-xl md:text-2xl font-bold text-amber-900 tracking-wide">
-            {t('loading')}
+            {t("loading")}
           </div>
           <div className="flex gap-2">
             <div
@@ -167,9 +167,7 @@ export default function Bookshelf() {
           <div className="text-xl sm:text-2xl font-bold text-red-600 mb-2">
             {error}
           </div>
-          <p className="text-sm sm:text-base text-gray-600">
-            {t('error')}
-          </p>
+          <p className="text-sm sm:text-base text-gray-600">{t("error")}</p>
         </div>
       </div>
     );
@@ -181,11 +179,21 @@ export default function Bookshelf() {
       <div className="flex justify-between items-center mb-4 sm:mb-6 md:mb-8">
         <div>
           <p className="text-sm sm:text-base text-amber-700 mt-2">
-          {/* [ ] 5권 제한  */}
-          {t('remainingCreations', { count: 5 - books.length })}
+            {/* [ ] 5권 제한  */}
+            {t("remainingCreations", { count: 5 - books.length })}
           </p>
         </div>
         {/* 편집 모드 버튼 (주석 처리됨) */}
+        {/* <div>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="bg-amber-300 text-gray-800 font-semibold px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-base rounded-full shadow-sm hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+            >
+              {isSubmitting ? t("creating") : t("creationComplete")}
+
+            </button>
+        </div> */}
       </div>
 
       {/* 책장 영역 */}
@@ -220,7 +228,7 @@ export default function Bookshelf() {
                           +
                         </div>
                         <p className="text-xs sm:text-sm font-semibold text-amber-700 group-hover:text-amber-800">
-                          {t('createBook')}
+                          {t("createBook")}
                         </p>
                       </div>
                     </div>
@@ -273,14 +281,14 @@ export default function Bookshelf() {
             📚
           </div>
           <h2 className="text-2xl sm:text-2xl md:text-3xl font-bold text-amber-800 mb-2 sm:mb-3 text-center">
-            {t('emptyTitle')}
+            {t("emptyTitle")}
           </h2>
           <p className="text-sm sm:text-base text-amber-600 mb-4 sm:mb-5 md:mb-6 text-center">
-            {t('emptySubtitle')}
+            {t("emptySubtitle")}
           </p>
           <Link to="/create">
             <button className="px-6 sm:px-7 md:px-8 py-3 sm:py-3.5 md:py-4 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm sm:text-base">
-              + {t('createBook')}
+              + {t("createBook")}
             </button>
           </Link>
         </div>
@@ -289,8 +297,8 @@ export default function Bookshelf() {
       <ConfirmModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
-        title={t('deleteBook')}
-        message={t('deleteConfirm')}
+        title={t("deleteBook")}
+        message={t("deleteConfirm")}
         onConfirm={() => confirmDeleteBook()}
       />
     </div>

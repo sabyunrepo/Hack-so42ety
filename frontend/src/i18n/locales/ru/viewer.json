@@ -1,4 +1,11 @@
 {
   "loading": "Загрузка книги...",
-  "error": "Произошла ошибка"
+  "error": "Произошла ошибка",
+  "backToBookshelf": "Назад на книжную полку",
+  "notFound": "Книга не найдена",
+  "noTitle": "Без названия",
+  "coverAlt": "Обложка книги",
+  "shareButton": "Поделиться",
+  "shareToggleOn": "Общедоступно",
+  "shareToggleOff": "Приватно"
 }

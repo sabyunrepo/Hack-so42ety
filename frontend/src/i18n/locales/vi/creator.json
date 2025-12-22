@@ -1,7 +1,37 @@
 {
+  "level": "Thiết lập độ khó",
+  "levelOption1": "Từ 3 đến 5 tuổi",
+  "levelOption2": "Từ 5 đến 7 tuổi",
+  "levelOption3": "Từ 7 đến 9 tuổi",
   "voice": "Giọng nói:",
+  "voicePreview": "Nghe thử giọng nói",
+  "voicePreviewNotAvailable": "Giọng nói nghe thử chưa sẵn sàng, nhưng bạn vẫn có thể tạo truyện.",
   "noVoice": "Không có giọng nói",
-  "noVoiceWarning": "Không có giọng nói khả dụng. Vui lòng đăng ký giọng nói của bạn.",
+  "noVoiceWarning": "Chưa có giọng nói nào sẵn sàng. Vui lòng đăng ký giọng nói.",
+  "goToSettings": "Đi đến cài đặt giọng nói",
   "creationComplete": "Tạo hoàn tất",
-  "creating": "Đang tạo..."
+  "creating": "Đang tạo...",
+  "modals": {
+    "pageLimit": {
+      "title": "Giới hạn số trang",
+      "maxPages": "Truyện có thể tạo tối đa 5 trang.",
+      "minPages": "Phải có ít nhất một trang."
+    },
+    "bookLimit": {
+      "title": "Giới hạn số cuốn sách",
+      "message": "Bạn có thể tạo tối đa 5 cuốn truyện. Vui lòng xóa bớt sách cũ và thử lại."
+    },
+    "validation": {
+      "title": "Kiểm tra nhập liệu",
+      "message": "Vui lòng thêm hình ảnh và câu chuyện vào tất cả các trang."
+    },
+    "success": {
+      "title": "Tạo truyện tranh",
+      "message": "Mất khoảng 10 phút để hoàn tất."
+    },
+    "error": {
+      "title": "Đã xảy ra lỗi",
+      "message": "Đã xảy ra lỗi. Vui lòng thử lại lần nữa."
+    }
+  }
 }

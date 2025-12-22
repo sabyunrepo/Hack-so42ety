@@ -9,7 +9,8 @@ export default function Header() {
 
   return (
     <div className="bg-[#f2bf27] relative h-[60px] sm:h-[75px] md:h-[90px] flex items-center justify-center px-2 sm:px-4">
-      <Link to="/">
+      <Link to="/"
+      >
         <img
           src={MoriAI_Icon}
           alt="MoriAI Logo"

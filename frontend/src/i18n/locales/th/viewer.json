@@ -1,4 +1,11 @@
 {
   "loading": "กำลังโหลดหนังสือ...",
-  "error": "เกิดข้อผิดพลาด"
+  "error": "เกิดข้อผิดพลาด",
+  "backToBookshelf": "กลับไปยังชั้นหนังสือ",
+  "notFound": "ไม่พบหนังสือ",
+  "noTitle": "ไม่มีชื่อเรื่อง",
+  "coverAlt": "หน้าปกหนังสือ",
+  "shareButton": "แชร์",
+  "shareToggleOn": "กำลังแชร์",
+  "shareToggleOff": "ส่วนตัว"
 }

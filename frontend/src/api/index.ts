@@ -59,12 +59,14 @@ interface CreateStorybookParams {
   stories: string[];
   images: File[];
   voice_id?: string | null;
+  level: string;
 }
 
 export const createStorybook = async ({
   stories,
   images,
   voice_id,
+  level,
 }: CreateStorybookParams): Promise<StorybookResponse> => {
   const formData = new FormData();
 
@@ -81,12 +83,18 @@ export const createStorybook = async ({
   if (voice_id) {
     formData.append("voice_id", voice_id);
   }
-
-  const response = await apiClient.post("/storybook/create/with-images", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+  if (level) {
+    formData.append("level", level);
   }
+
+  const response = await apiClient.post(
+    "/storybook/create/with-images",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
   );
   return response.data;
 };
@@ -109,7 +117,7 @@ export const createVoiceClone = async ({
   const formData = new FormData();
 
   formData.append("name", name.trim());
-  formData.append("audio_file", file);  // ✅ 백엔드와 일치하도록 'audio_file'로 변경
+  formData.append("audio_file", file); // ✅ 백엔드와 일치하도록 'audio_file'로 변경
 
   if (description) {
     formData.append("description", description);
@@ -126,4 +134,18 @@ export const createVoiceClone = async ({
     }
   );
   return response.data;
+};
+
+// 책 공유 상태 토글
+export const toggleBookShare = async (
+  bookId: string,
+  isShared: boolean
+): Promise<void> => {
+  if (!bookId) {
+    throw new Error("Book ID is required");
+  }
+
+  await apiClient.patch(`/storybook/books/${bookId}/share`, {
+    is_shared: isShared,
+  });
 };

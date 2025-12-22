@@ -4,5 +4,8 @@
   "backToBookshelf": "Back to Bookshelf",
   "notFound": "Book not found",
   "noTitle": "No title",
-  "coverAlt": "Cover"
+  "coverAlt": "Cover",
+  "shareButton": "Share",
+  "shareToggleOn": "Shared",
+  "shareToggleOff": "Private"
 }
