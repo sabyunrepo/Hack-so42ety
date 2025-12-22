@@ -496,7 +496,7 @@ async def generate_image_task(
             if not book:
                 raise ValueError(f"Book {book_id} not found")
 
-            # Update each page with storybook image path
+            # Update each page with storybook image path and prompt
             for page_idx, storage_path in storage_tracker.completed.items():
                 page = next(
                     (p for p in book.pages if p.sequence == page_idx + 1),
@@ -504,6 +504,8 @@ async def generate_image_task(
                 )
                 if page:
                     page.storybook_image_url = storage_path
+                    # 이미지 생성에 사용된 프롬프트 저장
+                    page.image_prompt = prompts[page_idx]
                     session.add(page)
                     logger.debug(
                         f"[Image Task] [Book: {book_id}] Updated Page {page_idx + 1} "
