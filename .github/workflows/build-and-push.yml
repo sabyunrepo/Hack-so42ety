@@ -95,7 +95,7 @@ jobs:
           echo "CLIENT_ID length: ${#INFISICAL_CLIENT_ID}"
           echo "CLIENT_SECRET length: ${#INFISICAL_CLIENT_SECRET}"
           infisical login --method=universal-auth --client-id=$INFISICAL_CLIENT_ID --client-secret=$INFISICAL_CLIENT_SECRET --domain=https://secrets.moriai.kr --silent
-          infisical export --projectId ${{ secrets.INFISICAL_PROJECT_ID }} --environment=prod > .env
+          infisical export --projectId ${{ secrets.INFISICAL_PROJECT_ID }} --env=prod > .env
           # Export to GITHUB_ENV so subsequent steps can use them if needed, or just use the generated .env file
           # For docker build-push-action, passing build-args is still needed unless we use secrets mount, but build-args is safer for static assets like VITE_
           
