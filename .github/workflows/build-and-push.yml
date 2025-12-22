@@ -35,6 +35,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        
+      - name: Debug Infisical Secrets
+        run: |
+            echo "CLIENT_ID length: ${#INFISICAL_CLIENT_ID}"
+            echo "CLIENT_SECRET length: ${#INFISICAL_CLIENT_SECRET}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
