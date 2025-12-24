@@ -56,7 +56,6 @@ services:
       # Development mode: 소스 코드 실시간 반영
       - ./backend:/app/backend
       - ./data:/app/data  # 공통 데이터 폴더 마운트
-      - ./backup_hackathon_20251130/data:/app/backup_data  # 백업 데이터 (상대 경로)
     environment:
       - APP_ENV=${APP_ENV:-dev}
       - DEBUG=${DEBUG:-true}
