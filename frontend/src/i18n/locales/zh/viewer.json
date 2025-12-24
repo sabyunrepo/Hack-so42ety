@@ -1,0 +1,11 @@
+{
+  "loading": "正在加载图书...",
+  "error": "发生错误",
+  "backToBookshelf": "返回书架",
+  "notFound": "未找到该书",
+  "noTitle": "无标题",
+  "coverAlt": "图书封面",
+  "shareButton": "分享",
+  "shareToggleOn": "已分享",
+  "shareToggleOff": "私密"
+}

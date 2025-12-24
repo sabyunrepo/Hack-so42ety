@@ -1,0 +1,16 @@
+{
+  "network": {
+    "timeout": "Yêu cầu hết thời gian. Vui lòng thử lại.",
+    "connectionFailed": "Không thể kết nối với máy chủ. Vui lòng kiểm tra mạng của bạn."
+  },
+  "http": {
+    "badRequest": "Yêu cầu không hợp lệ.",
+    "unauthorized": "Cần xác thực. Vui lòng đăng nhập lại.",
+    "forbidden": "Truy cập bị từ chối.",
+    "notFound": "Không tìm thấy tài nguyên được yêu cầu.",
+    "serverError": "Đã xảy ra lỗi máy chủ. Vui lòng thử lại sau.",
+    "serviceUnavailable": "Dịch vụ tạm thời không khả dụng.",
+    "default": "Đã xảy ra lỗi. ({{status}})",
+    "unknown": "Đã xảy ra lỗi không mong muốn."
+  }
+}

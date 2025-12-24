@@ -1,0 +1,9 @@
+{
+  "loading": "正在加载书架...",
+  "remainingCreations": "剩余 {{count}} 次创建",
+  "emptyTitle": "还没有书籍",
+  "emptySubtitle": "创建您的第一本童话书！",
+  "createBook": "创建新书",
+  "deleteBook": "删除书籍",
+  "deleteConfirm": "确定要删除吗？"
+}
