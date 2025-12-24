@@ -55,10 +55,20 @@ dev: ## 개발 모드 실행 (Hot Reload)
 	@echo "$(YELLOW)-------------------------------------------$(NC)"
 	@echo "$(YELLOW)Frontend is NOT running in Docker!$(NC)"
 	@echo "$(BLUE)Please run the following in a new terminal:$(NC)"
-	@echo "$(GREEN)  cd frontend && npm run dev$(NC)"
+	@echo "$(GREEN)  cd frontend && infisical run -- npm run dev$(NC)"
 	@echo "$(YELLOW)-------------------------------------------$(NC)"
 
+dev-secret: ## Infisical + 개발 모드 실행 (Auto-inject secrets 도커컴포즈 env_args 에만 적용됨!)
+	@echo "$(BLUE)Starting development environment with Infisical...$(NC)"
+	INFISICAL_API_URL=https://secrets.moriai.kr infisical run -- $(MAKE) dev
+
+dev-export: ## Infisical 시크릿을 .env 파일로 내보내기
+	@echo "$(BLUE)Exporting secrets to .env file...$(NC)"
+	INFISICAL_API_URL=https://secrets.moriai.kr infisical export --env=dev > .env
+	@echo "$(GREEN)✓ Secrets exported to .env$(NC)"
+
 dev-build: ## 개발 모드 이미지 빌드
+
 	@echo "$(BLUE)Building development images...$(NC)"
 	$(DOCKER_COMPOSE_DEV) build
 

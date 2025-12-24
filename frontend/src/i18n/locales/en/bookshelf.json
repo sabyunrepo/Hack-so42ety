@@ -1,0 +1,9 @@
+{
+  "loading": "Loading bookshelf...",
+  "remainingCreations": "{{count}} creation(s) remaining",
+  "emptyTitle": "No books yet",
+  "emptySubtitle": "Create your first storybook!",
+  "createBook": "Create New Book",
+  "deleteBook": "Delete Book",
+  "deleteConfirm": "Are you sure you want to delete?"
+}

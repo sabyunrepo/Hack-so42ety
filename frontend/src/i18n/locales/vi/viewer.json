@@ -1,0 +1,11 @@
+{
+  "loading": "Đang tải sách...",
+  "error": "Đã xảy ra lỗi",
+  "backToBookshelf": "Quay lại kệ sách",
+  "notFound": "Không tìm thấy sách",
+  "noTitle": "Không có tiêu đề",
+  "coverAlt": "Bìa sách",
+  "shareButton": "Chia sẻ",
+  "shareToggleOn": "Đang chia sẻ",
+  "shareToggleOff": "Riêng tư"
+}

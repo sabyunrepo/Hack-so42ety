@@ -27,6 +27,7 @@ from backend.features.storybook.prompts.generate_tts_expression_prompt import (
     EnhanceAudioPrompt,
 )
 from backend.features.storybook.prompts.generate_image_prompt import GenerateImagePrompt
+from backend.features.storybook.prompts.generate_video_prompt import GenerateVideoPrompt
 from backend.features.storybook.prompts.difficulty_settings import (
     get_difficulty_settings,
 )
@@ -419,68 +420,147 @@ async def generate_image_task(
         status = TaskStatus.FAILED
         logger.error(f"[Image Task] [Book: {book_id}] All images failed")
 
-    # === Phase 5: Cover Image 다운로드 및 저장 ===
-    cover_image_info = tracker.completed.get(0)  # 첫 페이지를 커버로 사용
+    # === Phase 5: Download and Store ALL Images ===
+    logger.info(f"[Image Task] [Book: {book_id}] Starting image storage phase")
 
-    if cover_image_info:
-        timeout = httpx.Timeout(settings.http_timeout, read=settings.http_read_timeout)
+    # Get book for base_path
+    async with AsyncSessionLocal() as session:
+        repo = BookRepository(session)
+        book = await repo.get(uuid.UUID(book_id))
+        if not book:
+            raise ValueError(f"Book {book_id} not found")
+        base_path = book.base_path
+
+    # Storage tracker (separate from generation tracker)
+    storage_tracker = BatchRetryTracker(
+        total_items=tracker.total_items,
+        max_retries=2
+    )
+
+    # Pre-mark failed generation items as storage failed
+    for idx in tracker.get_failed_indices():
+        storage_tracker.mark_failure(idx, "Generation failed - skipping storage")
+
+    # Download and store image
+    async def download_and_store_image(idx: int, image_info: dict) -> str:
+        """Download from Runware CDN and save to permanent storage"""
+        image_url = image_info.get("imageURL")
+
+        # Download with timeout
+        timeout = httpx.Timeout(
+            settings.http_timeout,
+            read=settings.http_read_timeout
+        )
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(cover_image_info["imageURL"])
+            response = await client.get(image_url)
             response.raise_for_status()
             image_bytes = response.content
 
-        async with AsyncSessionLocal() as session:
-            try:
-                repo = BookRepository(session)
-                book_uuid = uuid.UUID(book_id)
-                book = await repo.get(book_uuid)
-                if not book:
-                    raise ValueError(f"Book {book_id} not found")
+        # Save to storage
+        file_name = f"{base_path}/images/page_{idx + 1}.png"
+        await storage_service.save(
+            image_bytes,
+            file_name,
+            content_type="image/png"
+        )
 
-                file_name = f"{book.base_path}/images/cover.png"
-                logger.info(
-                    f"[Image Task] [Book: {book_id}] Using base_path: {book.base_path}, is_default: {book.is_default}"
+        logger.info(
+            f"[Image Task] [Book: {book_id}] Page {idx + 1}: "
+            f"Saved to {file_name} ({len(image_bytes)} bytes)"
+        )
+
+        return file_name
+
+    # Process images sequentially for memory management
+    for idx, image_info in tracker.completed.items():
+        try:
+            storage_path = await download_and_store_image(idx, image_info)
+            storage_tracker.mark_success(idx, storage_path)
+        except Exception as e:
+            storage_tracker.mark_failure(idx, str(e))
+            logger.error(
+                f"[Image Task] [Book: {book_id}] Page {idx + 1} storage failed: {e}"
+            )
+
+    logger.info(
+        f"[Image Task] [Book: {book_id}] Storage phase completed: "
+        f"{len(storage_tracker.completed)}/{storage_tracker.total_items} images stored"
+    )
+
+    # === Phase 6: DB Update (Page.image_url + Book metadata) ===
+    async with AsyncSessionLocal() as session:
+        try:
+            repo = BookRepository(session)
+            book_uuid = uuid.UUID(book_id)
+            book = await repo.get_with_pages(book_uuid)
+
+            if not book:
+                raise ValueError(f"Book {book_id} not found")
+
+            # Update each page with storybook image path and prompt
+            for page_idx, storage_path in storage_tracker.completed.items():
+                page = next(
+                    (p for p in book.pages if p.sequence == page_idx + 1),
+                    None
                 )
-                storage_url = await storage_service.save(
-                    image_bytes, file_name, content_type="image/png"
-                )
+                if page:
+                    page.storybook_image_url = storage_path
+                    # 이미지 생성에 사용된 프롬프트 저장
+                    page.image_prompt = prompts[page_idx]
+                    session.add(page)
+                    logger.debug(
+                        f"[Image Task] [Book: {book_id}] Updated Page {page_idx + 1} "
+                        f"storybook_image_url={storage_path}"
+                    )
 
-                # task_metadata 업데이트
-                task_metadata = book.task_metadata or {}
-                task_metadata["image"] = tracker.get_summary()
+            # Update book with cover and metadata
+            task_metadata = book.task_metadata or {}
+            task_metadata["image"] = {
+                **tracker.get_summary(),
+                "storage": storage_tracker.get_summary(),
+            }
 
-                updated = await repo.update(
-                    book_uuid,
-                    pipeline_stage="image",
-                    progress_percentage=60,
-                    cover_image=file_name,
-                    task_metadata=task_metadata,
-                )
-                if not updated:
-                    raise ValueError(f"Book {book_id} not found for update")
-                await session.commit()
+            # Cover is first page image
+            cover_path = storage_tracker.completed.get(0)
 
-                logger.info(
-                    f"[Image Task] [Book: {book_id}] Updated book with cover image and metadata"
-                )
+            updated = await repo.update(
+                book_uuid,
+                pipeline_stage="image",
+                progress_percentage=60,
+                cover_image=cover_path,
+                task_metadata=task_metadata,
+            )
 
-            except Exception as e:
-                logger.error(
-                    f"[Image Task] [Book: {book_id}] DB update failed: {e}",
-                    exc_info=True,
-                )
-                return TaskResult(status=TaskStatus.FAILED, error=str(e))
+            if not updated:
+                raise ValueError(f"Book {book_id} not found for update")
 
-    # === Phase 6: Redis에 최종 결과 저장 ===
+            await session.commit()
+
+            logger.info(
+                f"[Image Task] [Book: {book_id}] Updated {len(storage_tracker.completed)} "
+                f"page images, cover={cover_path is not None}"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"[Image Task] [Book: {book_id}] DB update failed: {e}",
+                exc_info=True,
+            )
+            return TaskResult(status=TaskStatus.FAILED, error=str(e))
+
+    # === Phase 7: Redis에 최종 결과 저장 ===
     # 순서 보장을 위해 인덱스 순으로 정렬
     image_infos = [tracker.completed.get(i) for i in range(tracker.total_items)]
+    storage_paths = [storage_tracker.completed.get(i) for i in range(tracker.total_items)]
 
     await task_store.set(
         f"images:{book_id}",
         {
             "images": [info for info in image_infos if info is not None],
+            "storage_paths": [path for path in storage_paths if path is not None],
             "page_count": len(images),
             "failed_pages": tracker.get_failed_indices(),
+            "storage_failed_pages": storage_tracker.get_failed_indices(),
         },
         ttl=3600,
     )
@@ -490,10 +570,14 @@ async def generate_image_task(
         status=status,
         result={
             "image_infos": image_infos,
+            "storage_paths": storage_paths,
             "page_count": len(images),
             "completed_count": len(tracker.completed),
             "failed_count": len(tracker.get_failed_indices()),
+            "storage_completed_count": len(storage_tracker.completed),
+            "storage_failed_count": len(storage_tracker.get_failed_indices()),
             "summary": tracker.get_summary(),
+            "storage_summary": storage_tracker.get_summary(),
         },
     )
 
@@ -706,11 +790,11 @@ async def generate_video_task(
     task_store = TaskStore()
     story_key = f"story:{book_id}"
     story_data = await task_store.get(story_key)
-    prompts = []
     dialogues = story_data.get("dialogues", []) if story_data else []
-    for dialogue in dialogues:
-        prompt = " ".join(dialogue)
-        prompts.append(prompt)
+    prompts = [
+        GenerateVideoPrompt(dialogues=page_dialogues).render()
+        for page_dialogues in dialogues
+    ]
 
     image_key = f"images:{book_id}"
     image_data = await task_store.get(image_key)
@@ -917,6 +1001,7 @@ async def generate_video_task(
                     )
                     continue
                 page.image_url = video_url
+                page.video_prompt = prompts[page_idx]
                 session.add(page)
 
             # task_metadata 업데이트

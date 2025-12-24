@@ -1,0 +1,38 @@
+{
+  "confirm": {
+    "yes": "是",
+    "no": "否"
+  },
+  "alert": {
+    "defaultTitle": "请求完成！",
+    "defaultMessage": "您的请求已成功处理。",
+    "defaultButton": "确定"
+  },
+  "script": {
+    "title": "录音脚本",
+    "languageSelect": {
+      "korean": "한국어",
+      "english": "English"
+    },
+    "instructions": {
+      "title": "说明",
+      "emotionLabel": "情感/语调参考：",
+      "emotion": "请清晰自然地朗读每个句子，遵循提供的情感和语调。（脚本仅供参考；您不必完全按照写的内容阅读。）",
+      "languageLabel": "语言选择：",
+      "language": "您可以选择用韩语或英语录制，以您更舒适的为准。",
+      "lengthLabel": "长度要求：",
+      "length": "如果录音少于2分钟30秒，将无法生成TTS。",
+      "lengthRecommendation": "（推荐录音时间：2分钟30秒至3分钟。）",
+      "retryLabel": "重新录音/继续：",
+      "retry": "如果您完成阅读脚本但未达到2分钟30秒，您可以从头开始继续阅读。",
+      "silenceLabel": "静音部分：",
+      "silence": "录音期间的静音部分将自动删除，因此请慢慢来。"
+    }
+  },
+  "share": {
+    "title": "分享故事书",
+    "message": "复制下方链接进行分享吧！",
+    "copyButton": "复制链接",
+    "copied": "已复制！"
+  }
+}

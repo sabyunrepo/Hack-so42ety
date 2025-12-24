@@ -89,7 +89,7 @@ class BookRepository(AbstractRepository[Book]):
                 .selectinload(Dialogue.audios)
             )
             .where(or_(Book.user_id == user_id, Book.is_default == True))
-            .order_by(Book.created_at.desc())
+            .order_by(Book.created_at.asc())
             .offset(skip)
             .limit(limit)
             .execution_options(populate_existing=False)  # 캐시 사용
@@ -124,7 +124,7 @@ class BookRepository(AbstractRepository[Book]):
         query = (
             select(Book)
             .where(or_(Book.user_id == user_id, Book.is_default == True))
-            .order_by(Book.created_at.desc())
+            .order_by(Book.created_at.asc())
             .offset(skip)
             .limit(limit)
         )

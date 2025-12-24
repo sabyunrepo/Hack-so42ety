@@ -182,6 +182,7 @@ class PageResponse(BaseModel):
     sequence: int = Field(..., description="페이지 순서", example=1)
     image_url: Optional[str] = Field(None, description="이미지 URL", example="https://storage.example.com/pages/page1.jpg")
     image_prompt: Optional[str] = Field(None, description="이미지 생성 프롬프트", example="A brave cat in a spacesuit")
+    video_prompt: Optional[str] = Field(None, description="비디오 생성 프롬프트")
     dialogues: List[DialogueResponse] = Field(default_factory=list, description="페이지 내 대화문 목록")
 
     class Config:
@@ -213,6 +214,7 @@ class PageResponse(BaseModel):
             sequence=page.sequence,
             image_url=storage_service.get_url(page.image_url) if page.image_url else None,
             image_prompt=page.image_prompt,
+            video_prompt=page.video_prompt,
             dialogues=[
                 DialogueResponse.from_orm_with_urls(d, storage_service)
                 for d in page.dialogues
