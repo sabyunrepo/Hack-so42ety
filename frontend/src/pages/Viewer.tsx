@@ -266,7 +266,7 @@ const Viewer: React.FC = () => {
                 disabled:opacity-50 disabled:cursor-not-allowed
                 ${
                   isShared
-                    ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white hover:from-green-500 hover:to-emerald-600"
+                    ? "bg-amber-300 text-gray-800 font-semibold px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-base rounded-full shadow-sm hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                     : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }
               `}
