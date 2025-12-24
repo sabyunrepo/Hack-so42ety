@@ -1,8 +1,8 @@
 {
   "level":"난이도 설정",
-  "levelOption1":"3세 ~ 5세",
-  "levelOption2":"5세 ~ 7세",
-  "levelOption3":"7세 ~ 9세",
+  "levelOption1":"Lv 1 (3세 ~ 5세)",
+  "levelOption2":"Lv 2 (5세 ~ 7세)",
+  "levelOption3":"Lv 3 (7세 ~ 9세)",
   "voice": "음성:",
   "voicePreview": "음성 미리듣기",
   "voicePreviewNotAvailable": "프리뷰 음성이 만들어지지 않았지만 동화 생성은 가능합니다",
