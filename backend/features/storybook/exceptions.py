@@ -102,3 +102,17 @@ class BookQuotaExceededException(BusinessLogicException):
                 "user_id": user_id
             },
         )
+
+
+class UnsupportedLanguageException(ValidationException):
+    """지원하지 않는 언어"""
+
+    def __init__(self, language: str, supported: list[str]):
+        super().__init__(
+            error_code=ErrorCode.BIZ_BOOK_UNSUPPORTED_LANGUAGE,
+            message=f"지원하지 않는 언어입니다: {language}",
+            details={
+                "requested_language": language,
+                "supported_languages": supported
+            },
+        )

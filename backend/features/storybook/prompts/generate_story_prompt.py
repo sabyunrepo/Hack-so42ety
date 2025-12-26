@@ -1,48 +1,213 @@
 from dataclasses import dataclass
+from typing import Dict, Any, List
 
-from .difficulty_settings import get_level_prompt_template, get_difficulty_settings
+from .difficulty_settings import (
+    get_level_prompt_template,
+    get_difficulty_settings,
+    get_universal_level_prompt,
+)
+
+
+# 다국어 설정 (레벨별 예시 포함)
+LANGUAGE_CONFIG: Dict[str, Dict[str, Any]] = {
+    "en": {
+        "name": "English",
+        "native_name": "English",
+        "first_person": "I",
+        "level_examples": {
+            1: {
+                "title": "A Happy Day",
+                "stories": [
+                    ["I see my dog.", "Woof!", "My dog is big.", "We run.", "So fun!"],
+                ],
+            },
+            2: {
+                "title": "Fun at the Park",
+                "stories": [
+                    ["Today I went to the park with my friend.", "We played on the swings.", "The sun was warm and bright.", "It was so much fun!", "Hooray!"],
+                ],
+            },
+            3: {
+                "title": "An Amazing Adventure",
+                "stories": [
+                    ["This morning, I decided to explore the forest behind my house.", "The trees were tall and the birds sang beautiful songs.", "I felt curious and excited as I walked deeper into the woods.", "This adventure showed me that nature is full of surprises!", "Amazing!"],
+                ],
+            },
+        },
+    },
+    "ko": {
+        "name": "Korean",
+        "native_name": "한국어",
+        "first_person": "나/저",
+        "level_examples": {
+            1: {
+                "title": "즐거운 하루",
+                "stories": [
+                    ["나는 강아지를 봤어요.", "멍멍!", "강아지가 커요.", "우리는 뛰었어요.", "재미있어요!"],
+                ],
+            },
+            2: {
+                "title": "공원에서 놀았어요",
+                "stories": [
+                    ["오늘 친구와 공원에 갔어요.", "그네를 탔어요.", "햇살이 따뜻했어요.", "정말 재미있었어요!", "신나요!"],
+                ],
+            },
+            3: {
+                "title": "신나는 모험",
+                "stories": [
+                    ["오늘 아침, 집 뒤 숲을 탐험하기로 했어요.", "나무는 크고 새들이 아름다운 노래를 불렀어요.", "숲 속으로 걸어갈수록 더 신기하고 설레었어요.", "이 모험으로 자연에는 놀라운 것들이 가득하다는 걸 알았어요!", "대단해요!"],
+                ],
+            },
+        },
+    },
+    "zh": {
+        "name": "Chinese",
+        "native_name": "中文",
+        "first_person": "我",
+        "level_examples": {
+            1: {
+                "title": "快乐的一天",
+                "stories": [
+                    ["我看到小狗。", "汪汪!", "小狗很大。", "我们跑。", "真开心!"],
+                ],
+            },
+            2: {
+                "title": "公园里玩耍",
+                "stories": [
+                    ["今天我和朋友去公园了。", "我们荡秋千。", "阳光很温暖。", "玩得真开心!", "太棒了!"],
+                ],
+            },
+            3: {
+                "title": "神奇的冒险",
+                "stories": [
+                    ["早上醒来的时候，我决定去探索房子后面的森林。", "树木高大，鸟儿唱着美妙的歌。", "我越走越深，心里越来越好奇和激动。", "这次冒险让我明白了大自然充满了奇妙的惊喜!", "太神奇了!"],
+                ],
+            },
+        },
+    },
+    "vi": {
+        "name": "Vietnamese",
+        "native_name": "Tiếng Việt",
+        "first_person": "Tôi/Con",
+        "level_examples": {
+            1: {
+                "title": "Một ngày vui vẻ",
+                "stories": [
+                    ["Tôi thấy con chó.", "Gâu gâu!", "Con chó to lắm.", "Chúng tôi chạy.", "Vui quá!"],
+                ],
+            },
+            2: {
+                "title": "Vui chơi ở công viên",
+                "stories": [
+                    ["Hôm nay tôi đi công viên với bạn.", "Chúng tôi chơi xích đu.", "Nắng ấm áp lắm.", "Thật là vui!", "Tuyệt vời!"],
+                ],
+            },
+            3: {
+                "title": "Cuộc phiêu lưu kỳ thú",
+                "stories": [
+                    ["Sáng nay, tôi quyết định khám phá khu rừng sau nhà.", "Cây cối cao lớn và chim hót những bài ca hay.", "Tôi đi sâu vào rừng, cảm thấy tò mò và hào hứng.", "Cuộc phiêu lưu dạy tôi rằng thiên nhiên thật kỳ diệu!", "Thật tuyệt vời!"],
+                ],
+            },
+        },
+    },
+    "ru": {
+        "name": "Russian",
+        "native_name": "Русский",
+        "first_person": "Я",
+        "level_examples": {
+            1: {
+                "title": "Счастливый день",
+                "stories": [
+                    ["Я вижу собаку.", "Гав-гав!", "Собака большая.", "Мы бежим.", "Весело!"],
+                ],
+            },
+            2: {
+                "title": "Веселье в парке",
+                "stories": [
+                    ["Сегодня я пошёл в парк с другом.", "Мы качались на качелях.", "Солнце было тёплым.", "Было очень весело!", "Ура!"],
+                ],
+            },
+            3: {
+                "title": "Удивительное приключение",
+                "stories": [
+                    ["Утром я решил исследовать лес за домом.", "Деревья были высокими, и птицы пели красиво.", "Чем глубже я заходил в лес, тем интереснее было.", "Это приключение показало мне, что природа полна чудес!", "Удивительно!"],
+                ],
+            },
+        },
+    },
+    "th": {
+        "name": "Thai",
+        "native_name": "ไทย",
+        "first_person": "ฉัน/ผม",
+        "level_examples": {
+            1: {
+                "title": "วันที่มีความสุข",
+                "stories": [
+                    ["ฉันเห็นสุนัข", "โฮ่งโฮ่ง!", "สุนัขตัวใหญ่", "เราวิ่ง", "สนุกมาก!"],
+                ],
+            },
+            2: {
+                "title": "สนุกที่สวนสาธารณะ",
+                "stories": [
+                    ["วันนี้ฉันไปสวนสาธารณะกับเพื่อน", "เราเล่นชิงช้า", "แดดอุ่นสบาย", "สนุกมากเลย!", "เยี่ยมเลย!"],
+                ],
+            },
+            3: {
+                "title": "การผจญภัยมหัศจรรย์",
+                "stories": [
+                    ["เช้านี้ ฉันตัดสินใจไปสำรวจป่าหลังบ้าน", "ต้นไม้สูงใหญ่และนกร้องเพลงไพเราะ", "ฉันเดินลึกเข้าไปในป่า รู้สึกตื่นเต้นมาก", "การผจญภัยนี้สอนฉันว่าธรรมชาติเต็มไปด้วยสิ่งมหัศจรรย์!", "น่าทึ่งมาก!"],
+                ],
+            },
+        },
+    },
+}
+
+
+def get_language_config(language_code: str) -> Dict[str, Any]:
+    """언어 코드에 해당하는 설정 반환"""
+    if language_code not in LANGUAGE_CONFIG:
+        # 지원하지 않는 언어는 영어로 fallback
+        return LANGUAGE_CONFIG["en"]
+    return LANGUAGE_CONFIG[language_code]
 
 
 @dataclass
 class GenerateStoryPrompt:
     diary_entries: list[str]
     level: int = 1  # 기본값 레벨 1 (4-5세)
+    target_language: str = "en"  # 목표 언어 코드
 
     def render(self) -> str:
         diary_text = "\n".join(f"* {entry}" for entry in self.diary_entries)
         settings = get_difficulty_settings(self.level)
-        level_prompt = get_level_prompt_template(self.level)
+        lang = get_language_config(self.target_language)
 
-        # 레벨별 예시 설정
-        examples = self._get_level_examples()
-        # 2. **시점:** 1인칭 주인공 시점('I')으로 작성
+        # 영어는 상세 템플릿, 다른 언어는 범용 템플릿 사용
+        if self.target_language == "en":
+            level_prompt = get_level_prompt_template(self.level)
+        else:
+            level_prompt = get_universal_level_prompt(self.level)
+
+        # 언어별 레벨별 예시
+        example_section = self._format_level_example(lang)
 
         return f"""
 **[역할]**
-당신은 한국인 아이들({settings.target_age}세)을 위한 영어 제2언어 학습용 동화를 작성하는 전문 작가입니다.
+당신은 아이들({settings.target_age}세)을 위한 **{lang['native_name']}** 동화를 작성하는 전문 작가입니다.
 
 {level_prompt}
 
 **[목표]**
-아래 [오늘의 일기]에 나열된 사건들을 바탕으로, 1인칭 주인공 시점('I')의 즐거운 영어 동화를 만들고, 동화에 어울리는 짧은 영어 제목(최대 20자)을 생성해야 합니다.
+아래 [오늘의 일기]에 나열된 사건들을 바탕으로, 1인칭 주인공 시점('{lang['first_person']}')의 즐거운 **{lang['native_name']}** 동화를 만들고, 동화에 어울리는 짧은 **{lang['native_name']}** 제목(최대 20자)을 생성해야 합니다.
 
 **[필수 규칙]**
-1. **제목:** 동화 내용을 요약하는 간단한 영어 제목 (최대 20자)
-3. **형식:** 모든 문장은 마침표(`.`)로 끝나야 함
-4. **언어:** 영어로만 작성 (한글 사용 금지)
+1. **제목:** 동화 내용을 요약하는 간단한 **{lang['native_name']}** 제목 (최대 20자)
+2. **형식:** 모든 문장은 마침표로 끝나야 함
+3. **언어:** 반드시 **{lang['native_name']}**로만 작성 (다른 언어 사용 금지)
+4. **입력 언어:** 입력은 어떤 언어든 가능 (AI가 {lang['native_name']}로 변환)
 5. **출력 형식:** 아래 JSON 형식 준수
-```json
-{{
-    "title": "동화 제목",
-    "stories": [
-        ["문장1", "문장2", "..."],  # 첫 번째 일기 내용에 대한 동화
-        ["문장1", "문장2", "..."],  # 두 번째 일기 내용에 대한 동화
-        ...
-    ]
-}}
-```
 
-{examples}
+{example_section}
 
 ---
 
@@ -50,112 +215,32 @@ class GenerateStoryPrompt:
 {diary_text}
 """
 
-    def _get_level_examples(self) -> str:
-        """레벨별 예시 반환"""
-        if self.level == 1:
-            return """
-**[예시 - 레벨 1 (3~5세)]**
+    def _format_level_example(self, lang: Dict[str, Any]) -> str:
+        """언어별 레벨별 예시 포맷팅"""
+        level_examples = lang.get("level_examples", {})
+        example = level_examples.get(self.level, {})
 
-* **입력:**
-    ["오늘 강아지와 공원에 갔다."]
+        if not example:
+            # 예시가 없으면 기본 영어 예시 사용
+            en_lang = LANGUAGE_CONFIG["en"]
+            example = en_lang["level_examples"].get(self.level, {})
 
-* **출력:**
-    {{
-        "title": "A Happy Day",
-        "stories": [
-            ["I see my puppy. Woof! My puppy is big and brown. I go to the park. We run fast. Yay!", "So fun!"]
-        ]
-    }}
+        title = example.get("title", "Example Title")
+        stories = example.get("stories", [[]])
 
-* **입력:**
-    [
-        "아침에 일어났다.",
-        "아침밥을 먹었다.",
-        "공원에 갔다."
+        # stories를 JSON 형식으로 포맷팅
+        stories_json = []
+        for page in stories:
+            page_json = ", ".join(f'"{s}"' for s in page)
+            stories_json.append(f"[{page_json}]")
+
+        return f"""**[{lang['native_name']} 예시 - 레벨 {self.level}]**
+
+```json
+{{
+    "title": "{title}",
+    "stories": [
+        {', '.join(stories_json)}
     ]
-
-* **출력:**
-    {{
-        "title": "My Sunny Day",
-        "stories": [
-            ["I wake up. The sun is up. It is sunny. Good!", "Yay!"],
-            ["I eat my food. Yum! The food is good. I like it.", "Happy!"],
-            ["I go to the park. I run and jump. I play. So fun!", "Wow!"]
-        ]
-    }}
-
-**[주의사항]**
-- 1음절 위주 (85~90%), 2음절 일부 허용 (puppy, happy, sunny)
-- 문장 길이 4~7단어
-- "and" 형용사 연결만 가능 ("big and brown")
-- 같은 단어를 5~10회 반복
-"""
-        elif self.level == 2:
-            return """
-**[예시 - 레벨 2 (5~7세)]**
-
-* **입력:**
-    ["오늘 친구와 수영장에 갔다.", "아이스크림을 먹었다."]
-
-* **출력:**
-    {{
-        "title": "Fun at the Pool",
-        "stories": [
-            ["Today I went to the pool with my best friend. Splash! The water was cold but it felt good. We jumped in and played together. We were swimming and laughing. It was so much fun!", "Hooray!"],
-            ["After swimming, I ate ice cream. Yum! It was pink and sweet. My friend had a yellow one. We sat together and enjoyed our treats. It was a beautiful day!", "Yummy!"]
-        ]
-    }}
-
-* **입력:**
-    ["강아지를 산책시켰다.", "공원에서 놀았다."]
-
-* **출력:**
-    {{
-        "title": "Walking My Puppy",
-        "stories": [
-            ["I have a fluffy puppy. His name is Max. He is brown and white. I took him for a walk. We went to the pretty park. Woof woof!", "Excited!"],
-            ["We played in the park. Max ran very fast. I tried to catch him but he was too quick. We had so much fun together. What a happy day!", "Amazing!"]
-        ]
-    }}
-
-**[주의사항]**
-- 1음절 (60~70%), 2음절 자유, 3음절 일부 허용 (beautiful, together)
-- 문장 길이 6~10단어
-- "and", "but" 사용 가능
-- 과거형 자유롭게 사용 (went, was, had, played)
-"""
-        else:  # level 3
-            return """
-**[예시 - 레벨 3 (7~9세)]**
-
-* **입력:**
-    ["오늘 친구들과 숲속 탐험을 했다.", "예쁜 나비를 발견했다."]
-
-* **출력:**
-    {{
-        "title": "An Incredible Forest Adventure",
-        "stories": [
-            ["Today was the most exciting day because I went on an adventure to the mysterious forest with my closest friends. As we walked along the winding path, we discovered the tallest trees I had ever seen. The forest was filled with beautiful sounds of birds singing their cheerful songs. We felt so curious and brave as we explored deeper into the wonderful woods!", "Amazing!"],
-            ["Suddenly, I saw something incredible flying near the colorful flowers! It was a magnificent butterfly with the most beautiful wings I had ever seen. The butterfly had so many different colors that sparkled in the sunlight. I watched it very carefully because I didn't want to miss a single moment. When it flew away, I felt grateful that I had the chance to see something so special. This adventure taught me that nature is full of unexpected surprises!", "Wonderful!"]
-        ]
-    }}
-
-* **입력:**
-    ["비가 와서 집에 있었다.", "좋아하는 책을 읽었다."]
-
-* **출력:**
-    {{
-        "title": "A Cozy Rainy Day",
-        "stories": [
-            ["When I woke up this morning, I heard the sound of rain tapping against my window. I looked outside and saw that the sky was gray and cloudy. The rain was falling heavily, so I decided to stay home where it was warm and cozy. Even though I couldn't go outside to play, I wasn't disappointed because I knew I could find other fun things to do inside.", "Hmm!"],
-            ["I remembered my favorite book that I had been wanting to read again. I found it on my bookshelf and sat down on my comfortable bed. The story was about a brave little mouse who went on exciting adventures and never gave up, even when things got difficult. As I read each page, I felt more and more inspired by the courageous mouse. When I finally finished the book, I realized something important: rainy days can be just as wonderful as sunny days if you find the right activity. I felt proud of myself for making the best of a rainy day!", "Hooray!"]
-        ]
-    }}
-
-**[주의사항]**
-- 1~2음절 (50~60%), 3음절 자유, 4음절 일부 허용 (incredible, magnificent, unexpected)
-- 문장 길이 9~15단어
-- 모든 접속사 자유 (because, when, if, after, before, while)
-- 복문 구조와 관계대명사 사용
-- 감정과 이유를 상세하게 설명
-"""
+}}
+```"""
