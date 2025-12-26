@@ -116,3 +116,18 @@ class UnsupportedLanguageException(ValidationException):
                 "supported_languages": supported
             },
         )
+
+
+class InvalidLevelException(ValidationException):
+    """잘못된 레벨"""
+
+    def __init__(self, level: int, min_level: int, max_level: int):
+        super().__init__(
+            error_code=ErrorCode.BIZ_BOOK_INVALID_LEVEL,
+            message=f"레벨은 {min_level}~{max_level} 사이여야 합니다",
+            details={
+                "requested_level": level,
+                "min_level": min_level,
+                "max_level": max_level,
+            },
+        )
