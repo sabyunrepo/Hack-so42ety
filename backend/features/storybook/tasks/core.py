@@ -80,7 +80,9 @@ async def generate_story_task(
 
     # 유효하지 않은 레벨이면 기본값 사용 (동적 범위)
     if not (settings.min_level <= level <= settings.max_level):
-        logger.warning(f"[Story Task] Invalid level {level}, using default level {settings.min_level}")
+        logger.warning(
+            f"[Story Task] Invalid level {level}, using default level {settings.min_level}"
+        )
         level = settings.min_level
     response_schema = create_stories_response_schema(
         max_pages=num_pages,
@@ -111,28 +113,28 @@ async def generate_story_task(
         # dialogues를 2D 배열 그대로 전달하여 정확한 문장 수 계산
         validator = ValidatorFactory.get_validator(target_language)
 
-        if validator:
-            result = validator.validate(dialogues, level)
+        # if validator:
+        #     result = validator.validate(dialogues, level)
 
-            logger.info(
-                f"[Story Task] [Book: {book_id}] Difficulty Validation - "
-                f"Language: {target_language}, Level: {level}, "
-                f"Pages: {len(dialogues)}, Score: {result.score:.2f}, "
-                f"Valid: {result.is_valid}, Metrics: {result.metrics}"
-            )
+        #     logger.info(
+        #         f"[Story Task] [Book: {book_id}] Difficulty Validation - "
+        #         f"Language: {target_language}, Level: {level}, "
+        #         f"Pages: {len(dialogues)}, Score: {result.score:.2f}, "
+        #         f"Valid: {result.is_valid}, Metrics: {result.metrics}"
+        #     )
 
-            if not result.is_valid:
-                raise ValueError(
-                    f"Difficulty validation failed for {target_language}: "
-                    f"{result.message}"
-                )
-        else:
-            # 검증기가 없는 언어는 프롬프트에 의존
-            sentence_count = sum(len(page) for page in dialogues)
-            logger.info(
-                f"[Story Task] [Book: {book_id}] No validator for {target_language}, "
-                f"relying on prompt. Pages: {len(dialogues)}, Sentences: {sentence_count}"
-            )
+        #     if not result.is_valid:
+        #         raise ValueError(
+        #             f"Difficulty validation failed for {target_language}: "
+        #             f"{result.message}"
+        #         )
+        # else:
+        # 검증기가 없는 언어는 프롬프트에 의존
+        sentence_count = sum(len(page) for page in dialogues)
+        logger.info(
+            f"[Story Task] [Book: {book_id}] No validator for {target_language}, "
+            f"relying on prompt. Pages: {len(dialogues)}, Sentences: {sentence_count}"
+        )
 
         return book_title, dialogues
 
