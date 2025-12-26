@@ -28,13 +28,7 @@ from backend.features.storybook.prompts.generate_tts_expression_prompt import (
 )
 from backend.features.storybook.prompts.generate_image_prompt import GenerateImagePrompt
 from backend.features.storybook.prompts.generate_video_prompt import GenerateVideoPrompt
-from backend.features.storybook.prompts.difficulty_settings import (
-    get_difficulty_settings,
-)
-from backend.features.storybook.utils.difficulty_validator import (
-    validate_difficulty,
-    get_text_stats,
-)
+from backend.features.storybook.validators import ValidatorFactory
 from backend.core.config import settings
 from backend.core.limiters import get_limiters
 from backend.features.tts.exceptions import BookVoiceNotConfiguredException
@@ -84,18 +78,10 @@ async def generate_story_task(
 
     max_retries = settings.task_story_max_retries
 
-    # 레벨별 난이도 설정 가져오기
-    try:
-        difficulty_settings = get_difficulty_settings(level)
-    except ValueError:
-        # 유효하지 않은 레벨이면 기본값 1 사용
-        logger.warning(f"[Story Task] Invalid level {level}, using default level 1")
-        level = 1
-        difficulty_settings = get_difficulty_settings(level)
-
-    # 레벨별 스키마 설정 적용
-    # max_dialogues_per_page=difficulty_settings.max_dialogues_per_page,
-    # max_chars_per_dialogue=difficulty_settings.max_chars_per_dialogue,
+    # 유효하지 않은 레벨이면 기본값 사용 (동적 범위)
+    if not (settings.min_level <= level <= settings.max_level):
+        logger.warning(f"[Story Task] Invalid level {level}, using default level {settings.min_level}")
+        level = settings.min_level
     response_schema = create_stories_response_schema(
         max_pages=num_pages,
         # max_dialogues_per_page는 프론트 최대 허용치보다 작게 제한 필요
@@ -121,30 +107,31 @@ async def generate_story_task(
         logger.info(f"[Story Task] [Book: {book_id}] generated_data={generated_data}")
         book_title, dialogues = validate_generated_story(generated_data)
 
-        # Flesch-Kincaid 난이도 검증 (영어만 지원 - textstat 라이브러리 한계)
-        full_text = " ".join(" ".join(page) for page in dialogues)
+        # 난이도 검증 (ValidatorFactory 사용)
+        # dialogues를 2D 배열 그대로 전달하여 정확한 문장 수 계산
+        validator = ValidatorFactory.get_validator(target_language)
 
-        if target_language == "en":
-            is_valid, fk_score = validate_difficulty(full_text, level)
+        if validator:
+            result = validator.validate(dialogues, level)
 
-            # 텍스트 통계 로깅 (디버깅용)
-            text_stats = get_text_stats(full_text)
             logger.info(
-                f"[Story Task] [Book: {book_id}] FK Validation - "
-                f"Level: {level}, Score: {fk_score:.2f}, Valid: {is_valid}, "
-                f"Stats: {text_stats}"
+                f"[Story Task] [Book: {book_id}] Difficulty Validation - "
+                f"Language: {target_language}, Level: {level}, "
+                f"Pages: {len(dialogues)}, Score: {result.score:.2f}, "
+                f"Valid: {result.is_valid}, Metrics: {result.metrics}"
             )
 
-            if not is_valid:
+            if not result.is_valid:
                 raise ValueError(
-                    f"FK score {fk_score:.2f} out of acceptable range for level {level}. "
-                    f"Target range: {difficulty_settings.fk_grade_range}"
+                    f"Difficulty validation failed for {target_language}: "
+                    f"{result.message}"
                 )
         else:
-            # 비영어는 FK 검증 스킵 (textstat 미지원)
+            # 검증기가 없는 언어는 프롬프트에 의존
+            sentence_count = sum(len(page) for page in dialogues)
             logger.info(
-                f"[Story Task] [Book: {book_id}] FK Validation skipped for "
-                f"non-English language: {target_language}"
+                f"[Story Task] [Book: {book_id}] No validator for {target_language}, "
+                f"relying on prompt. Pages: {len(dialogues)}, Sentences: {sentence_count}"
             )
 
         return book_title, dialogues

@@ -3,6 +3,7 @@ Core Configuration Module
 환경변수 및 애플리케이션 설정 중앙 관리
 """
 
+import json
 from typing import List, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -196,6 +197,33 @@ class Settings(BaseSettings):
         env="FK_TOLERANCE",
         description="Flesch-Kincaid Grade Level tolerance for difficulty validation",
     )
+
+    # ==================== Level Settings ====================
+    # 레벨별 대상 연령 (JSON 형식, 동적으로 레벨 추가 가능)
+    target_ages_json: str = Field(
+        default='{"1":"3-5","2":"5-7","3":"7-9"}',
+        env="TARGET_AGES",
+        description="Level-to-target-age mapping in JSON format",
+    )
+
+    @property
+    def target_ages(self) -> dict[int, str]:
+        """레벨별 대상 연령 딕셔너리"""
+        return {int(k): v for k, v in json.loads(self.target_ages_json).items()}
+
+    @property
+    def min_level(self) -> int:
+        """최소 레벨 (자동 계산)"""
+        return min(self.target_ages.keys())
+
+    @property
+    def max_level(self) -> int:
+        """최대 레벨 (자동 계산)"""
+        return max(self.target_ages.keys())
+
+    def get_target_age(self, level: int) -> str:
+        """레벨별 대상 연령 반환"""
+        return self.target_ages.get(level, self.target_ages[self.min_level])
 
     # ==================== Feature Flags ====================
     use_template_mode: bool = Field(default=False, env="USE_TEMPLATE_MODE")

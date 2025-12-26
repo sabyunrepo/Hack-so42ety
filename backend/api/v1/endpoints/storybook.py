@@ -22,7 +22,10 @@ from backend.features.storybook.dependencies import (
     get_book_service_readonly,
     get_book_service_write,
 )
-from backend.features.storybook.exceptions import UnsupportedLanguageException
+from backend.features.storybook.exceptions import (
+    UnsupportedLanguageException,
+    InvalidLevelException,
+)
 
 router = APIRouter()
 
@@ -216,6 +219,14 @@ async def create_book_with_images(
         raise UnsupportedLanguageException(
             language=target_language,
             supported=settings.supported_languages
+        )
+
+    # 레벨 범위 검증
+    if not (settings.min_level <= level <= settings.max_level):
+        raise InvalidLevelException(
+            level=level,
+            min_level=settings.min_level,
+            max_level=settings.max_level,
         )
 
     _images = []
