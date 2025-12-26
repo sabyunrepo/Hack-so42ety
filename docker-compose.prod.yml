@@ -21,14 +21,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     logging:
       driver: "json-file"
       options:
@@ -66,14 +58,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'
-          memory: 256M
-        reservations:
-          cpus: '0.15'
-          memory: 128M
     logging:
       driver: "json-file"
       options:
@@ -85,7 +69,7 @@ services:
     build:
       context: .
       dockerfile: ./docker/backend/Dockerfile
-    image: ghcr.io/alsksssass/moriai-backend:${BACKEND_TAG:-latest}
+    image: ghcr.io/sabyunrepo/moriai-backend:${BACKEND_TAG:-latest}
     container_name: moriai-backend-prod
     restart: unless-stopped
     init: true
@@ -137,14 +121,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.8'
-          memory: 1536M
-        reservations:
-          cpus: '0.4'
-          memory: 768M
     logging:
       driver: "json-file"
       options:
@@ -164,7 +140,7 @@ services:
         VITE_API_BASE_URL: ${API_BASE_URL:-/api/v1}
         VITE_PUBLIC_POSTHOG_KEY: ${VITE_PUBLIC_POSTHOG_KEY:-}
         VITE_PUBLIC_POSTHOG_HOST: ${VITE_PUBLIC_POSTHOG_HOST:-https://us.i.posthog.com}
-    image: ghcr.io/alsksssass/moriai-frontend:${FRONTEND_TAG:-prod}
+    image: ghcr.io/sabyunrepo/moriai-frontend:${FRONTEND_TAG:-prod}
     container_name: moriai-frontend-prod
     restart: unless-stopped
     ports:
@@ -179,14 +155,6 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'
-          memory: 256M
-        reservations:
-          cpus: '0.15'
-          memory: 128M
     logging:
       driver: "json-file"
       options:
