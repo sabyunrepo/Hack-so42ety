@@ -265,7 +265,6 @@ export default function Creator() {
               <div className="flex-1">
                 <StoryInput page={page} updatePage={updatePage} />
               </div>
-              {pages.length > 1 && (
                 <button
                   onClick={() => removePage(page.id)}
                   className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
@@ -285,7 +284,6 @@ export default function Creator() {
                     />
                   </svg>
                 </button>
-              )}
             </div>
           ))}
         </div>

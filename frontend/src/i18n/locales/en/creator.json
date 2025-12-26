@@ -1,8 +1,8 @@
 {
   "level": "Difficulty Setting",
-  "levelOption1": "Ages 3 – 5",
-  "levelOption2": "Ages 5 – 7",
-  "levelOption3": "Ages 7 – 9",
+  "levelOption1": "Lv 1 (Ages 3 – 5)",
+  "levelOption2": "Lv 2 (Ages 5 – 7)",
+  "levelOption3": "Lv 3 (Ages 7 – 9)",
   "voice": "Voice:",
   "voicePreview": "Preview Voice",
   "voicePreviewNotAvailable": "Preview voice is not ready, but you can still create the storybook.",

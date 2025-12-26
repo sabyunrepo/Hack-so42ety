@@ -1,8 +1,8 @@
 {
   "level": "Thiết lập độ khó",
-  "levelOption1": "Từ 3 đến 5 tuổi",
-  "levelOption2": "Từ 5 đến 7 tuổi",
-  "levelOption3": "Từ 7 đến 9 tuổi",
+  "levelOption1": "Lv 1 (Từ 3 đến 5 tuổi)",
+  "levelOption2": "Lv 2 (Từ 5 đến 7 tuổi)",
+  "levelOption3": "Lv 3 (Từ 7 đến 9 tuổi)",
   "voice": "Giọng nói:",
   "voicePreview": "Nghe thử giọng nói",
   "voicePreviewNotAvailable": "Giọng nói nghe thử chưa sẵn sàng, nhưng bạn vẫn có thể tạo truyện.",
