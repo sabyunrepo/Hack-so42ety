@@ -165,6 +165,18 @@ class Settings(BaseSettings):
     )
     cors_allow_headers: str = Field(default="*", env="CORS_ALLOW_HEADERS")
 
+    # ==================== Language Settings ====================
+    supported_languages_str: str = Field(
+        default="en,ko,zh,vi,ru,th",
+        env="SUPPORTED_LANGUAGES",
+        description="Comma-separated list of supported language codes",
+    )
+
+    @property
+    def supported_languages(self) -> List[str]:
+        """지원 언어 목록 (쉼표로 구분된 문자열 → 리스트)"""
+        return [lang.strip() for lang in self.supported_languages_str.split(",")]
+
     # ==================== Business Logic ====================
     max_books_per_user: int = Field(default=3, env="MAX_BOOKS_PER_USER")
     max_pages_per_book: int = Field(default=5, env="MAX_PAGES_PER_BOOK")
