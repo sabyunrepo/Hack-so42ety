@@ -63,8 +63,7 @@ class BookOrchestratorService:
         Raises:
             BookQuotaExceededException: 할당량 초과 시
         """
-        mybooks = await self.book_repo.get_user_books(user_id, skip=0, limit=100)
-        current_count = len(mybooks)
+        current_count = await self.book_repo.count_user_created_books(user_id)
         max_books = settings.max_books_per_user
 
         if current_count >= max_books:
@@ -111,9 +110,7 @@ class BookOrchestratorService:
         """
 
         # 1. 할당량 검사
-        print(f"[BookService] user_id={user_id} 동화책 갯수 검사 시작")
-        # write only로 변화 인해 할당량 검사 불화
-        # await self._check_book_quota(user_id)
+        await self._check_book_quota(user_id)
 
         logger.info(
             "#########################################################################"
@@ -121,7 +118,6 @@ class BookOrchestratorService:
         logger.info(f"[BookService] Checking book quota {stories}, {len(stories)}")
 
         # 2. 페이지 수 검증
-        print(f"[BookService] user_id={user_id} 동화책 페이지 수 검사 시작")
         story_page_count = len(stories)
         if story_page_count < 1 or story_page_count > settings.max_pages_per_book:
             raise InvalidPageCountException(
@@ -129,16 +125,12 @@ class BookOrchestratorService:
             )
 
         # 3. 페이지 수, 이미지 수 검증
-        print(
-            f"[BookService] user_id={user_id} 동화책 페이지 수 및 이미지 수 검사 시작"
-        )
         if story_page_count != len(images):
             raise StoriesImagesMismatchException(
                 stories_count=story_page_count, images_count=len(images)
             )
 
         # 3. Book 레코드 즉시 생성 (모니터링용)
-        print(f"[BookService] user_id={user_id} 동화책 임시 생성")
         book = await self.book_repo.create(
             user_id=user_id,
             title="생성중...",  # Story 생성 후 업데이트됨
@@ -151,7 +143,6 @@ class BookOrchestratorService:
         )
 
         # 3-1. Page Skeleton 생성 (len(images)만큼)
-        print(f"[BookService] Creating {len(images)} page skeletons")
         for page_idx in range(len(images)):
             await self.book_repo.add_page(
                 book_id=book.id,
@@ -167,10 +158,6 @@ class BookOrchestratorService:
         # Refresh to reload attributes after commit
         await self.db_session.refresh(book)
 
-        print(
-            f"[BookService] Created book {book.id} for async processing, "
-            f"user_id={user_id}, num_pages={story_page_count}"
-        )
         # 4. DAG 생성 및 백그라운드 실행
         task_ids = await create_storybook_dag(
             user_id=user_id,

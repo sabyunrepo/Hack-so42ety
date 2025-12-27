@@ -211,8 +211,6 @@ async def create_book_with_images(
         - 이미지와 스토리 배열의 길이가 동일해야 함
         - 지원 이미지 형식: JPG, PNG, WEBP
     """
-    print("######################################################")
-    print(f"stories: {stories}, number of images: {len(images)}, target_language: {target_language}")
 
     # 지원 언어 검증
     if target_language not in settings.supported_languages:

@@ -103,6 +103,25 @@ class BookRepository(AbstractRepository[Book]):
 
         return books
 
+    async def count_user_created_books(self, user_id: uuid.UUID) -> int:
+        """
+        사용자가 생성한 책 개수만 카운트 (샘플 제외)
+
+        Args:
+            user_id: 사용자 UUID
+
+        Returns:
+            int: 사용자가 생성한 책 개수
+        """
+        query = (
+            select(func.count())
+            .select_from(Book)
+            .where(Book.user_id == user_id)
+            .where(Book.is_default == False)
+        )
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
     async def get_user_books_summary(
         self, user_id: uuid.UUID, skip: int = 0, limit: int = 100
     ) -> List[Book]:
