@@ -88,6 +88,12 @@ class ErrorCode(str, Enum):
     BIZ_BOOK_QUOTA_EXCEEDED = "BIZ_108"
     """책 생성 한도를 초과했습니다"""
 
+    BIZ_BOOK_UNSUPPORTED_LANGUAGE = "BIZ_109"
+    """지원하지 않는 언어입니다"""
+
+    BIZ_BOOK_INVALID_LEVEL = "BIZ_110"
+    """잘못된 레벨입니다"""
+
     BIZ_TTS_GENERATION_FAILED = "BIZ_201"
     """음성 생성에 실패했습니다"""
 

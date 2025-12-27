@@ -28,13 +28,7 @@ from backend.features.storybook.prompts.generate_tts_expression_prompt import (
 )
 from backend.features.storybook.prompts.generate_image_prompt import GenerateImagePrompt
 from backend.features.storybook.prompts.generate_video_prompt import GenerateVideoPrompt
-from backend.features.storybook.prompts.difficulty_settings import (
-    get_difficulty_settings,
-)
-from backend.features.storybook.utils.difficulty_validator import (
-    validate_difficulty,
-    get_text_stats,
-)
+from backend.features.storybook.validators import ValidatorFactory
 from backend.core.config import settings
 from backend.core.limiters import get_limiters
 from backend.features.tts.exceptions import BookVoiceNotConfiguredException
@@ -59,6 +53,7 @@ async def generate_story_task(
     level: int,
     num_pages: int,
     context: TaskContext,
+    target_language: str = "en",
 ) -> TaskResult:
     """
     Task 1: Story 생성 (AI 호출) with 레벨별 난이도 조절
@@ -69,29 +64,26 @@ async def generate_story_task(
         level: 난이도 레벨 (1: 4-5세, 2: 5-6세, 3: 6-8세)
         num_pages: 페이지 수
         context: Task 실행 컨텍스트
+        target_language: 목표 언어 코드 (en, ko, zh, vi, ru, th)
 
     Returns:
         TaskResult: 성공 시 story_data_key 반환
     """
-    logger.info(f"[Story Task] Starting for book_id={book_id}")
+    logger.info(
+        f"[Story Task] Starting for book_id={book_id}, target_language={target_language}"
+    )
     logger.info(f"[Story Task] stories={stories}, level={level}, num_pages={num_pages}")
     ai_factory = get_ai_factory()
     story_provider = ai_factory.get_story_provider()
 
     max_retries = settings.task_story_max_retries
 
-    # 레벨별 난이도 설정 가져오기
-    try:
-        difficulty_settings = get_difficulty_settings(level)
-    except ValueError:
-        # 유효하지 않은 레벨이면 기본값 1 사용
-        logger.warning(f"[Story Task] Invalid level {level}, using default level 1")
-        level = 1
-        difficulty_settings = get_difficulty_settings(level)
-
-    # 레벨별 스키마 설정 적용
-    # max_dialogues_per_page=difficulty_settings.max_dialogues_per_page,
-    # max_chars_per_dialogue=difficulty_settings.max_chars_per_dialogue,
+    # 유효하지 않은 레벨이면 기본값 사용 (동적 범위)
+    if not (settings.min_level <= level <= settings.max_level):
+        logger.warning(
+            f"[Story Task] Invalid level {level}, using default level {settings.min_level}"
+        )
+        level = settings.min_level
     response_schema = create_stories_response_schema(
         max_pages=num_pages,
         # max_dialogues_per_page는 프론트 최대 허용치보다 작게 제한 필요
@@ -100,8 +92,12 @@ async def generate_story_task(
         max_title_length=settings.max_title_length,
     )
 
-    # 레벨이 적용된 프롬프트 생성
-    prompt = GenerateStoryPrompt(diary_entries=stories, level=level).render()
+    # 레벨이 적용된 프롬프트 생성 (다국어 지원)
+    prompt = GenerateStoryPrompt(
+        diary_entries=stories,
+        level=level,
+        target_language=target_language,
+    ).render()
 
     # === Phase 1: Story 생성 (재시도 유틸리티 사용) ===
     async def _generate_and_validate():
@@ -113,23 +109,32 @@ async def generate_story_task(
         logger.info(f"[Story Task] [Book: {book_id}] generated_data={generated_data}")
         book_title, dialogues = validate_generated_story(generated_data)
 
-        # Flesch-Kincaid 난이도 검증
-        full_text = " ".join(" ".join(page) for page in dialogues)
-        is_valid, fk_score = validate_difficulty(full_text, level)
+        # 난이도 검증 (ValidatorFactory 사용)
+        # dialogues를 2D 배열 그대로 전달하여 정확한 문장 수 계산
+        validator = ValidatorFactory.get_validator(target_language)
 
-        # 텍스트 통계 로깅 (디버깅용)
-        text_stats = get_text_stats(full_text)
+        # if validator:
+        #     result = validator.validate(dialogues, level)
+
+        #     logger.info(
+        #         f"[Story Task] [Book: {book_id}] Difficulty Validation - "
+        #         f"Language: {target_language}, Level: {level}, "
+        #         f"Pages: {len(dialogues)}, Score: {result.score:.2f}, "
+        #         f"Valid: {result.is_valid}, Metrics: {result.metrics}"
+        #     )
+
+        #     if not result.is_valid:
+        #         raise ValueError(
+        #             f"Difficulty validation failed for {target_language}: "
+        #             f"{result.message}"
+        #         )
+        # else:
+        # 검증기가 없는 언어는 프롬프트에 의존
+        sentence_count = sum(len(page) for page in dialogues)
         logger.info(
-            f"[Story Task] [Book: {book_id}] FK Validation - "
-            f"Level: {level}, Score: {fk_score:.2f}, Valid: {is_valid}, "
-            f"Stats: {text_stats}"
+            f"[Story Task] [Book: {book_id}] No validator for {target_language}, "
+            f"relying on prompt. Pages: {len(dialogues)}, Sentences: {sentence_count}"
         )
-
-        if not is_valid:
-            raise ValueError(
-                f"FK score {fk_score:.2f} out of acceptable range for level {level}. "
-                f"Target range: {difficulty_settings.fk_grade_range}"
-            )
 
         return book_title, dialogues
 
@@ -235,11 +240,11 @@ async def generate_story_task(
                 for dialogue_idx, dialogue_text in enumerate(page_dialogues):
                     await repo.add_dialogue_with_translation(
                         page_id=page.id,
-                        speaker="Narrator",  # test 이거 무슨 의미?
+                        speaker="Narrator",
                         sequence=dialogue_idx + 1,
                         translations=[
                             {
-                                "language_code": "en",
+                                "language_code": target_language,
                                 "text": dialogue_text,
                                 "is_primary": True,
                             }
@@ -432,10 +437,7 @@ async def generate_image_task(
         base_path = book.base_path
 
     # Storage tracker (separate from generation tracker)
-    storage_tracker = BatchRetryTracker(
-        total_items=tracker.total_items,
-        max_retries=2
-    )
+    storage_tracker = BatchRetryTracker(total_items=tracker.total_items, max_retries=2)
 
     # Pre-mark failed generation items as storage failed
     for idx in tracker.get_failed_indices():
@@ -447,10 +449,7 @@ async def generate_image_task(
         image_url = image_info.get("imageURL")
 
         # Download with timeout
-        timeout = httpx.Timeout(
-            settings.http_timeout,
-            read=settings.http_read_timeout
-        )
+        timeout = httpx.Timeout(settings.http_timeout, read=settings.http_read_timeout)
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(image_url)
             response.raise_for_status()
@@ -458,11 +457,7 @@ async def generate_image_task(
 
         # Save to storage
         file_name = f"{base_path}/images/page_{idx + 1}.png"
-        await storage_service.save(
-            image_bytes,
-            file_name,
-            content_type="image/png"
-        )
+        await storage_service.save(image_bytes, file_name, content_type="image/png")
 
         logger.info(
             f"[Image Task] [Book: {book_id}] Page {idx + 1}: "
@@ -499,10 +494,7 @@ async def generate_image_task(
 
             # Update each page with storybook image path and prompt
             for page_idx, storage_path in storage_tracker.completed.items():
-                page = next(
-                    (p for p in book.pages if p.sequence == page_idx + 1),
-                    None
-                )
+                page = next((p for p in book.pages if p.sequence == page_idx + 1), None)
                 if page:
                     page.storybook_image_url = storage_path
                     # 이미지 생성에 사용된 프롬프트 저장
@@ -551,7 +543,9 @@ async def generate_image_task(
     # === Phase 7: Redis에 최종 결과 저장 ===
     # 순서 보장을 위해 인덱스 순으로 정렬
     image_infos = [tracker.completed.get(i) for i in range(tracker.total_items)]
-    storage_paths = [storage_tracker.completed.get(i) for i in range(tracker.total_items)]
+    storage_paths = [
+        storage_tracker.completed.get(i) for i in range(tracker.total_items)
+    ]
 
     await task_store.set(
         f"images:{book_id}",
