@@ -82,6 +82,7 @@ class BookOrchestratorService:
         level: int,
         is_default: bool,
         is_shared: bool = False,
+        target_language: str = "en",
     ) -> Book:
         """
         비동기 동화책 생성 (즉시 응답)
@@ -179,6 +180,7 @@ class BookOrchestratorService:
             images=images,
             voice_id=voice_id,
             level=level,
+            target_language=target_language,
         )
 
         # 5. Task IDs를 Book 메타데이터에 저장

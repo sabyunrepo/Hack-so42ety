@@ -1,11 +1,33 @@
 """
-Flesch-Kincaid Grade Level 기반 난이도 검증 유틸리티
+[DEPRECATED] Flesch-Kincaid Grade Level 기반 난이도 검증 유틸리티
 
-Flesch-Kincaid Grade Level 공식:
+이 모듈은 더 이상 사용되지 않습니다.
+새로운 다국어 검증 시스템을 사용하세요:
+
+    from backend.features.storybook.validators import ValidatorFactory
+
+    validator = ValidatorFactory.get_validator("en")  # or "ko", etc.
+    result = validator.validate(text, level=1)
+    if result.is_valid:
+        ...
+
+이 파일은 하위 호환성을 위해 유지되며, 향후 버전에서 제거될 예정입니다.
+
+---
+(Legacy) Flesch-Kincaid Grade Level 공식:
 (0.39 × 평균 문장 길이) + (11.8 × 평균 음절/단어) - 15.59
 
 점수가 낮을수록 쉬운 텍스트를 의미함
 """
+
+import warnings
+
+warnings.warn(
+    "difficulty_validator 모듈은 deprecated되었습니다. "
+    "backend.features.storybook.validators.ValidatorFactory를 사용하세요.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 import logging
 from typing import Tuple

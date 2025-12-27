@@ -298,6 +298,7 @@ async def create_storybook_dag(
     tts_producer: TTSProducer,
     voice_id: str,
     level: int,
+    target_language: str = "en",
 ) -> Dict[str, Any]:
     """
     동화책 생성 DAG 생성 및 실행
@@ -357,6 +358,7 @@ async def create_storybook_dag(
             level,
             len(stories),
             context,
+            target_language,
         ),
     )
 
