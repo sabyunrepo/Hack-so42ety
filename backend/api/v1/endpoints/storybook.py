@@ -231,10 +231,10 @@ async def create_book_with_images(
         )
 
     # TODO: 임시 - stories가 단일 문자열로 들어올 경우 쉼표로 분리
-    if len(stories) == 1 and "," in stories[0]:
-        parsed_stories = [s.strip() for s in stories[0].split(",") if s.strip()]
-    else:
-        parsed_stories = stories
+    # if len(stories) == 1 and "," in stories[0]:
+    #     parsed_stories = [s.strip() for s in stories[0].split(",") if s.strip()]
+    # else:
+    #     parsed_stories = stories
 
     _images = []
     for image in images:
@@ -243,8 +243,8 @@ async def create_book_with_images(
 
     book = await service.create_storybook_async(
         user_id=current_user.id,
-        stories=parsed_stories,
-        # stories=stories,
+        # stories=parsed_stories,
+        stories=stories,
         images=_images,
         voice_id=voice_id,
         level=level,
