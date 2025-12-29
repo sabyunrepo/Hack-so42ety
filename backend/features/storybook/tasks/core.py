@@ -55,6 +55,22 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 
+def _merge_page_dialogues(dialogues: List[List[str]]) -> List[List[str]]:
+    """
+    페이지별 대화를 1개로 통합 (2D 구조 유지)
+
+    Emotion 생성 후 호출되어 각 페이지의 여러 대화를 하나로 합침.
+    감정 태그가 포함된 경우에도 그대로 유지됨.
+
+    Args:
+        dialogues: [["대화1", "대화2"], ["대화1"], ...]
+
+    Returns:
+        [["대화1 대화2"], ["대화1"], ...]
+    """
+    return [[" ".join(page_dialogues)] for page_dialogues in dialogues]
+
+
 async def _mark_book_failed(book_id: str, stage: str, error: str) -> None:
     """공통: Book 실패 상태 업데이트"""
     try:
@@ -435,13 +451,21 @@ async def generate_story_task(
         f"[Story Task] Restructured dialogues: {len(restructured_dialogues)} pages"
     )
 
-    # === Phase 3-4: 저장 (Redis + DB) ===
+    # === Phase 3.5: 페이지별 대화 통합 (2D 구조 유지) ===
+    merged_dialogues = _merge_page_dialogues(dialogues)
+    merged_restructured = _merge_page_dialogues(restructured_dialogues)
+    logger.info(
+        f"[Story Task] [Book: {book_id}] Merged dialogues: {len(merged_dialogues)} pages, "
+        f"each with 1 dialogue"
+    )
+
+    # === Phase 4: 저장 (Redis + DB) ===
     story_key = f"story:{book_id}"
     return await _save_story_to_db(
         book_id=book_id,
-        dialogues=dialogues,
+        dialogues=merged_dialogues,
         book_title=book_title,
-        restructured_dialogues=restructured_dialogues,
+        restructured_dialogues=merged_restructured,
         target_language=target_language,
         context=context,
         max_retries=max_retries,
