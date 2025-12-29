@@ -4,15 +4,17 @@ Google Gemini를 사용한 스토리 및 이미지 생성
 """
 
 import json
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Type, Union
 import httpx
-from typing import Type
 from pydantic import BaseModel
 
-from ..base import StoryGenerationProvider, ImageGenerationProvider
+from ..base import StoryGenerationProvider, ImageGenerationProvider, StoryResponse
 from ....core.config import settings
 from google import genai
 from google.genai import types as genai_types
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
@@ -30,7 +32,9 @@ class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
         """
         self.api_key = api_key or settings.google_api_key
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
-        self.timeout = httpx.Timeout(settings.http_timeout, read=settings.http_read_timeout)
+        self.timeout = httpx.Timeout(
+            settings.http_timeout, read=settings.http_read_timeout
+        )
         self.client: genai.Client = None  # 초기에는 None
         self._init_client()
 
@@ -43,30 +47,182 @@ class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
         self,
         prompt: str,
         response_schema: Optional[Type[BaseModel]] = None,
-    ) -> str:
+    ) -> Optional[StoryResponse]:
         """
         Gemini로 스토리 생성
 
         Args:
             prompt: 스토리 생성 프롬프트
-            context: 추가 컨텍스트
-            max_length: 최대 토큰 수
-            temperature: 생성 온도
+            response_schema: Pydantic 응답 스키마
 
         Returns:
-            str: 생성된 스토리
+            StoryResponse: 표준화된 스토리 응답 (실패 시 None)
         """
         response = await self.client.aio.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-                config=genai_types.GenerateContentConfig(
-                    # thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
-                    temperature=0.1,
-                    response_mime_type="application/json",
-                    response_schema=response_schema,
-                ),
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+                temperature=0.1,
+                response_mime_type="application/json",
+                response_schema=response_schema,
+            ),
+        )
+        logger.info(f"[Story Task] Gemini response received")
+        self._log_gemini_response(response)
+
+        # 1차: Pydantic 자동 파싱 성공
+        if response.parsed is not None:
+            return StoryResponse(
+                title=response.parsed.title,
+                stories=response.parsed.stories,
+                is_fallback=False,
             )
-        return response.parsed  # parsed가 schema_cls 타입으로 자동 변환됨
+
+        # 2차: Fallback JSON 파싱
+        raw_text = getattr(response, "text", None)
+        if raw_text:
+            fallback_result = self._try_fallback_parse(raw_text)
+            if fallback_result:
+                return StoryResponse(
+                    title=fallback_result.title,
+                    stories=fallback_result.stories,
+                    is_fallback=True,
+                )
+
+        # 둘 다 실패
+        return None
+
+    async def generate_text(
+        self,
+        prompt: str,
+        response_schema: Optional[Type[BaseModel]] = None,
+    ) -> Union[BaseModel, str]:
+        """
+        범용 텍스트/스키마 생성
+
+        Args:
+            prompt: 생성 프롬프트
+            response_schema: Pydantic 스키마 (선택)
+
+        Returns:
+            - 스키마 있으면: 파싱된 BaseModel 인스턴스
+            - 스키마 없으면: 원본 텍스트 (str)
+        """
+        config = genai_types.GenerateContentConfig(
+            thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+            temperature=0.1,
+        )
+
+        # 스키마가 있으면 JSON 모드
+        if response_schema:
+            config.response_mime_type = "application/json"
+            config.response_schema = response_schema
+
+        response = await self.client.aio.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=config,
+        )
+
+        logger.info(f"[GoogleAI] generate_text response received")
+
+        # 스키마가 있으면 파싱된 결과 반환
+        if response_schema and response.parsed is not None:
+            return response.parsed
+
+        # 스키마 없거나 파싱 실패 시 텍스트 반환
+        return getattr(response, "text", "") or ""
+
+    def _log_gemini_response(self, response):
+        """Gemini 응답 상세 로깅 (디버깅용)"""
+        logger.info("[Story Task] " + "=" * 50)
+        logger.info("[Story Task] [Gemini Response Debug]")
+
+        # 1) candidates 체크
+        if not response.candidates:
+            logger.error("[Story Task]   ❌ No candidates!")
+            logger.error(
+                f"[Story Task]   prompt_feedback: {getattr(response, 'prompt_feedback', 'N/A')}"
+            )
+            logger.info("[Story Task] " + "=" * 50)
+            return
+
+        candidate = response.candidates[0]
+
+        # 2) finish_reason 로깅
+        finish_reason = getattr(candidate, "finish_reason", "N/A")
+        logger.info(f"[Story Task]   finish_reason: {finish_reason}")
+
+        # 3) Safety Filter 체크
+        if str(finish_reason).upper() in ["SAFETY", "BLOCKED"]:
+            logger.error("[Story Task]   ❌ BLOCKED by Safety Filter!")
+            safety_ratings = getattr(candidate, "safety_ratings", [])
+            for rating in safety_ratings:
+                category = getattr(rating, "category", "N/A")
+                probability = getattr(rating, "probability", "N/A")
+                logger.error(f"[Story Task]     - {category}: {probability}")
+
+        # 4) 원본 텍스트 로깅
+        raw_text = getattr(response, "text", None)
+        if raw_text:
+            preview = raw_text[:300] if len(raw_text) > 300 else raw_text
+            logger.info(f"[Story Task]   text (preview): {preview}...")
+        else:
+            logger.warning("[Story Task]   text: None or empty")
+
+        # 5) parsed 결과 로깅
+        parsed = getattr(response, "parsed", None)
+        if parsed:
+            logger.info(
+                f"[Story Task]   parsed.title: {getattr(parsed, 'title', 'N/A')}"
+            )
+            stories = getattr(parsed, "stories", [])
+            logger.info(
+                f"[Story Task]   parsed.stories: {len(stories) if stories else 0} pages"
+            )
+        else:
+            logger.warning("[Story Task]   ❌ parsed: None")
+
+        logger.info("[Story Task] " + "=" * 50)
+
+    def _try_fallback_parse(self, raw_text: str):
+        """
+        response.parsed 실패 시 수동 파싱 시도
+
+        Note:
+            길이 검증은 core.py에서 처리됨
+        """
+        from types import SimpleNamespace
+
+        try:
+            data = json.loads(raw_text)
+
+            title = data.get("title")
+            stories = data.get("stories")
+
+            # 타입 유효성 검사만 (길이는 core.py에서 처리)
+            if not title or not isinstance(title, str):
+                logger.warning(
+                    "[Story Task] Fallback failed: title is missing or invalid"
+                )
+                return None
+
+            if not stories or not isinstance(stories, list):
+                logger.warning(
+                    "[Story Task] Fallback failed: stories is missing or invalid"
+                )
+                return None
+
+            # SimpleNamespace로 객체처럼 접근 가능하게 변환
+            logger.info(
+                f"[Story Task] ✅ Fallback parse successful! title='{title}' ({len(title)} chars)"
+            )
+            return SimpleNamespace(title=title, stories=stories)
+
+        except json.JSONDecodeError as e:
+            logger.error(f"[Story Task] Fallback JSON parse failed: {e}")
+            return None
 
     async def generate_story_with_images(
         self,
@@ -172,19 +328,19 @@ Format your response as JSON:
         # 여기서는 임시로 NotImplementedError 대신 더미 데이터를 반환하거나
         # 실제 API 호출 코드를 작성해야 함.
         # 하지만 현재 환경에서는 google-genai 라이브러리 사용법에 맞춰 구현 시도.
-        
+
         # 주의: google-genai 라이브러리가 설치되어 있어야 함.
         # from google import genai
         # from google.genai import types
-        
-        # 현재 코드에는 httpx만 사용하고 있음. 
+
+        # 현재 코드에는 httpx만 사용하고 있음.
         # google-genai 라이브러리를 사용하는 방식으로 변경하거나 REST API 직접 호출 필요.
         # 여기서는 REST API 호출 방식 유지 (일관성)
-        
+
         # 하지만 Imagen은 Vertex AI 또는 별도 엔드포인트일 수 있음.
-        # 간단히 구현하기 위해 NotImplementedError를 유지하되, 
+        # 간단히 구현하기 위해 NotImplementedError를 유지하되,
         # Image-to-Image 구현에 집중.
-        
+
         raise NotImplementedError("Text-to-Image not fully implemented yet.")
 
     async def generate_images_batch(
@@ -206,28 +362,29 @@ Format your response as JSON:
     ) -> bytes:
         """
         이미지-to-이미지 생성 (Gemini Vision 활용)
-        
+
         Gemini는 이미지를 입력받아 텍스트를 생성하는 것이 주력이지만,
         최신 모델은 이미지 편집/생성도 가능할 수 있음.
         또는 Imagen API를 사용해야 함.
-        
+
         여기서는 레거시 코드(ImageGeneratorService)에서 사용했던 방식을 참고하여 구현.
         레거시 코드에서는 `gemini-2.5-flash-image` 모델을 사용하여 이미지를 생성했음.
         """
         # 레거시 코드 참고:
         # img = types.Part.from_bytes(data=input_img["content"], mime_type=input_img["content_type"])
         # response = await self.genai_client.aio.models.generate_content(...)
-        
+
         # 이 클래스는 httpx를 사용하므로 REST API로 변환 필요.
         # 하지만 멀티파트 데이터 전송이 복잡하므로, google-genai 라이브러리를 사용하는 것이 나을 수 있음.
         # 기존 코드에 google-genai import가 없으므로 추가 필요.
-        
+
         # 일단 httpx로 구현 시도 (Base64 인코딩 등 필요)
         import base64
+
         encoded_image = base64.b64encode(image_data).decode("utf-8")
-        
+
         full_prompt = f"Generate a high-quality illustration based on this sketch/image. Style: {style or 'cartoon'}. Prompt: {prompt}"
-        
+
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             # Gemini 1.5 Flash 등 비전 모델 사용
             response = await client.post(
@@ -240,10 +397,10 @@ Format your response as JSON:
                                 {"text": full_prompt},
                                 {
                                     "inline_data": {
-                                        "mime_type": "image/png", # 가정
-                                        "data": encoded_image
+                                        "mime_type": "image/png",  # 가정
+                                        "data": encoded_image,
                                     }
-                                }
+                                },
                             ]
                         }
                     ],
@@ -254,41 +411,38 @@ Format your response as JSON:
                 },
             )
             response.raise_for_status()
-            
+
         # 주의: Gemini generateContent는 텍스트를 반환함. 이미지를 반환하지 않음.
         # 이미지를 반환하려면 Imagen API를 써야 함.
         # 레거시 코드는 `gemini-2.5-flash-image`라는 모델을 썼는데, 이는 실험적 모델이거나 착각일 수 있음.
         # 또는 `google-genai` 라이브러리가 Imagen을 래핑하고 있을 수 있음.
-        
+
         # 확인 결과: Gemini는 텍스트/멀티모달 입력 -> 텍스트 출력임.
         # 이미지를 생성하려면 `imagen-3.0-generate-001` 같은 모델을 써야 함.
         # 하지만 Google AI Studio API(REST)에서 Imagen을 지원하는지 확인 필요.
-        
+
         # 대안: 레거시 코드가 `google.genai` 라이브러리를 사용했으므로, 여기서도 라이브러리를 사용하는 것이 안전함.
         # httpx 기반 구현을 google-genai 라이브러리 기반으로 마이그레이션하거나,
         # 라이브러리를 혼용해야 함.
-        
+
         # 여기서는 google-genai 라이브러리를 동적으로 import하여 사용.
         try:
             from google import genai
             from google.genai import types
-            
+
             client = genai.Client(api_key=self.api_key)
-            
+
             # 이미지 파트 생성
             # mime_type은 image/png로 가정 (실제로는 인자로 받아야 정확함)
-            img_part = types.Part.from_bytes(
-                data=image_data, 
-                mime_type="image/png" 
-            )
-            
+            img_part = types.Part.from_bytes(data=image_data, mime_type="image/png")
+
             # Imagen 3 호출 (또는 사용 가능한 이미지 모델)
             # google-genai SDK 문서에 따르면 models.generate_image 또는 유사 메서드 사용
-            # 하지만 레거시 코드는 models.generate_content를 사용했음. 
+            # 하지만 레거시 코드는 models.generate_content를 사용했음.
             # 레거시 코드를 다시 보면: model="gemini-2.5-flash-image"
             # 이는 존재하지 않는 모델명일 가능성이 높음 (2.0 Flash가 최신).
             # 아마도 `imagen-3.0-generate-001` 등을 의도했을 것.
-            
+
             # 여기서는 Imagen 3를 사용하도록 수정.
             response = client.models.generate_image(
                 model="imagen-3.0-generate-001",
@@ -299,26 +453,28 @@ Format your response as JSON:
                     # image_source=img_part # Imagen이 image source를 지원하는지 확인 필요
                     # 현재 공개된 Imagen API는 Text-to-Image 위주임.
                     # Image-to-Image는 Vertex AI에서 지원.
-                )
+                ),
             )
-            
-            # 만약 Image-to-Image가 지원되지 않는다면, 
+
+            # 만약 Image-to-Image가 지원되지 않는다면,
             # 프롬프트만 사용하여 생성하도록 폴백하거나,
             # Gemini가 이미지를 설명하게 하고 그 설명으로 이미지를 생성하는 2단계 방식을 써야 함.
-            
+
             # 일단은 Text-to-Image로 구현하되, 프롬프트에 "based on previous context" 등을 추가.
             if response.generated_images:
                 return response.generated_images[0].image.image_bytes
             else:
                 raise Exception("No image generated")
-                
+
         except ImportError:
             raise ImportError("google-genai library is required")
         except Exception as e:
             # 라이브러리 호출 실패 시
             raise RuntimeError(f"Image generation failed: {e}")
 
-    def _build_story_prompt(self, prompt: str, context: Optional[Dict[str, Any]]) -> str:
+    def _build_story_prompt(
+        self, prompt: str, context: Optional[Dict[str, Any]]
+    ) -> str:
         """
         스토리 생성을 위한 전체 프롬프트 구성
 
@@ -343,7 +499,9 @@ Story Request: {prompt}
             if "themes" in context:
                 base_prompt += f"\nThemes: {', '.join(context['themes'])}"
             if "previous_stories" in context:
-                base_prompt += f"\n\nPrevious Stories Context: {context['previous_stories']}"
+                base_prompt += (
+                    f"\n\nPrevious Stories Context: {context['previous_stories']}"
+                )
 
         base_prompt += "\n\nPlease write a complete, engaging story (200-300 words)."
 

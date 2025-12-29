@@ -6,7 +6,8 @@ Runware API를 사용한 비디오 생성
 import uuid
 import base64
 import logging
-from typing import Optional, Dict, Any
+from dataclasses import dataclass
+from typing import Optional, Dict, Any, Literal
 import httpx
 
 from ..base import VideoGenerationProvider, ImageGenerationProvider
@@ -14,15 +15,45 @@ from ....core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 # ============================================================
-# Model Configuration Dictionaries
+# 작업 상태 응답 데이터클래스
+# ============================================================
+
+
+@dataclass
+class TaskStatusResponse:
+    """
+    Runware 비동기 작업 상태 응답 표준화
+
+    check_image_status()와 check_video_status()의 공통 반환 타입
+    """
+
+    status: Literal["pending", "processing", "completed", "failed"]
+    progress: int
+    result_url: Optional[str] = None  # imageURL 또는 videoURL
+    result_uuid: Optional[str] = None  # imageUUID (이미지 전용)
+    error: Optional[str] = None
+
+# ============================================================
+# 모델 설정 딕셔너리
 # ============================================================
 
 IMAGE_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
     "google": {
         "default_width": 896,
         "default_height": 1152,
-        "reference_key": "referenceImages",  # Top-level
+        "reference_key": "inputs.referenceImages",  # 중첩 구조 (API 요구사항)
+        "provider_settings": None,
+        "output_type": ["dataURI", "URL"],
+        "output_format": "PNG",
+        "include_cost": True,
+        "output_quality": 85,
+    },
+    "google:4@1": {  # Google Imagen 3 (명시적 설정)
+        "default_width": 896,
+        "default_height": 1152,
+        "reference_key": "inputs.referenceImages",  # 중첩 구조
         "provider_settings": None,
         "output_type": ["dataURI", "URL"],
         "output_format": "PNG",
@@ -32,7 +63,7 @@ IMAGE_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
     "openai:1@2": {  # GPT Image 1 Mini
         "default_width": 1024,
         "default_height": 1024,
-        "reference_key": "inputs.referenceImages",  # Nested
+        "reference_key": "inputs.referenceImages",  # 중첩 구조
         "provider_settings": {"openai": {"quality": "auto", "background": "opaque"}},
         "output_type": ["dataURI", "URL"],
         "output_format": "PNG",
@@ -69,25 +100,42 @@ VIDEO_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
 
 
 def get_image_config(model_id: str) -> Dict[str, Any]:
-    """모델 ID에서 이미지 설정 조회 (부분 매칭 지원)"""
-    # 정확한 매칭 먼저
+    """
+    모델 ID에서 이미지 설정 조회 (부분 매칭 지원)
+
+    Args:
+        model_id: 모델 식별자 (예: "google:4@1", "openai:1@2")
+
+    Returns:
+        Dict[str, Any]: 모델별 설정 딕셔너리
+    """
+    # 정확한 매칭 우선
     if model_id in IMAGE_MODEL_CONFIGS:
         return IMAGE_MODEL_CONFIGS[model_id]
 
-    # 부분 매칭
+    # 부분 매칭 (모델 ID에 키가 포함된 경우)
     for key in IMAGE_MODEL_CONFIGS:
         if key in model_id:
             return IMAGE_MODEL_CONFIGS[key]
 
-    # 기본값: google
+    # 기본값: google 설정 반환
     return IMAGE_MODEL_CONFIGS["google"]
 
 
 def get_video_config(model_id: str) -> Dict[str, Any]:
-    """모델 ID에서 비디오 설정 조회 (부분 매칭 지원)"""
+    """
+    모델 ID에서 비디오 설정 조회 (부분 매칭 지원)
+
+    Args:
+        model_id: 모델 식별자 (예: "klingai:6@0", "bytedance:2@2")
+
+    Returns:
+        Dict[str, Any]: 모델별 설정 딕셔너리
+    """
     for key in VIDEO_MODEL_CONFIGS:
         if key in model_id:
             return VIDEO_MODEL_CONFIGS[key]
+    # 기본값: klingai 설정 반환
     return VIDEO_MODEL_CONFIGS["klingai"]
 
 
@@ -252,7 +300,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             httpx.HTTPStatusError: API 요청 실패
             Exception: 응답 형식 오류 또는 API 에러
         """
-        # Unused parameters kept for backward compatibility
+        # 하위 호환성을 위해 미사용 파라미터 유지
         _ = (strength, cfg_scale, steps, style, quality, background)
 
         task_uuid = str(uuid.uuid4())
@@ -262,7 +310,7 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         model = settings.runware_img2img_model
         config = get_image_config(model)
 
-        # Base payload (common fields)
+        # 기본 페이로드 (공통 필드) - 항상 비동기 모드 사용
         payload = [
             {
                 "taskType": "imageInference",
@@ -270,14 +318,15 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "positivePrompt": prompt,
                 "model": model,
                 "numberResults": 1,
+                "deliveryMethod": "async",  # 타임아웃 방지를 위한 비동기 모드
             }
         ]
 
-        # Apply config-based settings
+        # 모델 설정 기반 크기 적용
         payload[0]["width"] = width if width is not None else config["default_width"]
         payload[0]["height"] = height if height is not None else config["default_height"]
 
-        # Reference images (nested or top-level based on config)
+        # 참조 이미지 설정 (모델별 중첩/최상위 구조)
         if config["reference_key"] == "inputs.referenceImages":
             payload[0]["inputs"] = {
                 "referenceImages": [f"data:image/png;base64,{image_base64}"]
@@ -285,11 +334,11 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         else:
             payload[0]["referenceImages"] = [f"data:image/png;base64,{image_base64}"]
 
-        # Provider settings
+        # 프로바이더별 설정
         if config.get("provider_settings"):
             payload[0]["providerSettings"] = config["provider_settings"]
 
-        # Optional output settings (OpenAI specific)
+        # 선택적 출력 설정 (OpenAI 전용)
         if config.get("output_type"):
             payload[0]["outputType"] = config["output_type"]
         if config.get("output_format"):
@@ -310,43 +359,188 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 },
                 json=payload,
             )
-            if response.status_code >= 400:
-                logger.error("[Image Task] Runware API ERROR")
-                logger.error(f"[Image Task] Status Code: {response.status_code}")
-                logger.error(f"[Image Task] Response Text: {response.text}")
 
+            # HTTP 에러 처리
+            if response.status_code >= 400:
+                logger.error("[Image Task] Runware API 에러 발생")
+                logger.error(f"[Image Task] 상태 코드: {response.status_code}")
+                logger.error(f"[Image Task] 응답 텍스트: {response.text}")
                 try:
-                    logger.error(f"[Image Task] Response JSON: {response.json()}")
+                    error_json = response.json()
+                    logger.error(f"[Image Task] 응답 JSON: {error_json}")
                 except Exception:
-                    logger.error("[Image Task] Response is not JSON")
-                    response.raise_for_status()
-                    result = response.json()
-                    logger.info(
-                        f"[Image Task] Runware image generation response: {result}"
-                    )
-            response.raise_for_status()
+                    logger.error("[Image Task] 응답이 JSON 형식이 아님")
+                response.raise_for_status()
+
             result = response.json()
 
+            # 응답 내 API 에러 확인
             if "error" in result:
                 error_msg = result.get("error", "Unknown error")
-                logger.error(f"[Image Task] Runware image-to-image failed: {error_msg}")
+                logger.error(f"[Image Task] Runware 이미지 생성 실패: {error_msg}")
                 raise Exception(f"Runware API error: {error_msg}")
 
-            # 응답에서 이미지 데이터 확인
-            if "data" not in result or len(result["data"]) == 0:
-                raise Exception("No image data in response")
+            # errors 배열 확인 (Runware 에러 형식)
+            if "errors" in result and len(result["errors"]) > 0:
+                error = result["errors"][0]
+                error_msg = error.get("message", "Unknown error")
+                error_code = error.get("code", "unknown")
+                logger.error(f"[Image Task] Runware API 에러: [{error_code}] {error_msg}")
+                raise Exception(f"Runware API error [{error_code}]: {error_msg}")
 
-            image_uuid = result["data"][0].get("imageUUID")
+            # 비동기 모드: 폴링을 위한 task_uuid 반환
             actual_width = payload[0].get("width")
             actual_height = payload[0].get("height")
 
             logger.info(
-                f"[Image Task] Image-to-image completed: model={model}, "
-                f"size={actual_width}x{actual_height}, UUID={image_uuid}"
+                f"[Image Task] Async request submitted: task_uuid={task_uuid}, "
+                f"model={model}, size={actual_width}x{actual_height}"
             )
 
-            # JSON 응답 반환 (core.py에서 imageUUID, imageURL 사용)
-            return result
+            return {"task_uuid": task_uuid}
+
+    # ========== 작업 상태 확인 (통합 메서드) ==========
+
+    async def _check_task_status(
+        self,
+        task_id: str,
+        task_type: Literal["image", "video"],
+    ) -> TaskStatusResponse:
+        """
+        Runware 비동기 작업 상태 확인 (공통 로직)
+
+        이미지와 비디오 작업의 상태 확인 로직을 통합한 내부 메서드.
+        check_image_status()와 check_video_status()에서 래퍼로 호출됨.
+
+        Args:
+            task_id: Runware task UUID
+            task_type: "image" 또는 "video"
+
+        Returns:
+            TaskStatusResponse: 표준화된 작업 상태 응답
+
+        상태 매핑 (Runware API → 내부 상태):
+            - imageURL/videoURL 있음 -> "completed"
+            - status="processing" -> "processing"
+            - status="success" (URL 없음) -> "processing" (대기)
+            - status="error" -> "failed"
+            - errors 배열 있음 -> "failed"
+            - 빈 응답/데이터 없음 -> "processing"
+        """
+        # 타입별 설정
+        url_key = "imageURL" if task_type == "image" else "videoURL"
+        uuid_key = "imageUUID" if task_type == "image" else None
+        log_tag = f"[{task_type.capitalize()} Task]"
+
+        payload = [{"taskType": "getResponse", "taskUUID": task_id}]
+        logger.info(f"{log_tag} 상태 확인: task_id={task_id[:8]}...")
+
+        # ========== API 호출 ==========
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                response = await client.post(
+                    self.base_url,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+                response.raise_for_status()
+                result = response.json()
+
+            except httpx.HTTPStatusError as e:
+                logger.warning(f"{log_tag} HTTP 에러 (재시도): {e.response.status_code}")
+                return TaskStatusResponse(status="processing", progress=50)
+
+            except Exception as e:
+                logger.warning(f"{log_tag} 예외 (재시도): {type(e).__name__}")
+                return TaskStatusResponse(status="processing", progress=50)
+
+        # ========== 응답 파싱 ==========
+        if not result:
+            return TaskStatusResponse(status="processing", progress=50)
+
+        # errors 배열 확인 (Runware 에러 형식)
+        if "errors" in result and result["errors"]:
+            err = result["errors"][0]
+            error_msg = f"[{err.get('code', 'unknown')}] {err.get('message', 'Unknown')}"
+            logger.error(f"{log_tag} ❌ API 에러: {error_msg}")
+            return TaskStatusResponse(status="failed", progress=0, error=error_msg)
+
+        # data 배열 확인
+        if "data" not in result or not result["data"]:
+            return TaskStatusResponse(status="processing", progress=50)
+
+        task_result = result["data"][0]
+
+        # ========== 완료 확인 (타입별 URL 키 사용) ==========
+        if url_key in task_result:
+            result_url = task_result[url_key]
+            result_uuid = task_result.get(uuid_key) if uuid_key else None
+            # URL 로깅 (이미지는 길어서 truncate)
+            log_url = result_url[:80] + "..." if len(result_url) > 80 else result_url
+            logger.info(f"{log_tag} ✅ 완료! URL: {log_url}")
+            return TaskStatusResponse(
+                status="completed",
+                progress=100,
+                result_url=result_url,
+                result_uuid=result_uuid,
+            )
+
+        # ========== status 필드 분기 ==========
+        # Runware API 상태값: "processing", "success", "error"
+        if "status" in task_result:
+            status = task_result["status"]
+            logger.info(f"{log_tag} 작업 상태: {status}")
+
+            if status == "processing":
+                return TaskStatusResponse(status="processing", progress=50)
+
+            elif status == "success":
+                # URL 없이 success (엣지 케이스)
+                return TaskStatusResponse(
+                    status="processing",
+                    progress=80,
+                    result_uuid=task_result.get(uuid_key) if uuid_key else None,
+                )
+
+            elif status == "error":
+                error_msg = task_result.get(
+                    "message", task_result.get("error", "Unknown error")
+                )
+                logger.error(f"{log_tag} ❌ 실패: {error_msg}")
+                return TaskStatusResponse(status="failed", progress=0, error=error_msg)
+
+        # 기본값: 처리 중
+        return TaskStatusResponse(status="processing", progress=50)
+
+    # ========== 이미지 상태 확인 (래퍼) ==========
+
+    async def check_image_status(self, task_id: str) -> Dict[str, Any]:
+        """
+        비동기 이미지 생성 상태 확인
+
+        Args:
+            task_id: generate_image_from_image()에서 반환된 Runware task UUID
+
+        Returns:
+            Dict[str, Any]: {
+                "status": str,      # "pending", "processing", "completed", "failed"
+                "progress": int,    # 0-100
+                "image_url": Optional[str],
+                "image_uuid": Optional[str],
+                "error": Optional[str]
+            }
+        """
+        result = await self._check_task_status(task_id, "image")
+        return {
+            "status": result.status,
+            "progress": result.progress,
+            "image_url": result.result_url,
+            "image_uuid": result.result_uuid,
+            "error": result.error,
+        }
 
     async def generate_video(
         self,
@@ -387,22 +581,22 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             ValueError: 파라미터 검증 실패
             Exception: API 에러
         """
-        # Validation
+        # 파라미터 검증
         if duration is not None and not (1.2 <= duration <= 12):
             raise ValueError(
-                f"duration must be between 1.2 and 12 seconds. Got: {duration}"
+                f"duration은 1.2~12초 사이여야 합니다. 입력값: {duration}"
             )
 
         if output_quality < 20 or output_quality > 99:
             raise ValueError(
-                f"output_quality must be between 20 and 99. Got: {output_quality}"
+                f"output_quality는 20~99 사이여야 합니다. 입력값: {output_quality}"
             )
 
         task_uuid = str(uuid.uuid4())
         model = settings.runware_video_model
         config = get_video_config(model)
 
-        # Base payload (common fields)
+        # 기본 페이로드 (공통 필드)
         payload = [
             {
                 "taskType": "videoInference",
@@ -418,16 +612,16 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
             }
         ]
 
-        # Apply config-based settings
+        # 모델 설정 기반 값 적용
         payload[0]["duration"] = duration if duration is not None else config["default_duration"]
 
-        # Dimensions (only for models that support it)
+        # 크기 설정 (지원 모델만)
         if config.get("supports_dimensions"):
             payload[0]["fps"] = fps if fps is not None else config.get("default_fps", 24)
             payload[0]["width"] = width if width is not None else config.get("default_width")
             payload[0]["height"] = height if height is not None else config.get("default_height")
 
-        # Provider settings
+        # 프로바이더별 설정
         if config.get("provider_settings_key"):
             payload[0]["providerSettings"] = {
                 config["provider_settings_key"]: {"cameraFixed": camera_fixed}
@@ -499,12 +693,14 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         )
         return task_uuid
 
+    # ========== 비디오 상태 확인 (래퍼) ==========
+
     async def check_video_status(self, task_id: str) -> Dict[str, Any]:
         """
-        비디오 생성 상태 확인 (getResponse)
+        비디오 생성 상태 확인
 
         Args:
-            task_id: 작업 ID
+            task_id: generate_video()에서 반환된 Runware task UUID
 
         Returns:
             Dict[str, Any]: {
@@ -514,132 +710,13 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 "error": Optional[str]
             }
         """
-        payload = [{"taskType": "getResponse", "taskUUID": task_id}]
-
-        logger.info(f"[Video Task] Checking status for task_id: {task_id}")
-
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            try:
-                response = await client.post(
-                    self.base_url,
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                )
-                response.raise_for_status()
-
-                result = response.json()
-                logger.info(f"[Video Task] API Response: {result}")
-
-            except httpx.HTTPStatusError as e:
-                error_detail = e.response.text
-                logger.error(
-                    f"[Video Task] HTTP Status Error: {e.response.status_code}"
-                )
-                logger.error(f"[Video Task] Error Response Body: {error_detail}")
-                # 에러 발생 시에도 processing으로 반환 (재시도 허용)
-                return {
-                    "status": "processing",
-                    "progress": 50,
-                    "video_url": None,
-                    "error": None,
-                }
-            except Exception as e:
-                logger.error(
-                    f"[Video Task] Unexpected error: {type(e).__name__}: {str(e)}"
-                )
-                return {
-                    "status": "processing",
-                    "progress": 50,
-                    "video_url": None,
-                    "error": None,
-                }
-
-        # Response 파싱 - Runware API는 {"data": [...]} 형태로 응답
-        if not result:
-            logger.info(f"[Video Task] Empty result, status: processing")
-            return {
-                "status": "processing",
-                "progress": 50,
-                "video_url": None,
-                "error": None,
-            }
-
-        # 에러 체크
-        if "errors" in result and len(result["errors"]) > 0:
-            error = result["errors"][0]
-            error_msg = error.get("message", "Unknown error")
-            error_code = error.get("code", "unknown")
-            logger.error(f"[Video Task] API returned error: [{error_code}] {error_msg}")
-            return {
-                "status": "failed",
-                "progress": 0,
-                "video_url": None,
-                "error": f"[{error_code}] {error_msg}",
-            }
-
-        # data 배열 확인
-        if "data" not in result or len(result["data"]) == 0:
-            logger.info(f"[Video Task] No data in result, status: processing")
-            return {
-                "status": "processing",
-                "progress": 50,
-                "video_url": None,
-                "error": None,
-            }
-
-        task_result = result["data"][0]
-        logger.info(f"[Video Task] Task result: {task_result}")
-
-        # 완료 체크 - videoURL이 있으면 완료
-        if "videoURL" in task_result:
-            video_url = task_result["videoURL"]
-            logger.info(f"[Video Task] Video completed! URL: {video_url}")
-            return {
-                "status": "completed",
-                "progress": 100,
-                "video_url": video_url,
-                "error": None,
-            }
-        # status 필드 체크 (processing 중일 때)
-        elif "status" in task_result:
-            status = task_result["status"]
-            logger.info(f"[Video Task] Task status: {status}")
-            if status == "processing":
-                return {
-                    "status": "processing",
-                    "progress": 50,
-                    "video_url": None,
-                    "error": None,
-                }
-            elif status == "failed":
-                error_msg = task_result.get("error", "Unknown error")
-                return {
-                    "status": "failed",
-                    "progress": 0,
-                    "video_url": None,
-                    "error": error_msg,
-                }
-            else:
-                # 알 수 없는 상태
-                logger.info(f"[Video Task] Unknown status: {status}")
-                return {
-                    "status": "processing",
-                    "progress": 50,
-                    "video_url": None,
-                    "error": None,
-                }
-        else:
-            # status도 videoURL도 없으면 아직 처리 중
-            logger.info(f"[Video Task] No status or videoURL, assuming processing...")
-            return {
-                "status": "processing",
-                "progress": 50,
-                "video_url": None,
-                "error": None,
-            }
+        result = await self._check_task_status(task_id, "video")
+        return {
+            "status": result.status,
+            "progress": result.progress,
+            "video_url": result.result_url,
+            "error": result.error,
+        }
 
     async def download_video(self, video_url: str) -> bytes:
         """
