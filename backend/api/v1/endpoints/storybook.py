@@ -165,9 +165,7 @@ async def create_book(
     summary="이미지 기반 동화책 생성",
     responses={
         201: {"description": "동화책 생성 성공"},
-        400: {
-            "description": "잘못된 요청 (이미지/스토리 개수 불일치 또는 지원하지 않는 언어)"
-        },
+        400: {"description": "잘못된 요청 (이미지/스토리 개수 불일치 또는 지원하지 않는 언어)"},
         401: {"description": "인증 실패"},
         500: {"description": "서버 오류"},
     },
@@ -178,9 +176,7 @@ async def create_book_with_images(
     voice_id: str = Form(default="EXAVITQu4vr4xnSDxMaL", description="TTS 음성 ID"),
     level: int = Form(default=1, description="난이도 레벨"),
     is_default: bool = Form(default=False, description="샘플 동화책 여부"),
-    target_language: str = Form(
-        default="en", description="목표 언어 (en, ko, zh, vi, ru, th)"
-    ),
+    target_language: str = Form(default="en", description="목표 언어 (en, ko, zh, vi, ru, th)"),
     current_user: User = Depends(get_current_user),
     service: BookOrchestratorService = Depends(get_book_service_write),
     storage_service: AbstractStorageService = Depends(get_storage_service),
@@ -219,7 +215,8 @@ async def create_book_with_images(
     # 지원 언어 검증
     if target_language not in settings.supported_languages:
         raise UnsupportedLanguageException(
-            language=target_language, supported=settings.supported_languages
+            language=target_language,
+            supported=settings.supported_languages
         )
 
     # 레벨 범위 검증
@@ -230,12 +227,6 @@ async def create_book_with_images(
             max_level=settings.max_level,
         )
 
-    # TODO: 임시 - stories가 단일 문자열로 들어올 경우 쉼표로 분리
-    if len(stories) == 1 and "," in stories[0]:
-        parsed_stories = [s.strip() for s in stories[0].split(",") if s.strip()]
-    else:
-        parsed_stories = stories
-
     _images = []
     for image in images:
         _byte = await image.read()
@@ -243,8 +234,7 @@ async def create_book_with_images(
 
     book = await service.create_storybook_async(
         user_id=current_user.id,
-        stories=parsed_stories,
-        # stories=stories,
+        stories=stories,
         images=_images,
         voice_id=voice_id,
         level=level,
@@ -316,7 +306,7 @@ async def get_book(
 ):
     """
     동화책 상세 조회
-
+    
     특정 동화책의 전체 정보를 조회합니다.
     - 공유된 책(is_shared=True)은 누구나 조회 가능
     - 비공개 책은 소유자만 조회 가능

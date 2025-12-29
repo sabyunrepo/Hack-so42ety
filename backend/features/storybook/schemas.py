@@ -423,13 +423,3 @@ class TTSExpressionResponse(BaseModel):
         ...,
         description="감정 태그가 추가된 스토리 대사 목록 (평탄화된 리스트)",
     )
-
-
-class ShortenedTitle(BaseModel):
-    """Title 축약 응답 스키마 (AI용)"""
-
-    title: str = Field(
-        ...,
-        max_length=settings.max_title_length,
-        description="Shortened title",
-    )

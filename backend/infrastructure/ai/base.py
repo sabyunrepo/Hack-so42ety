@@ -4,26 +4,8 @@ AI Provider Abstract Base Classes
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 from enum import Enum
-
-
-@dataclass
-class StoryResponse:
-    """
-    AI Story 생성 응답 표준화
-
-    모든 StoryGenerationProvider가 이 타입을 반환해야 함
-
-    Attributes:
-        title: 스토리 제목
-        stories: 페이지별 대사 리스트 (2D 배열)
-        is_fallback: Fallback 파싱 여부 (True면 스키마 실패 후 수동 파싱됨)
-    """
-    title: str
-    stories: List[List[str]]
-    is_fallback: bool = False
 
 
 class AIProviderType(str, Enum):
@@ -64,17 +46,21 @@ class StoryGenerationProvider(ABC):
     async def generate_story(
         self,
         prompt: str,
-        response_schema: Optional[Any] = None,
-    ) -> Optional[StoryResponse]:
+        context: Optional[Dict[str, Any]] = None,
+        max_length: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> str:
         """
         스토리 생성
 
         Args:
             prompt: 스토리 생성 프롬프트
-            response_schema: 응답 스키마 (Pydantic 모델 등)
+            context: 추가 컨텍스트 (사용자 정보, 이전 스토리 등)
+            max_length: 최대 토큰 길이
+            temperature: 생성 온도 (0.0~1.0)
 
         Returns:
-            StoryResponse: 표준화된 스토리 응답 (실패 시 None)
+            str: 생성된 스토리 텍스트
         """
         pass
 
