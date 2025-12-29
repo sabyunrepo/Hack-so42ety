@@ -123,7 +123,7 @@ class Settings(BaseSettings):
     )
     runware_img2img_steps: int = Field(default=30, env="RUNWARE_IMG2IMG_STEPS")
     runware_img2img_model: str = Field(
-        default="google:4@1", env="RUNWARE_IMG2IMG_MODEL"
+        default="openai:4@1", env="RUNWARE_IMG2IMG_MODEL"
     )
     # runware_img2img_model: str = Field(default="civitai:102438@133677", env="RUNWARE_IMG2IMG_MODEL")
 
@@ -256,6 +256,19 @@ class Settings(BaseSettings):
         env="TASK_VIDEO_MAX_RETRIES",
         description="Video generation task maximum retry attempts (per video)",
     )
+
+    # Image generation async polling settings
+    task_image_poll_interval: int = Field(
+        default=5,
+        env="TASK_IMAGE_POLL_INTERVAL",
+        description="Polling interval for async image generation status check (seconds)",
+    )
+    task_image_max_wait_time: int = Field(
+        default=300,
+        env="TASK_IMAGE_MAX_WAIT_TIME",
+        description="Maximum wait time for async image generation (seconds)",
+    )
+
     task_retry_delay: float = Field(
         default=2.0,
         env="TASK_RETRY_DELAY",
