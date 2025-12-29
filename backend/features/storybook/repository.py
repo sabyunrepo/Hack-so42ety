@@ -89,6 +89,7 @@ class BookRepository(AbstractRepository[Book]):
                 .selectinload(Dialogue.audios)
             )
             .where(or_(Book.user_id == user_id, Book.is_default == True))
+            .where(Book.is_deleted == False)  # 삭제된 책 제외
             .order_by(Book.created_at.asc())
             .offset(skip)
             .limit(limit)
@@ -118,6 +119,7 @@ class BookRepository(AbstractRepository[Book]):
             .select_from(Book)
             .where(Book.user_id == user_id)
             .where(Book.is_default == False)
+            .where(Book.is_deleted == False)  # 삭제된 책 제외
         )
         result = await self.session.execute(query)
         return result.scalar() or 0
@@ -143,6 +145,7 @@ class BookRepository(AbstractRepository[Book]):
         query = (
             select(Book)
             .where(or_(Book.user_id == user_id, Book.is_default == True))
+            .where(Book.is_deleted == False)  # 삭제된 책 제외
             .order_by(Book.created_at.asc())
             .offset(skip)
             .limit(limit)
