@@ -147,6 +147,9 @@ async def _generate_story_phase(
         (book_title, dialogues) 또는 실패 시 None
     """
     # 스키마 & 프롬프트 생성
+    logger.info(
+        f"[Story Task] [Book: {book_id}] stories={stories}, level={level}, num_pages={num_pages}"
+    )
     response_schema = create_stories_response_schema(
         max_pages=num_pages,
         max_dialogues_per_page=settings.max_dialogues_per_page,
@@ -166,6 +169,12 @@ async def _generate_story_phase(
         )
         logger.info(f"[Story Task] [Book: {book_id}] generated_data={generated_data}")
         title, dialogues = validate_generated_story(generated_data)
+
+        # 페이지 수 검증 (불일치 시 재시도)
+        if len(dialogues) != num_pages:
+            raise ValueError(
+                f"Page count mismatch: expected {num_pages}, got {len(dialogues)}"
+            )
 
         # Title 길이 초과 시 AI 축약 요청 (1회)
         if len(title) > settings.max_title_length:
@@ -257,11 +266,16 @@ async def _save_story_to_db(
     """
     # Redis 저장
     task_store = TaskStore()
+    logger.info(
+        f"[Story Task] [Book: {book_id}] Saving to Redis: key={story_key}, "
+        f"dialogues count={len(restructured_dialogues)}, title={book_title}"
+    )
     await task_store.set(
         story_key,
         {"dialogues": restructured_dialogues, "title": book_title},
         ttl=3600,
     )
+    logger.info(f"[Story Task] [Book: {book_id}] Redis save completed")
 
     # DB 저장
     async with AsyncSessionLocal() as session:
@@ -428,9 +442,22 @@ async def generate_image_task(
     context: TaskContext,
 ) -> TaskResult:
     """
-    Task 2: Image 생성 (배치 처리 - 모든 페이지, 재시도 지원)
+    Task 2: Image 생성 (Async Mode + Polling)
 
-    실패한 이미지만 재시도하며, 성공한 이미지는 Redis에 보존
+    비동기 모드로 이미지 생성 요청을 제출하고 폴링으로 결과를 수집합니다.
+    Cloudflare 타임아웃 문제를 해결하기 위해 동기 방식에서 변경되었습니다.
+
+    Flow:
+        Phase 1: Initialize trackers + Redis cache recovery
+        Phase 2: Generate prompts from dialogues
+        Phase 3: MAIN RETRY LOOP
+            Phase 3a: Submit async requests (get task_uuids)
+            Phase 3b: Polling loop (check_image_status)
+            Phase 3c: Handle timeouts + Save to Redis
+        Phase 4: Evaluate results (all/partial/failed)
+        Phase 5: Download images from CDN → Save to S3
+        Phase 6: Update database (Page.storybook_image_url)
+        Phase 7: Save final results to Redis
 
     Args:
         book_id: Book UUID (string)
@@ -441,31 +468,39 @@ async def generate_image_task(
         TaskResult: 성공 시 모든 페이지의 image_urls 반환
     """
     logger.info(
-        f"[Image Task] [Book: {book_id}] Starting batch processing, {len(images)} images"
+        f"[Image Task] [Book: {book_id}] Starting async batch processing, {len(images)} images"
     )
-    # return ""
 
+    # === Dependencies ===
     storage_service = get_storage_service()
     task_store = TaskStore()
     story_key = f"story:{book_id}"
     story_data = await task_store.get(story_key)
     dialogues = story_data.get("dialogues", []) if story_data else []
 
-    # === Phase 1: 재시도 추적기 초기화 ===
+    # 디버깅: Redis에서 가져온 데이터 확인
+    logger.info(
+        f"[Image Task] [Book: {book_id}] Redis story_data exists: {story_data is not None}, "
+        f"dialogues count: {len(dialogues)}, images count: {len(images)}"
+    )
+
+    # === Phase 1: Initialize Trackers ===
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 1: Initializing trackers")
     max_retries = settings.task_image_max_retries
     tracker = BatchRetryTracker(total_items=len(images), max_retries=max_retries)
 
-    # Redis 캐시 복구 (재시도 시)
+    # Redis cache recovery (for restart scenarios)
     image_cache_key = f"images_cache:{book_id}"
     cached_data = await task_store.get(image_cache_key)
     if cached_data:
         for idx_str, img_info in cached_data.get("completed", {}).items():
             tracker.mark_success(int(idx_str), img_info)
         logger.info(
-            f"[Image Task] [Book: {book_id}] Recovered {len(tracker.completed)} cached images"
+            f"[Image Task] [Book: {book_id}] Recovered {len(tracker.completed)} cached images from Redis"
         )
 
     # === Phase 2: Prompt 생성 ===
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 2: Generating prompts")
     prompts = [
         GenerateImagePrompt(stories=dialogue, style_keyword="cartoon").render()
         for dialogue in dialogues
@@ -473,7 +508,7 @@ async def generate_image_task(
     ai_factory = get_ai_factory()
     image_provider = ai_factory.get_image_provider()
 
-    # === Phase 3: 재시도 루프 ===
+    # === Phase 3: Async Request + Polling Loop ===
     while not tracker.is_all_completed():
         pending_indices = tracker.get_pending_indices()
 
@@ -481,11 +516,15 @@ async def generate_image_task(
             break
 
         logger.info(
-            f"[Image Task] [Book: {book_id}] Processing {len(pending_indices)} images "
+            f"[Image Task] [Book: {book_id}] Phase 3: Processing {len(pending_indices)} images "
             f"(completed: {len(tracker.completed)}/{tracker.total_items})"
         )
 
-        # 실패한 이미지만 재시도
+        # === Phase 3a: Submit Async Requests ===
+        logger.info(
+            f"[Image Task] [Book: {book_id}] Phase 3a: Submitting async requests"
+        )
+
         tasks = [
             image_provider.generate_image_from_image(
                 image_data=images[idx], prompt=prompts[idx]
@@ -494,24 +533,102 @@ async def generate_image_task(
         ]
 
         # return_exceptions=True로 개별 실패 허용
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        task_uuid_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 결과 처리
-        for idx, result in zip(pending_indices, results):
+        # Map successful submissions to pending_to_task_uuid
+        pending_to_task_uuid: dict[int, str] = {}
+        for idx, result in zip(pending_indices, task_uuid_results):
             if isinstance(result, Exception):
-                tracker.mark_failure(idx, str(result))
+                tracker.mark_failure(idx, f"Request failed: {result}")
                 logger.error(
-                    f"[Image Task] [Book: {book_id}] Page {idx} failed: {result}"
+                    f"[Image Task] [Book: {book_id}] Page {idx} request failed: {result}"
                 )
             else:
-                image_info = {
-                    "imageUUID": result["data"][0]["imageUUID"],
-                    "imageURL": result["data"][0]["imageURL"],
-                }
-                tracker.mark_success(idx, image_info)
-                logger.info(f"[Image Task] [Book: {book_id}] Page {idx} completed")
+                task_uuid = result.get("task_uuid")
+                if task_uuid:
+                    pending_to_task_uuid[idx] = task_uuid
+                    logger.info(
+                        f"[Image Task] [Book: {book_id}] Page {idx} submitted: task_uuid={task_uuid}"
+                    )
+                else:
+                    tracker.mark_failure(idx, "No task_uuid in response")
+                    logger.error(
+                        f"[Image Task] [Book: {book_id}] Page {idx}: no task_uuid in response"
+                    )
 
-        # Redis에 중간 결과 저장 (재시도 복구용)
+        if not pending_to_task_uuid:
+            logger.warning(
+                f"[Image Task] [Book: {book_id}] All requests failed, breaking loop"
+            )
+            break
+
+        # === Phase 3b: Polling Loop ===
+        logger.info(
+            f"[Image Task] [Book: {book_id}] Phase 3b: Starting polling for {len(pending_to_task_uuid)} tasks"
+        )
+
+        max_wait_time = settings.task_image_max_wait_time  # 300 seconds
+        poll_interval = settings.task_image_poll_interval  # 5 seconds
+        elapsed_time = 0
+
+        while elapsed_time < max_wait_time and pending_to_task_uuid:
+            logger.info(
+                f"[Image Task] [Book: {book_id}] Polling: {len(pending_to_task_uuid)} pending, "
+                f"elapsed={elapsed_time}s/{max_wait_time}s"
+            )
+
+            for idx in list(pending_to_task_uuid.keys()):
+                task_uuid = pending_to_task_uuid[idx]
+
+                try:
+                    status_response = await image_provider.check_image_status(task_uuid)
+                    status = status_response["status"]
+                    progress = status_response.get("progress", 0)
+
+                    if status == "completed":
+                        image_info = {
+                            "imageUUID": status_response.get("image_uuid"),
+                            "imageURL": status_response.get("image_url"),
+                        }
+                        tracker.mark_success(idx, image_info)
+                        del pending_to_task_uuid[idx]
+                        logger.info(
+                            f"[Image Task] [Book: {book_id}] Page {idx} ✅ completed: "
+                            f"imageURL={image_info['imageURL'][:50] if image_info['imageURL'] else 'None'}..."
+                        )
+
+                    elif status == "failed":
+                        error_msg = status_response.get("error", "Unknown error")
+                        tracker.mark_failure(idx, error_msg)
+                        del pending_to_task_uuid[idx]
+                        logger.error(
+                            f"[Image Task] [Book: {book_id}] Page {idx} ❌ failed: {error_msg}"
+                        )
+
+                    else:
+                        # processing/pending 상태
+                        logger.info(
+                            f"[Image Task] [Book: {book_id}] Page {idx} ⏳ {status} (progress={progress}%)"
+                        )
+
+                except Exception as e:
+                    logger.error(
+                        f"[Image Task] [Book: {book_id}] Page {idx} ⚠️ status check error: {e}"
+                    )
+
+            if pending_to_task_uuid:
+                await asyncio.sleep(poll_interval)
+                elapsed_time += poll_interval
+
+        # Handle timed-out tasks
+        for idx in list(pending_to_task_uuid.keys()):
+            tracker.mark_failure(idx, "Image generation timeout")
+            logger.warning(f"[Image Task] [Book: {book_id}] Page {idx} timed out")
+
+        # === Phase 3c: Save Intermediate Results to Redis ===
+        logger.info(
+            f"[Image Task] [Book: {book_id}] Phase 3c: Saving intermediate results"
+        )
         await task_store.set(
             image_cache_key,
             {
@@ -522,17 +639,18 @@ async def generate_image_task(
             ttl=3600,
         )
 
-        # 재시도 대기 (마지막이 아니면)
+        # Wait before retry (if needed)
         if not tracker.is_all_completed() and tracker.get_pending_indices():
             delay = await calculate_retry_delay(max(tracker.retry_counts.values()))
             logger.info(f"[Image Task] [Book: {book_id}] Retrying in {delay:.1f}s...")
             await asyncio.sleep(delay)
 
-    # === Phase 4: 결과 평가 ===
+    # === Phase 4: Evaluate Results ===
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 4: Evaluating results")
     if tracker.is_all_completed():
         status = TaskStatus.COMPLETED
         logger.info(
-            f"[Image Task] [Book: {book_id}] All {tracker.total_items} images completed"
+            f"[Image Task] [Book: {book_id}] All {tracker.total_items} images completed successfully"
         )
     elif tracker.is_partial_failure():
         status = TaskStatus.COMPLETED  # 부분 성공도 COMPLETED로 처리
@@ -545,7 +663,7 @@ async def generate_image_task(
         logger.error(f"[Image Task] [Book: {book_id}] All images failed")
 
     # === Phase 5: Download and Store ALL Images ===
-    logger.info(f"[Image Task] [Book: {book_id}] Starting image storage phase")
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 5: Starting image storage phase")
 
     # Get book for base_path
     async with AsyncSessionLocal() as session:
@@ -597,11 +715,12 @@ async def generate_image_task(
             )
 
     logger.info(
-        f"[Image Task] [Book: {book_id}] Storage phase completed: "
+        f"[Image Task] [Book: {book_id}] Phase 5 completed: "
         f"{len(storage_tracker.completed)}/{storage_tracker.total_items} images stored"
     )
 
     # === Phase 6: DB Update (Page.image_url + Book metadata) ===
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 6: Updating database")
     async with AsyncSessionLocal() as session:
         try:
             repo = BookRepository(session)
@@ -659,8 +778,12 @@ async def generate_image_task(
             )
             return TaskResult(status=TaskStatus.FAILED, error=str(e))
 
-    # === Phase 7: Redis에 최종 결과 저장 ===
-    # 순서 보장을 위해 인덱스 순으로 정렬
+    # === Phase 7: Save Final Results to Redis ===
+    logger.info(
+        f"[Image Task] [Book: {book_id}] Phase 7: Saving final results to Redis"
+    )
+    # Order preservation: build arrays using range(total_items)
+    # 중요: None을 유지하여 Video Task에서 인덱스가 일치하도록 함
     image_infos = [tracker.completed.get(i) for i in range(tracker.total_items)]
     storage_paths = [
         storage_tracker.completed.get(i) for i in range(tracker.total_items)
@@ -669,8 +792,9 @@ async def generate_image_task(
     await task_store.set(
         f"images:{book_id}",
         {
-            "images": [info for info in image_infos if info is not None],
-            "storage_paths": [path for path in storage_paths if path is not None],
+            # None 유지하여 순서 보존 (Video Task에서 인덱스 매칭 필요)
+            "images": image_infos,
+            "storage_paths": storage_paths,
             "page_count": len(images),
             "failed_pages": tracker.get_failed_indices(),
             "storage_failed_pages": storage_tracker.get_failed_indices(),
@@ -678,7 +802,11 @@ async def generate_image_task(
         ttl=3600,
     )
 
-    logger.info(f"[Image Task] [Book: {book_id}] Image task completed")
+    logger.info(
+        f"[Image Task] [Book: {book_id}] All phases completed. "
+        f"Generated: {len(tracker.completed)}/{tracker.total_items}, "
+        f"Stored: {len(storage_tracker.completed)}/{storage_tracker.total_items}"
+    )
     return TaskResult(
         status=status,
         result={
@@ -711,7 +839,6 @@ async def generate_tts_task(
         TaskResult: 성공 시 모든 audio_urls 반환
     """
     logger.info(f"[TTS Task] Starting batch processing for book_id={book_id}")
-    # return ""
     async with AsyncSessionLocal() as session:
         try:
             # === Phase 1: Data Retrieval & Validation ===
@@ -898,7 +1025,6 @@ async def generate_video_task(
         TaskResult: 성공 시 video_url 반환
     """
     logger.info(f"[Video Task] [Book: {book_id}] Starting video generation")
-    # return ""
     ai_factory = get_ai_factory()
     video_provider = ai_factory.get_video_provider()
 
@@ -913,15 +1039,37 @@ async def generate_video_task(
 
     image_key = f"images:{book_id}"
     image_data = await task_store.get(image_key)
-    image_uuids = (
-        [img_info["imageUUID"] for img_info in image_data.get("images", [])]
-        if image_data
-        else []
-    )
+
+    # 이미지 정보 추출 (None 포함하여 순서 유지)
+    image_infos = image_data.get("images", []) if image_data else []
+
+    # imageUUID 추출 (None인 경우 None 유지)
+    image_uuids = [
+        img_info["imageUUID"] if img_info is not None else None
+        for img_info in image_infos
+    ]
+
+    # 이미지 생성 실패한 페이지 인덱스
+    failed_image_indices = [idx for idx, uuid in enumerate(image_uuids) if uuid is None]
+
+    if failed_image_indices:
+        logger.warning(
+            f"[Video Task] [Book: {book_id}] Skipping pages with failed images: {failed_image_indices}"
+        )
 
     # === Phase 1: 재시도 추적기 초기화 ===
     max_retries = settings.task_video_max_retries
-    tracker = BatchRetryTracker(total_items=len(image_uuids), max_retries=max_retries)
+    total_pages = len(image_uuids)
+    tracker = BatchRetryTracker(total_items=total_pages, max_retries=max_retries)
+
+    # 이미지 생성 실패한 페이지는 영구 실패 처리 (재시도 불가)
+    # retry_counts를 max_retries로 설정하여 get_pending_indices()에서 제외
+    for idx in failed_image_indices:
+        tracker.retry_counts[idx] = max_retries  # 최대 재시도 초과로 설정
+        tracker.last_errors[idx] = "Image generation failed - skipping video"
+        logger.debug(
+            f"[Video Task] [Book: {book_id}] Page {idx} permanently failed: no image available"
+        )
 
     # Redis 캐시 복구
     video_cache_key = f"videos_cache:{book_id}"
@@ -1200,7 +1348,6 @@ async def finalize_book_task(
         TaskResult: 성공 시 book_id 반환
     """
     logger.info(f"[Finalize Task] Starting for book_id={book_id}")
-    # return ""
     # === Phase 1: Redis 조회 - 세션 밖에서 실행 ===
     task_store = TaskStore()
     story_key = f"story:{book_id}"
