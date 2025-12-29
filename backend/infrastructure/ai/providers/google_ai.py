@@ -68,7 +68,6 @@ class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
                 response_schema=response_schema,
             ),
         )
-        logger.info(f"[Story Task] Gemini response received")
         self._log_gemini_response(response)
 
         # 1차: Pydantic 자동 파싱 성공
@@ -126,13 +125,30 @@ class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
         )
 
         logger.info(f"[GoogleAI] generate_text response received")
+        logger.info(
+            f"[GoogleAI] response.parsed={response.parsed}, type={type(response.parsed)}"
+        )
 
         # 스키마가 있으면 파싱된 결과 반환
         if response_schema and response.parsed is not None:
             return response.parsed
 
+        # parsed가 None인 경우: 텍스트에서 수동 JSON 파싱 시도
+        raw_text = getattr(response, "text", "") or ""
+        logger.info(
+            f"[GoogleAI] response.parsed is None, raw_text={raw_text[:200] if raw_text else 'empty'}"
+        )
+
+        if response_schema and raw_text:
+            try:
+                data = json.loads(raw_text)
+                logger.info(f"[GoogleAI] Manual JSON parse succeeded: {data}")
+                return response_schema(**data)
+            except (json.JSONDecodeError, TypeError, ValueError) as e:
+                logger.warning(f"[GoogleAI] Manual JSON parse failed: {e}")
+
         # 스키마 없거나 파싱 실패 시 텍스트 반환
-        return getattr(response, "text", "") or ""
+        return raw_text
 
     def _log_gemini_response(self, response):
         """Gemini 응답 상세 로깅 (디버깅용)"""
