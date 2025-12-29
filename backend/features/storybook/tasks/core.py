@@ -3,6 +3,7 @@ Storybook Task Definitions
 비동기 파이프라인의 개별 Task 구현
 """
 
+import json
 import logging
 import uuid
 from typing import List
@@ -97,13 +98,28 @@ Rules:
 
 Return ONLY the shortened title, nothing else."""
 
+    shortened = title  # AI 호출 실패 시 원본 사용
+
     try:
         result = await story_provider.generate_text(
             prompt=prompt,
             response_schema=ShortenedTitle,
         )
 
-        shortened = result.title.strip()
+        # result 타입에 따라 title 추출
+        if isinstance(result, str):
+            # JSON 문자열인 경우 파싱
+            try:
+                data = json.loads(result)
+                shortened = data.get("title", "").strip()
+            except json.JSONDecodeError:
+                # 순수 문자열인 경우
+                shortened = result.strip()
+        elif isinstance(result, dict):
+            shortened = result.get("title", "").strip()
+        else:
+            # ShortenedTitle 객체
+            shortened = result.title.strip()
 
         if 0 < len(shortened) <= max_length:
             logger.info(
@@ -120,15 +136,14 @@ Return ONLY the shortened title, nothing else."""
         logger.warning(f"[Story Task] Title shortening failed: {e}")
 
     # Fallback: 30자 이하면 단순 자르기, 초과면 에러
-    # max_fallback_length = max_length + 10  # 20 + 10 = 30
-    max_fallback_length = max_length
+    max_fallback_length = max_length + 10  # 20 + 10 = 30
 
-    if len(title) > max_fallback_length:
+    if len(shortened) > max_fallback_length:
         # 30자 초과: 자르면 의미 손실이 큼 → 에러
         raise ValueError(
-            f"Title too long for truncation ({len(title)} > {max_fallback_length} chars): '{title}'"
+            f"Title too long for truncation ({len(shortened)} > {max_fallback_length} chars): '{shortened}'"
         )
-    return title
+    return shortened
 
 
 async def _generate_story_phase(
@@ -167,7 +182,7 @@ async def _generate_story_phase(
             prompt=prompt,
             response_schema=response_schema,
         )
-        logger.info(f"[Story Task] [Book: {book_id}] generated_data={generated_data}")
+
         title, dialogues = validate_generated_story(generated_data)
 
         # 페이지 수 검증 (불일치 시 재시도)
@@ -179,7 +194,7 @@ async def _generate_story_phase(
         # Title 길이 초과 시 AI 축약 요청 (1회)
         if len(title) > settings.max_title_length:
             logger.info(
-                f"[Story Task] [Book: {book_id}] Title too long ({len(title)} chars), "
+                f"[Story Task] [Book: {book_id}] Title: {title} too long ({len(title)} chars), "
                 f"requesting AI shortening..."
             )
             title = await _shorten_title(
@@ -377,9 +392,8 @@ async def generate_story_task(
         TaskResult: 성공 시 story_data_key 반환
     """
     logger.info(
-        f"[Story Task] Starting for book_id={book_id}, target_language={target_language}"
+        f"[Story Task] Starting for book_id={book_id}, target_language={target_language}. level={level}, num_pages={num_pages}"
     )
-    logger.info(f"[Story Task] stories={stories}, level={level}, num_pages={num_pages}")
 
     # === 준비 ===
     ai_factory = get_ai_factory()
@@ -407,7 +421,6 @@ async def generate_story_task(
         return TaskResult(status=TaskStatus.FAILED, error="Story generation failed")
 
     book_title, dialogues = result
-
     # === Phase 2: Emotion 생성 ===
     emotion_result = await _generate_emotion_phase(
         story_provider, dialogues, book_title, book_id, max_retries
@@ -470,6 +483,7 @@ async def generate_image_task(
     logger.info(
         f"[Image Task] [Book: {book_id}] Starting async batch processing, {len(images)} images"
     )
+    # return ""
 
     # === Dependencies ===
     storage_service = get_storage_service()
@@ -839,6 +853,7 @@ async def generate_tts_task(
         TaskResult: 성공 시 모든 audio_urls 반환
     """
     logger.info(f"[TTS Task] Starting batch processing for book_id={book_id}")
+    # return ""
     async with AsyncSessionLocal() as session:
         try:
             # === Phase 1: Data Retrieval & Validation ===
@@ -1025,6 +1040,7 @@ async def generate_video_task(
         TaskResult: 성공 시 video_url 반환
     """
     logger.info(f"[Video Task] [Book: {book_id}] Starting video generation")
+    # return ""
     ai_factory = get_ai_factory()
     video_provider = ai_factory.get_video_provider()
 
@@ -1488,10 +1504,5 @@ def validate_generated_story(data: StoryResponse) -> tuple[str, list]:
         raise ValueError(
             f"Invalid stories in StoryResponse. Got stories={data.stories}"
         )
-
-    # 길이 검증은 _generate_story_phase()에서 처리:
-    # 1. title > 20자 → _shorten_title()로 AI 축약 요청
-    # 2. AI 축약 실패 + title ≤ 30자 → 단순 자르기
-    # 3. AI 축약 실패 + title > 30자 → ValueError 발생
 
     return data.title, data.stories
