@@ -16,11 +16,13 @@ from backend.core.dependencies import (
 )
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.infrastructure.ai.factory import AIProviderFactory
+from backend.infrastructure.ai.base import StoryResponse
 from backend.features.storybook.repository import BookRepository
 from backend.features.storybook.models import BookStatus
 from backend.features.storybook.schemas import (
     create_stories_response_schema,
     TTSExpressionResponse,
+    ShortenedTitle,
 )
 from backend.features.storybook.prompts.generate_story_prompt import GenerateStoryPrompt
 from backend.features.storybook.prompts.generate_tts_expression_prompt import (
@@ -45,6 +47,297 @@ from .retry import retry_with_config, BatchRetryTracker, calculate_retry_delay
 import asyncio
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# Story Task Helper Functions
+# ============================================================
+
+
+async def _mark_book_failed(book_id: str, stage: str, error: str) -> None:
+    """공통: Book 실패 상태 업데이트"""
+    try:
+        async with AsyncSessionLocal() as session:
+            repo = BookRepository(session)
+            await repo.update(
+                id=uuid.UUID(book_id),
+                pipeline_stage="failed",
+                error_message=f"{stage}: {error}",
+                status=BookStatus.FAILED,
+            )
+            await session.commit()
+    except Exception as e:
+        logger.error(f"[Story Task] Failed to update error in DB: {e}")
+
+
+async def _shorten_title(
+    story_provider,
+    title: str,
+    max_length: int,
+) -> str:
+    """
+    Title 길이 초과 시 AI에게 축약 요청 (1회 한정)
+
+    Args:
+        story_provider: AI provider (generate_text 메서드 필요)
+        title: 원본 제목
+        max_length: 최대 허용 길이
+
+    Returns:
+        축약된 제목 (실패 시 단순 자르기)
+    """
+    prompt = f"""Shorten this title to under {max_length} characters while keeping its core meaning.
+
+Original title: "{title}"
+
+Rules:
+- Keep the main subject/theme
+- Remove unnecessary words
+- Must be under {max_length} characters
+
+Return ONLY the shortened title, nothing else."""
+
+    try:
+        result = await story_provider.generate_text(
+            prompt=prompt,
+            response_schema=ShortenedTitle,
+        )
+
+        shortened = result.title.strip()
+
+        if 0 < len(shortened) <= max_length:
+            logger.info(
+                f"[Story Task] Title shortened: '{title}' ({len(title)} chars) "
+                f"→ '{shortened}' ({len(shortened)} chars)"
+            )
+            return shortened
+        else:
+            logger.warning(
+                f"[Story Task] Shortened title invalid: '{shortened}' ({len(shortened)} chars)"
+            )
+
+    except Exception as e:
+        logger.warning(f"[Story Task] Title shortening failed: {e}")
+
+    # Fallback: 30자 이하면 단순 자르기, 초과면 에러
+    # max_fallback_length = max_length + 10  # 20 + 10 = 30
+    max_fallback_length = max_length
+
+    if len(title) > max_fallback_length:
+        # 30자 초과: 자르면 의미 손실이 큼 → 에러
+        raise ValueError(
+            f"Title too long for truncation ({len(title)} > {max_fallback_length} chars): '{title}'"
+        )
+    return title
+
+
+async def _generate_story_phase(
+    story_provider,
+    book_id: str,
+    stories: List[str],
+    level: int,
+    target_language: str,
+    num_pages: int,
+    max_retries: int,
+) -> tuple[str, list] | None:
+    """
+    Phase 1: Story 생성 + 검증
+
+    Returns:
+        (book_title, dialogues) 또는 실패 시 None
+    """
+    # 스키마 & 프롬프트 생성
+    response_schema = create_stories_response_schema(
+        max_pages=num_pages,
+        max_dialogues_per_page=settings.max_dialogues_per_page,
+        max_chars_per_dialogue=settings.max_chars_per_dialogue,
+        max_title_length=settings.max_title_length,
+    )
+    prompt = GenerateStoryPrompt(
+        diary_entries=stories,
+        level=level,
+        target_language=target_language,
+    ).render()
+
+    async def _generate_and_validate():
+        generated_data = await story_provider.generate_story(
+            prompt=prompt,
+            response_schema=response_schema,
+        )
+        logger.info(f"[Story Task] [Book: {book_id}] generated_data={generated_data}")
+        title, dialogues = validate_generated_story(generated_data)
+
+        # Title 길이 초과 시 AI 축약 요청 (1회)
+        if len(title) > settings.max_title_length:
+            logger.info(
+                f"[Story Task] [Book: {book_id}] Title too long ({len(title)} chars), "
+                f"requesting AI shortening..."
+            )
+            title = await _shorten_title(
+                story_provider,
+                title,
+                settings.max_title_length,
+            )
+
+        return title, dialogues
+
+    try:
+        return await retry_with_config(
+            func=_generate_and_validate,
+            max_retries=max_retries,
+            error_message_prefix=f"[Story Task] [Book: {book_id}]",
+        )
+    except RuntimeError as e:
+        logger.error(f"[Story Task] All retries failed: {e}")
+        await _mark_book_failed(book_id, "Story generation failed", str(e))
+        return None
+
+
+async def _generate_emotion_phase(
+    story_provider,
+    dialogues: list,
+    book_title: str,
+    book_id: str,
+    max_retries: int,
+) -> StoryResponse | None:
+    """
+    Phase 2: Emotion 생성
+
+    Returns:
+        StoryResponse 또는 실패 시 None
+    """
+
+    async def _generate_emotion():
+        emotion_prompt = EnhanceAudioPrompt(
+            stories=dialogues, title=book_title
+        ).render()
+        return await story_provider.generate_story(
+            prompt=emotion_prompt,
+            response_schema=TTSExpressionResponse,
+        )
+
+    try:
+        return await retry_with_config(
+            func=_generate_emotion,
+            max_retries=max_retries,
+            error_message_prefix=f"[Story Task] [Book: {book_id}] Emotion generation",
+        )
+    except RuntimeError as e:
+        logger.error(f"[Story Task] Emotion generation failed: {e}")
+        await _mark_book_failed(book_id, "Emotion generation failed", str(e))
+        return None
+
+
+def _restructure_dialogues(dialogues: list, flat_emotions: list) -> list:
+    """Emotion을 원본 페이지 구조에 맞게 재구성"""
+    page_sizes = [len(page) for page in dialogues]
+    result = []
+    idx = 0
+    for size in page_sizes:
+        result.append(flat_emotions[idx : idx + size])
+        idx += size
+    return result
+
+
+async def _save_story_to_db(
+    book_id: str,
+    dialogues: list,
+    book_title: str,
+    restructured_dialogues: list,
+    target_language: str,
+    context: TaskContext,
+    max_retries: int,
+    story_key: str,
+) -> TaskResult:
+    """
+    Phase 3-4: Redis 저장 + DB 저장
+
+    Returns:
+        TaskResult (성공 또는 실패)
+    """
+    # Redis 저장
+    task_store = TaskStore()
+    await task_store.set(
+        story_key,
+        {"dialogues": restructured_dialogues, "title": book_title},
+        ttl=3600,
+    )
+
+    # DB 저장
+    async with AsyncSessionLocal() as session:
+        try:
+            repo = BookRepository(session)
+            book_uuid = uuid.UUID(book_id)
+
+            book = await repo.get_with_pages(book_uuid)
+            if not book or not book.pages:
+                raise ValueError(f"Book {book_id} has no pages for dialogues creation")
+
+            # Dialogue + Translation 생성
+            for page_idx, page_dialogues in enumerate(dialogues):
+                page = next((p for p in book.pages if p.sequence == page_idx + 1), None)
+                if not page:
+                    logger.info(
+                        f"[Story Task] [Book: {book_id}] Page {page_idx + 1} not found, skipping"
+                    )
+                    continue
+
+                for dialogue_idx, dialogue_text in enumerate(page_dialogues):
+                    await repo.add_dialogue_with_translation(
+                        page_id=page.id,
+                        speaker="Narrator",
+                        sequence=dialogue_idx + 1,
+                        translations=[
+                            {
+                                "language_code": target_language,
+                                "text": dialogue_text,
+                                "is_primary": True,
+                            }
+                        ],
+                    )
+
+            # Book 메타데이터 업데이트
+            task_metadata = book.task_metadata or {}
+            task_metadata["story"] = {
+                "status": "completed",
+                "retry_count": context.retry_count,
+                "max_retries": max_retries,
+            }
+
+            updated = await repo.update(
+                book_uuid,
+                pipeline_stage="story",
+                progress_percentage=30,
+                title=book_title,
+                task_metadata=task_metadata,
+                error_message=None,
+            )
+            if not updated:
+                raise ValueError(f"Book {book_id} not found for update")
+
+            await session.commit()
+            logger.info(f"[Story Task] Completed for book_id={book_id}")
+
+            return TaskResult(
+                status=TaskStatus.COMPLETED,
+                result={
+                    "story_key": story_key,
+                    "title": book_title,
+                    "dialogues": dialogues,
+                },
+            )
+
+        except Exception as e:
+            logger.error(
+                f"[Story Task] Failed for book_id={book_id}: {e}", exc_info=True
+            )
+            await _mark_book_failed(book_id, "DB save failed", str(e))
+            return TaskResult(status=TaskStatus.FAILED, error=str(e))
+
+
+# ============================================================
+# Story Task Main Function
+# ============================================================
 
 
 async def generate_story_task(
@@ -73,235 +366,60 @@ async def generate_story_task(
         f"[Story Task] Starting for book_id={book_id}, target_language={target_language}"
     )
     logger.info(f"[Story Task] stories={stories}, level={level}, num_pages={num_pages}")
+
+    # === 준비 ===
     ai_factory = get_ai_factory()
     story_provider = ai_factory.get_story_provider()
-
     max_retries = settings.task_story_max_retries
 
-    # 유효하지 않은 레벨이면 기본값 사용 (동적 범위)
+    # 레벨 검증
     if not (settings.min_level <= level <= settings.max_level):
         logger.warning(
             f"[Story Task] Invalid level {level}, using default level {settings.min_level}"
         )
         level = settings.min_level
-    response_schema = create_stories_response_schema(
-        max_pages=num_pages,
-        # max_dialogues_per_page는 프론트 최대 허용치보다 작게 제한 필요
-        max_dialogues_per_page=settings.max_dialogues_per_page,  # 프론트 허용 최대 개수
-        max_chars_per_dialogue=settings.max_chars_per_dialogue,  # 프론트 허용 최대 개수
-        max_title_length=settings.max_title_length,
-    )
 
-    # 레벨이 적용된 프롬프트 생성 (다국어 지원)
-    prompt = GenerateStoryPrompt(
-        diary_entries=stories,
+    # === Phase 1: Story 생성 ===
+    result = await _generate_story_phase(
+        story_provider=story_provider,
+        book_id=book_id,
+        stories=stories,
         level=level,
         target_language=target_language,
-    ).render()
+        num_pages=num_pages,
+        max_retries=max_retries,
+    )
+    if result is None:
+        return TaskResult(status=TaskStatus.FAILED, error="Story generation failed")
 
-    # === Phase 1: Story 생성 (재시도 유틸리티 사용) ===
-    async def _generate_and_validate():
-        """Story 생성, 검증 및 Flesch-Kincaid 난이도 검증"""
-        generated_data = await story_provider.generate_story(
-            prompt=prompt,
-            response_schema=response_schema,
-        )
-        logger.info(f"[Story Task] [Book: {book_id}] generated_data={generated_data}")
-        book_title, dialogues = validate_generated_story(generated_data)
+    book_title, dialogues = result
 
-        # 난이도 검증 (ValidatorFactory 사용)
-        # dialogues를 2D 배열 그대로 전달하여 정확한 문장 수 계산
-        validator = ValidatorFactory.get_validator(target_language)
+    # === Phase 2: Emotion 생성 ===
+    emotion_result = await _generate_emotion_phase(
+        story_provider, dialogues, book_title, book_id, max_retries
+    )
+    if emotion_result is None:
+        return TaskResult(status=TaskStatus.FAILED, error="Emotion generation failed")
 
-        # if validator:
-        #     result = validator.validate(dialogues, level)
-
-        #     logger.info(
-        #         f"[Story Task] [Book: {book_id}] Difficulty Validation - "
-        #         f"Language: {target_language}, Level: {level}, "
-        #         f"Pages: {len(dialogues)}, Score: {result.score:.2f}, "
-        #         f"Valid: {result.is_valid}, Metrics: {result.metrics}"
-        #     )
-
-        #     if not result.is_valid:
-        #         raise ValueError(
-        #             f"Difficulty validation failed for {target_language}: "
-        #             f"{result.message}"
-        #         )
-        # else:
-        # 검증기가 없는 언어는 프롬프트에 의존
-        sentence_count = sum(len(page) for page in dialogues)
-        logger.info(
-            f"[Story Task] [Book: {book_id}] No validator for {target_language}, "
-            f"relying on prompt. Pages: {len(dialogues)}, Sentences: {sentence_count}"
-        )
-
-        return book_title, dialogues
-
-    try:
-        book_title, dialogues = await retry_with_config(
-            func=_generate_and_validate,
-            max_retries=max_retries,
-            error_message_prefix=f"[Story Task] [Book: {book_id}]",
-        )
-    except RuntimeError as e:
-        # 모든 시도 실패 - DB 업데이트 후 TaskResult(FAILED) 반환
-        logger.error(f"[Story Task] All retries failed: {e}")
-
-        async with AsyncSessionLocal() as error_session:
-            error_repo = BookRepository(error_session)
-            await error_repo.update(
-                id=uuid.UUID(book_id),
-                pipeline_stage="failed",
-                error_message=f"Story generation failed: {str(e)}",
-                status=BookStatus.FAILED,
-            )
-            await error_session.commit()
-
-        return TaskResult(status=TaskStatus.FAILED, error=str(e))
-
-    # === Phase 2: AI 호출 (Emotion 추가) - 세션 밖에서 실행, 재시도 포함 ===
-    async def _generate_emotion():
-        """감정 표현 생성 (재시도용 래퍼)"""
-        emotion_prefixed_prompt = EnhanceAudioPrompt(
-            stories=dialogues, title=book_title
-        ).render()
-        return await story_provider.generate_story(
-            prompt=emotion_prefixed_prompt,
-            response_schema=TTSExpressionResponse,
-        )
-
-    try:
-        response_with_emotion = await retry_with_config(
-            func=_generate_emotion,
-            max_retries=max_retries,
-            error_message_prefix=f"[Story Task] [Book: {book_id}] Emotion generation",
-        )
-    except RuntimeError as e:
-        logger.error(f"[Story Task] Emotion generation failed: {e}")
-
-        async with AsyncSessionLocal() as error_session:
-            error_repo = BookRepository(error_session)
-            await error_repo.update(
-                id=uuid.UUID(book_id),
-                pipeline_stage="failed",
-                error_message=f"Emotion generation failed: {str(e)}",
-                status=BookStatus.FAILED,
-            )
-            await error_session.commit()
-
-        return TaskResult(status=TaskStatus.FAILED, error=str(e))
-
-    logger.info(f"[Story Task] Generating story with emotions: {response_with_emotion}")
-    dialogues_with_emotions = response_with_emotion.stories
-
-    # 페이지 구조 복원: dialogues의 페이지별 대사 수에 맞춰 재구성
-    page_sizes = [len(page) for page in dialogues]
-    flat_emotions = dialogues_with_emotions if dialogues_with_emotions else []
-
-    restructured_dialogues = []
-    idx = 0
-    for size in page_sizes:
-        restructured_dialogues.append(flat_emotions[idx : idx + size])
-        idx += size
-
+    logger.info(f"[Story Task] Emotion generated: {emotion_result}")
+    flat_emotions = emotion_result.stories if emotion_result.stories else []
+    restructured_dialogues = _restructure_dialogues(dialogues, flat_emotions)
     logger.info(
         f"[Story Task] Restructured dialogues: {len(restructured_dialogues)} pages"
     )
 
-    # === Phase 3: Redis 저장 - 세션 밖에서 실행 ===
-    task_store = TaskStore()
+    # === Phase 3-4: 저장 (Redis + DB) ===
     story_key = f"story:{book_id}"
-    await task_store.set(
-        story_key, {"dialogues": restructured_dialogues, "title": book_title}, ttl=3600
+    return await _save_story_to_db(
+        book_id=book_id,
+        dialogues=dialogues,
+        book_title=book_title,
+        restructured_dialogues=restructured_dialogues,
+        target_language=target_language,
+        context=context,
+        max_retries=max_retries,
+        story_key=story_key,
     )
-
-    # === Phase 4: DB 작업만 세션 안에서 실행 ===
-    async with AsyncSessionLocal() as session:
-        try:
-            repo = BookRepository(session)
-            book_uuid = uuid.UUID(book_id)
-
-            # Get book with pages
-            book = await repo.get_with_pages(book_uuid)
-            if not book or not book.pages:
-                raise ValueError(f"Book {book_id} has no pages for dialogues creation")
-
-            pages = book.pages
-
-            # Create Dialogue + DialogueTranslation for each page
-            for page_idx, page_dialogues in enumerate(dialogues):
-                page = next((p for p in pages if p.sequence == page_idx + 1), None)
-                if not page:
-                    logger.info(
-                        f"[Story Task] [Book: {book_id}] Page {page_idx + 1} not found, skipping dialogues"
-                    )
-                    continue
-                for dialogue_idx, dialogue_text in enumerate(page_dialogues):
-                    await repo.add_dialogue_with_translation(
-                        page_id=page.id,
-                        speaker="Narrator",
-                        sequence=dialogue_idx + 1,
-                        translations=[
-                            {
-                                "language_code": target_language,
-                                "text": dialogue_text,
-                                "is_primary": True,
-                            }
-                        ],
-                    )
-
-            # Update DB with title and progress
-            # task_metadata 업데이트
-            task_metadata = book.task_metadata or {}
-            task_metadata["story"] = {
-                "status": "completed",
-                "retry_count": context.retry_count,
-                "max_retries": max_retries,
-            }
-
-            updated = await repo.update(
-                book_uuid,
-                pipeline_stage="story",
-                progress_percentage=30,
-                title=book_title,
-                task_metadata=task_metadata,
-                error_message=None,
-            )
-            if not updated:
-                raise ValueError(f"Book {book_id} not found for update")
-            await session.commit()
-
-            logger.info(f"[Story Task] Completed for book_id={book_id}")
-            return TaskResult(
-                status=TaskStatus.COMPLETED,
-                result={
-                    "story_key": story_key,
-                    "title": book_title,
-                    "dialogues": dialogues,
-                },
-            )
-
-        except Exception as e:
-            logger.error(
-                f"[Story Task] Failed for book_id={book_id}: {e}", exc_info=True
-            )
-
-            # Update DB error
-            try:
-                async with AsyncSessionLocal() as error_session:
-                    error_repo = BookRepository(error_session)
-                    updated_book = await error_repo.update(
-                        id=uuid.UUID(book_id),
-                        pipeline_stage="failed",
-                        error_message=f"Story generation failed: {str(e)}",
-                        status=BookStatus.FAILED,
-                    )
-                    if updated_book:
-                        await error_session.commit()
-            except Exception as db_error:
-                logger.error(f"[Story Task] Failed to update error in DB: {db_error}")
-            return TaskResult(status=TaskStatus.FAILED, error=str(e))
 
 
 async def generate_image_task(
@@ -325,6 +443,7 @@ async def generate_image_task(
     logger.info(
         f"[Image Task] [Book: {book_id}] Starting batch processing, {len(images)} images"
     )
+    # return ""
 
     storage_service = get_storage_service()
     task_store = TaskStore()
@@ -592,6 +711,7 @@ async def generate_tts_task(
         TaskResult: 성공 시 모든 audio_urls 반환
     """
     logger.info(f"[TTS Task] Starting batch processing for book_id={book_id}")
+    # return ""
     async with AsyncSessionLocal() as session:
         try:
             # === Phase 1: Data Retrieval & Validation ===
@@ -778,6 +898,7 @@ async def generate_video_task(
         TaskResult: 성공 시 video_url 반환
     """
     logger.info(f"[Video Task] [Book: {book_id}] Starting video generation")
+    # return ""
     ai_factory = get_ai_factory()
     video_provider = ai_factory.get_video_provider()
 
@@ -1079,7 +1200,7 @@ async def finalize_book_task(
         TaskResult: 성공 시 book_id 반환
     """
     logger.info(f"[Finalize Task] Starting for book_id={book_id}")
-
+    # return ""
     # === Phase 1: Redis 조회 - 세션 밖에서 실행 ===
     task_store = TaskStore()
     story_key = f"story:{book_id}"
@@ -1190,25 +1311,40 @@ async def finalize_book_task(
     )
 
 
-def validate_generated_story(data) -> tuple[str, list]:
+def validate_generated_story(data: StoryResponse) -> tuple[str, list]:
     """
-    generated_data 검증
-    Returns: (title, dialogues)
-    Raises: ValueError
+    StoryResponse 검증
+
+    Args:
+        data: AI Provider에서 반환된 StoryResponse
+
+    Returns:
+        (title, stories) 튜플
+
+    Raises:
+        ValueError: 검증 실패 시
+
+    Note:
+        길이 검증은 _generate_story_phase()에서 처리됨.
+        초과 시 _shorten_title()로 AI 축약 요청.
     """
     if data is None:
-        raise ValueError("generated_data is None")
+        raise ValueError(
+            "StoryResponse is None - AI returned empty response (check logs for details)"
+        )
 
-    title = getattr(data, "title", None)
-    stories = getattr(data, "stories", None)
+    # StoryResponse는 이미 파싱된 상태이므로 타입 체크만
+    if not data.title or not isinstance(data.title, str):
+        raise ValueError(f"Invalid title in StoryResponse. Got title={data.title}")
 
-    if not title or not isinstance(title, str):
-        raise ValueError("Missing or invalid title")
+    if not data.stories or not isinstance(data.stories, list):
+        raise ValueError(
+            f"Invalid stories in StoryResponse. Got stories={data.stories}"
+        )
 
-    if not stories or not isinstance(stories, list):
-        raise ValueError("Missing or invalid stories")
+    # 길이 검증은 _generate_story_phase()에서 처리:
+    # 1. title > 20자 → _shorten_title()로 AI 축약 요청
+    # 2. AI 축약 실패 + title ≤ 30자 → 단순 자르기
+    # 3. AI 축약 실패 + title > 30자 → ValueError 발생
 
-    if len(title) > 20:
-        raise ValueError("Title too long")
-
-    return title, stories
+    return data.title, data.stories
