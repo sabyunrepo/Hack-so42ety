@@ -109,7 +109,7 @@ class GoogleAIProvider(StoryGenerationProvider, ImageGenerationProvider):
             - 스키마 없으면: 원본 텍스트 (str)
         """
         config = genai_types.GenerateContentConfig(
-            thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+            # thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
             temperature=0.1,
         )
 
