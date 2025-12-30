@@ -1,0 +1,37 @@
+{
+  "level": "Difficulty Setting",
+  "levelOption1": "Lv 1 (Ages 3 – 5)",
+  "levelOption2": "Lv 2 (Ages 5 – 7)",
+  "levelOption3": "Lv 3 (Ages 7 – 9)",
+  "voice": "Voice:",
+  "voicePreview": "Preview Voice",
+  "voicePreviewNotAvailable": "Preview voice is not ready, but you can still create the storybook.",
+  "noVoice": "No Voice",
+  "noVoiceWarning": "No voice is ready. Please register a voice first.",
+  "goToSettings": "Go to Voice Settings",
+  "creationComplete": "Creation Complete",
+  "creating": "Creating...",
+  "modals": {
+    "pageLimit": {
+      "title": "Page Limit",
+      "maxPages": "You can create up to 5 pages.",
+      "minPages": "There must be at least one page."
+    },
+    "bookLimit": {
+      "title": "Book Limit",
+      "message": "You can create up to 5 storybooks. Please delete an existing book and try again."
+    },
+    "validation": {
+      "title": "Check Input",
+      "message": "Please fill in images and stories for all pages."
+    },
+    "success": {
+      "title": "Book Creation",
+      "message": "It will take about 10 minutes to complete."
+    },
+    "error": {
+      "title": "Error",
+      "message": "An error occurred. Please try again."
+    }
+  }
+}

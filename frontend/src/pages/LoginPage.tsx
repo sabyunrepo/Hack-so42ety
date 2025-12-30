@@ -1,11 +1,13 @@
 import React, { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/use-auth";
 import { useNavigate } from "react-router-dom";
 // import { GoogleLogin } from "@react-oauth/google";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 import { usePostHog } from "@posthog/react";
+import { useTranslation } from "react-i18next";
 
 const LoginPage = () => {
+  const { t } = useTranslation('auth');
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -19,11 +21,11 @@ const LoginPage = () => {
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) {
-      setEmailError("이메일을 입력해주세요");
+      setEmailError(t('login.validation.emailRequired'));
       return false;
     }
     if (!emailRegex.test(email)) {
-      setEmailError("올바른 이메일 형식이 아닙니다");
+      setEmailError(t('login.validation.emailInvalid'));
       return false;
     }
     setEmailError("");
@@ -33,11 +35,11 @@ const LoginPage = () => {
   // 비밀번호 형식 검증
   const validatePassword = (password: string): boolean => {
     if (!password) {
-      setPasswordError("비밀번호를 입력해주세요");
+      setPasswordError(t('login.validation.passwordRequired'));
       return false;
     }
     if (password.length < 8) {
-      setPasswordError("비밀번호는 최소 8자 이상이어야 합니다");
+      setPasswordError(t('login.validation.passwordTooShort'));
       return false;
     }
     // [ ] 비밀번호 형식 확인 후 개선
@@ -61,7 +63,7 @@ const LoginPage = () => {
     }
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // ✅ 폼 제출 시 이전 에러를 초기화 (필수)
@@ -75,16 +77,12 @@ const handleSubmit = async (e: React.FormEvent) => {
       return;
     }
 
-
     try {
       await login({ email, password });
       posthog?.capture("login_success", { method: "email" });
       navigate("/");
     } catch (err) {
-
-
       setError(getUserFriendlyErrorMessage(err));
-
     }
   };
 
@@ -94,10 +92,10 @@ const handleSubmit = async (e: React.FormEvent) => {
         <div className="text-center mb-8">
           {/* <div className="text-5xl mb-4">📚</div> */}
           <h2 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
-            로그인
+            {t('login.title')}
           </h2>
           <p className="text-amber-700 mt-2 text-sm">
-            동화책 세상으로 들어가보세요!
+            {t('login.subtitle')}
           </p>
         </div>
 
@@ -110,28 +108,28 @@ const handleSubmit = async (e: React.FormEvent) => {
           </div>
         )} */}
 
-{error && (
-  <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 shadow-sm">
-    <div className="flex items-start gap-2">
-      <span className="text-lg flex-shrink-0">⚠️</span>
-      <span className="flex-1 text-sm leading-snug">{error}</span>
-      <button
-        onClick={() => setError("")}
-        className="ml-4 p-0.5 text-red-700 hover:text-red-900 transition-colors flex-shrink-0"
-        aria-label="닫기"
-      >
-        &times;
-      </button>
-    </div>
-  </div>
-)}
+        {error && (
+          <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 shadow-sm">
+            <div className="flex items-start gap-2">
+              <span className="text-lg flex-shrink-0">⚠️</span>
+              <span className="flex-1 text-sm leading-snug">{error}</span>
+              <button
+                onClick={() => setError("")}
+                className="ml-4 p-0.5 text-red-700 hover:text-red-900 transition-colors flex-shrink-0"
+                aria-label={t('login.closeAria')}
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label
               className="mb-2 block text-sm font-bold text-amber-900"
               htmlFor="email"
             >
-              이메일
+              {t('login.email')}
             </label>
             <input
               className={`w-full appearance-none rounded-lg border-2 px-4 py-3 leading-tight text-gray-700 bg-white/50 focus:outline-none focus:bg-white transition-all duration-200 shadow-sm ${
@@ -141,7 +139,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               }`}
               id="email"
               type="email"
-              placeholder="example@email.com"
+              placeholder={t('login.emailPlaceholder')}
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -162,7 +160,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               className="mb-2 block text-sm font-bold text-amber-900"
               htmlFor="password"
             >
-              비밀번호
+              {t('login.password')}
             </label>
             <input
               className={`w-full appearance-none rounded-lg border-2 px-4 py-3 leading-tight text-gray-700 bg-white/50 focus:outline-none focus:bg-white transition-all duration-200 shadow-sm ${
@@ -172,7 +170,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               }`}
               id="password"
               type="password"
-              placeholder="비밀번호를 입력하세요"
+              placeholder={t('login.passwordPlaceholder')}
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -196,7 +194,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               className="w-full bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 font-bold px-6 py-3 rounded-full shadow-lg hover:shadow-xl hover:from-amber-500 hover:to-amber-600 focus:outline-none focus:ring-4 focus:ring-amber-300 transition-all duration-300 transform hover:scale-[1.02] active:scale-95"
               type="submit"
             >
-              로그인하기
+              {t('login.submit')}
             </button>
           </div>
           <div className="text-center pt-4">

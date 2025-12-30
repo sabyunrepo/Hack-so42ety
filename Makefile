@@ -1,5 +1,5 @@
 .PHONY: help setup dev prod test clean migrate backup down \
-	dev-build dev-logs dev-logs-backend dev-stop dev-down dev-restart \
+	dev-build dev-logs dev-logs-backend dev-stop dev-down dev-restart dev-export prod-export \
 	prod-build prod-logs prod-logs-backend prod-logs-cloudflared prod-stop prod-down prod-restart \
 	prod-deploy prod-update prod-health prod-status prod-pull \
 	db-shell db-shell-prod db-migrate db-migrate-prod db-rollback db-rollback-prod db-reset db-backup db-backup-prod \
@@ -49,15 +49,31 @@ dev: ## 개발 모드 실행 (Hot Reload)
 	@echo "$(YELLOW)Waiting for PostgreSQL...$(NC)"
 	@sleep 5
 	$(DOCKER_COMPOSE_DEV) up -d backend 
-	@echo "$(GREEN)✓ Development services started$(NC)"
+	@echo "$(green)✓ Development services started$(NC)"
 	@echo "$(BLUE)Backend API: http://localhost:8000$(NC)"
 	@echo "$(BLUE)API Docs: http://localhost:8000/docs$(NC)"
-	$(DOCKER_COMPOSE_DEV) up -d frontend 
-	@echo "$(GREEN)✓ frontend & nginx services started$(NC)"
-	@echo "$(BLUE) frontend : cd frontend && npm run dev$(NC)"
-	@echo "$(BLUE) nginx : port 80 $(NC)"
+	@echo "$(YELLOW)-------------------------------------------$(NC)"
+	@echo "$(YELLOW)Frontend is NOT running in Docker!$(NC)"
+	@echo "$(BLUE)Please run the following in a new terminal:$(NC)"
+	@echo "$(GREEN)  cd frontend && infisical run -- npm run dev$(NC)"
+	@echo "$(YELLOW)-------------------------------------------$(NC)"
+
+dev-secret: ## Infisical + 개발 모드 실행 (Auto-inject secrets 도커컴포즈 env_args 에만 적용됨!)
+	@echo "$(BLUE)Starting development environment with Infisical...$(NC)"
+	INFISICAL_API_URL=https://secrets.moriai.kr infisical run -- $(MAKE) dev
+
+dev-export: ## Infisical 시크릿을 .env 파일로 내보내기 (개발 환경)
+	@echo "$(BLUE)Exporting secrets to .env file...$(NC)"
+	INFISICAL_API_URL=https://secrets.moriai.kr infisical export --env=dev > .env
+	@echo "$(GREEN)✓ Secrets exported to .env$(NC)"
+
+prod-export: ## Infisical 시크릿을 .env 파일로 내보내기 (프로덕션 환경)
+	@echo "$(BLUE)Exporting production secrets to .env file...$(NC)"
+	INFISICAL_API_URL=https://secrets.moriai.kr infisical export --env=prod > .env
+	@echo "$(GREEN)✓ Production secrets exported to .env$(NC)"
 
 dev-build: ## 개발 모드 이미지 빌드
+
 	@echo "$(BLUE)Building development images...$(NC)"
 	$(DOCKER_COMPOSE_DEV) build
 
@@ -151,15 +167,24 @@ prod-deploy: ## 🚀 프로덕션 초기 배포 (환경 설정 + 빌드 + 실행
 	@echo "$(BLUE)🚀 Production Deployment Starting...$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
 	@echo ""
-	@echo "$(YELLOW)Step 1/5: Checking environment...$(NC)"
-	@if [ ! -f .env.production ]; then \
-		echo "$(RED)❌ .env.production not found!$(NC)"; \
-		echo "$(YELLOW)Creating from template...$(NC)"; \
-		cp .env.production.example .env.production; \
-		echo "$(YELLOW)⚠️  Please edit .env.production with your credentials$(NC)"; \
+	@echo "$(YELLOW)Step 1/5: Fetching secrets from Infisical...$(NC)"
+	@if command -v infisical >/dev/null 2>&1; then \
+		echo "$(BLUE)Exporting production secrets to .env...$(NC)"; \
+		INFISICAL_API_URL=https://secrets.moriai.kr infisical export --env=prod > .env || { \
+			echo "$(RED)❌ Failed to fetch secrets from Infisical!$(NC)"; \
+			echo "$(YELLOW)Please check:$(NC)"; \
+			echo "  1. Infisical token is configured (run 'infisical login')"; \
+			echo "  2. INFISICAL_API_URL is correct"; \
+			echo "  3. Project and environment 'prod' exist"; \
+			exit 1; \
+		}; \
+		echo "$(GREEN)✓ Secrets exported from Infisical$(NC)"; \
+	else \
+		echo "$(RED)❌ Infisical CLI not found!$(NC)"; \
+		echo "$(YELLOW)Install it: https://infisical.com/docs/cli/overview$(NC)"; \
+		echo "$(YELLOW)Or manually create .env file$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(GREEN)✓ Environment file found$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Step 2/5: Pulling latest code...$(NC)"
 	git pull origin main

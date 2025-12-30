@@ -1,0 +1,49 @@
+{
+  "title": "Voice Settings",
+  "description": "Upload an audio file to create a custom voice.",
+  "viewScript": "View Script for Recording",
+  "voiceName": "Voice Name",
+  "voiceNamePlaceholder": "e.g., Mom's voice, Dad's voice",
+  "audioFile": "Audio File",
+  "fileSizeError": "File size exceeds 30MB.",
+  "fileTypeError": "Unsupported file format. Allowed: {{types}}",
+  "audioLoadError": "Error reading audio file information.",
+  "audioMetadataError": "Could not load audio file.",
+  "audioDurationCheckError": "Error checking audio duration:",
+  "nameRequired": "Please enter a voice name.",
+  "fileRequired": "Please select an audio file.",
+  "unknownError": "An unknown error occurred.",
+  "submitting": "Uploading...",
+  "submit": "Request Creation",
+  "reset": "Reset",
+  "fileInfo": {
+    "allowedFormats": "• Supported formats: mp3, wav, m4a, flac, ogg",
+    "maxSize": "• Max size: 30MB",
+    "duration": "• Duration: 2:30 ~ 3:00 (Auto-trimmed if over 3 mins)",
+    "durationDetail": "• Duration: 2m 30s ~ 3m (Will be trimmed automatically if longer)"
+  },
+  "notice": {
+    "title": "Notice",
+    "duration": "🟡 Voice creation takes approximately 3 minutes.",
+    "minDuration": "🟡 Audio shorter than 2 minutes 30 seconds will be rejected.",
+    "trimming": "🟡 Audio over 3 minutes will be automatically trimmed to 2 minutes 59 seconds.",
+    "restrictions": "🟡 To prevent misuse, creation of public figures' or specific celebrities' voices may be restricted."
+  },
+  "modals": {
+    "voiceLimit": {
+      "title": "Voice Creation Limit",
+      "message": "You cannot create any more voices.",
+      "submessage": "Under current policy, you can hold a maximum of 1 voice."
+    },
+    "audioDuration": {
+      "title": "Insufficient Audio Length",
+      "message": "The uploaded audio file is too short.",
+      "submessage": "Current length: {{minutes}}m {{seconds}}s. A minimum of 2 minutes 30 seconds is required."
+    },
+    "success": {
+      "title": "Information",
+      "message": "Your voice creation request has been successfully submitted.",
+      "submessage": "It will take about 3 minutes. Since this is processed in the background, you can continue with other tasks."
+    }
+  }
+}

@@ -3,6 +3,7 @@ Storybook Task Definitions
 비동기 파이프라인의 개별 Task 구현
 """
 
+import json
 import logging
 import uuid
 from typing import List
@@ -16,24 +17,21 @@ from backend.core.dependencies import (
 )
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.infrastructure.ai.factory import AIProviderFactory
+from backend.infrastructure.ai.base import StoryResponse
 from backend.features.storybook.repository import BookRepository
 from backend.features.storybook.models import BookStatus
 from backend.features.storybook.schemas import (
     create_stories_response_schema,
     TTSExpressionResponse,
+    ShortenedTitle,
 )
 from backend.features.storybook.prompts.generate_story_prompt import GenerateStoryPrompt
 from backend.features.storybook.prompts.generate_tts_expression_prompt import (
     EnhanceAudioPrompt,
 )
 from backend.features.storybook.prompts.generate_image_prompt import GenerateImagePrompt
-from backend.features.storybook.prompts.difficulty_settings import (
-    get_difficulty_settings,
-)
-from backend.features.storybook.utils.difficulty_validator import (
-    validate_difficulty,
-    get_text_stats,
-)
+from backend.features.storybook.prompts.generate_video_prompt import GenerateVideoPrompt
+from backend.features.storybook.validators import ValidatorFactory
 from backend.core.config import settings
 from backend.core.limiters import get_limiters
 from backend.features.tts.exceptions import BookVoiceNotConfiguredException
@@ -52,201 +50,298 @@ import asyncio
 logger = logging.getLogger(__name__)
 
 
-async def generate_story_task(
+# ============================================================
+# Story Task Helper Functions
+# ============================================================
+
+
+def _merge_page_dialogues(dialogues: List[List[str]]) -> List[List[str]]:
+    """
+    페이지별 대화를 1개로 통합 (2D 구조 유지)
+
+    Emotion 생성 후 호출되어 각 페이지의 여러 대화를 하나로 합침.
+    감정 태그가 포함된 경우에도 그대로 유지됨.
+
+    Args:
+        dialogues: [["대화1", "대화2"], ["대화1"], ...]
+
+    Returns:
+        [["대화1 대화2"], ["대화1"], ...]
+    """
+    return [[" ".join(page_dialogues)] for page_dialogues in dialogues]
+
+
+async def _mark_book_failed(book_id: str, stage: str, error: str) -> None:
+    """공통: Book 실패 상태 업데이트"""
+    try:
+        async with AsyncSessionLocal() as session:
+            repo = BookRepository(session)
+            await repo.update(
+                id=uuid.UUID(book_id),
+                pipeline_stage="failed",
+                error_message=f"{stage}: {error}",
+                status=BookStatus.FAILED,
+            )
+            await session.commit()
+    except Exception as e:
+        logger.error(f"[Story Task] Failed to update error in DB: {e}")
+
+
+async def _shorten_title(
+    story_provider,
+    title: str,
+    max_length: int,
+) -> str:
+    """
+    Title 길이 초과 시 AI에게 축약 요청 (1회 한정)
+
+    Args:
+        story_provider: AI provider (generate_text 메서드 필요)
+        title: 원본 제목
+        max_length: 최대 허용 길이
+
+    Returns:
+        축약된 제목 (실패 시 단순 자르기)
+    """
+    prompt = f"""Shorten this title to under {max_length} characters while keeping its core meaning.
+
+Original title: "{title}"
+
+Rules:
+- Keep the main subject/theme
+- Remove unnecessary words
+- Must be under {max_length} characters
+
+Return ONLY the shortened title, nothing else."""
+
+    shortened = title  # AI 호출 실패 시 원본 사용
+
+    try:
+        result = await story_provider.generate_text(
+            prompt=prompt,
+            response_schema=ShortenedTitle,
+        )
+
+        # result 타입에 따라 title 추출
+        if isinstance(result, str):
+            # JSON 문자열인 경우 파싱
+            try:
+                data = json.loads(result)
+                shortened = data.get("title", "").strip()
+            except json.JSONDecodeError:
+                # 순수 문자열인 경우
+                shortened = result.strip()
+        elif isinstance(result, dict):
+            shortened = result.get("title", "").strip()
+        else:
+            # ShortenedTitle 객체
+            shortened = result.title.strip()
+
+        if 0 < len(shortened) <= max_length:
+            logger.info(
+                f"[Story Task] Title shortened: '{title}' ({len(title)} chars) "
+                f"→ '{shortened}' ({len(shortened)} chars)"
+            )
+            return shortened
+        else:
+            logger.warning(
+                f"[Story Task] Shortened title invalid: '{shortened}' ({len(shortened)} chars)"
+            )
+
+    except Exception as e:
+        logger.warning(f"[Story Task] Title shortening failed: {e}")
+
+    # Fallback: 30자 이하면 단순 자르기, 초과면 에러
+    max_fallback_length = max_length + 10  # 20 + 10 = 30
+
+    if len(shortened) > max_fallback_length:
+        # 30자 초과: 자르면 의미 손실이 큼 → 에러
+        raise ValueError(
+            f"Title too long for truncation ({len(shortened)} > {max_fallback_length} chars): '{shortened}'"
+        )
+    return shortened
+
+
+async def _generate_story_phase(
+    story_provider,
     book_id: str,
     stories: List[str],
     level: int,
+    target_language: str,
     num_pages: int,
-    context: TaskContext,
-) -> TaskResult:
+    max_retries: int,
+) -> tuple[str, list] | None:
     """
-    Task 1: Story 생성 (AI 호출) with 레벨별 난이도 조절
-
-    Args:
-        book_id: Book UUID (string)
-        stories: 사용자 일기 항목 리스트
-        level: 난이도 레벨 (1: 4-5세, 2: 5-6세, 3: 6-8세)
-        num_pages: 페이지 수
-        context: Task 실행 컨텍스트
+    Phase 1: Story 생성 + 검증
 
     Returns:
-        TaskResult: 성공 시 story_data_key 반환
+        (book_title, dialogues) 또는 실패 시 None
     """
-    logger.info(f"[Story Task] Starting for book_id={book_id}")
-    logger.info(f"[Story Task] stories={stories}, level={level}, num_pages={num_pages}")
-    ai_factory = get_ai_factory()
-    story_provider = ai_factory.get_story_provider()
-
-    max_retries = settings.task_story_max_retries
-
-    # 레벨별 난이도 설정 가져오기
-    try:
-        difficulty_settings = get_difficulty_settings(level)
-    except ValueError:
-        # 유효하지 않은 레벨이면 기본값 1 사용
-        logger.warning(f"[Story Task] Invalid level {level}, using default level 1")
-        level = 1
-        difficulty_settings = get_difficulty_settings(level)
-
-    # 레벨별 스키마 설정 적용
-    # max_dialogues_per_page=difficulty_settings.max_dialogues_per_page,
-    # max_chars_per_dialogue=difficulty_settings.max_chars_per_dialogue,
+    # 스키마 & 프롬프트 생성
+    logger.info(
+        f"[Story Task] [Book: {book_id}] stories={stories}, level={level}, num_pages={num_pages}"
+    )
     response_schema = create_stories_response_schema(
         max_pages=num_pages,
-        # max_dialogues_per_page는 프론트 최대 허용치보다 작게 제한 필요
-        max_dialogues_per_page=5,  # 프론트 허용 최대 개수
-        max_chars_per_dialogue=85,  # 프론트 허용 최대 개수
-        max_title_length=20,
+        max_dialogues_per_page=settings.max_dialogues_per_page,
+        max_chars_per_dialogue=settings.max_chars_per_dialogue,
+        max_title_length=settings.max_title_length,
     )
+    prompt = GenerateStoryPrompt(
+        diary_entries=stories,
+        level=level,
+        target_language=target_language,
+    ).render()
 
-    # 레벨이 적용된 프롬프트 생성
-    prompt = GenerateStoryPrompt(diary_entries=stories, level=level).render()
-
-    # === Phase 1: Story 생성 (재시도 유틸리티 사용) ===
     async def _generate_and_validate():
-        """Story 생성, 검증 및 Flesch-Kincaid 난이도 검증"""
         generated_data = await story_provider.generate_story(
             prompt=prompt,
             response_schema=response_schema,
         )
-        logger.info(f"[Story Task] [Book: {book_id}] generated_data={generated_data}")
-        book_title, dialogues = validate_generated_story(generated_data)
 
-        # Flesch-Kincaid 난이도 검증
-        full_text = " ".join(" ".join(page) for page in dialogues)
-        is_valid, fk_score = validate_difficulty(full_text, level)
+        title, dialogues = validate_generated_story(generated_data)
 
-        # 텍스트 통계 로깅 (디버깅용)
-        text_stats = get_text_stats(full_text)
-        logger.info(
-            f"[Story Task] [Book: {book_id}] FK Validation - "
-            f"Level: {level}, Score: {fk_score:.2f}, Valid: {is_valid}, "
-            f"Stats: {text_stats}"
-        )
-
-        if not is_valid:
+        # 페이지 수 검증 (불일치 시 재시도)
+        if len(dialogues) != num_pages:
             raise ValueError(
-                f"FK score {fk_score:.2f} out of acceptable range for level {level}. "
-                f"Target range: {difficulty_settings.fk_grade_range}"
+                f"Page count mismatch: expected {num_pages}, got {len(dialogues)}"
             )
 
-        return book_title, dialogues
+        # Title 길이 초과 시 AI 축약 요청 (1회)
+        if len(title) > settings.max_title_length:
+            logger.info(
+                f"[Story Task] [Book: {book_id}] Title: {title} too long ({len(title)} chars), "
+                f"requesting AI shortening..."
+            )
+            title = await _shorten_title(
+                story_provider,
+                title,
+                settings.max_title_length,
+            )
+
+        return title, dialogues
 
     try:
-        book_title, dialogues = await retry_with_config(
+        return await retry_with_config(
             func=_generate_and_validate,
             max_retries=max_retries,
             error_message_prefix=f"[Story Task] [Book: {book_id}]",
         )
     except RuntimeError as e:
-        # 모든 시도 실패 - DB 업데이트 후 TaskResult(FAILED) 반환
         logger.error(f"[Story Task] All retries failed: {e}")
+        await _mark_book_failed(book_id, "Story generation failed", str(e))
+        return None
 
-        async with AsyncSessionLocal() as error_session:
-            error_repo = BookRepository(error_session)
-            await error_repo.update(
-                id=uuid.UUID(book_id),
-                pipeline_stage="failed",
-                error_message=f"Story generation failed: {str(e)}",
-                status=BookStatus.FAILED,
-            )
-            await error_session.commit()
 
-        return TaskResult(status=TaskStatus.FAILED, error=str(e))
+async def _generate_emotion_phase(
+    story_provider,
+    dialogues: list,
+    book_title: str,
+    book_id: str,
+    max_retries: int,
+) -> StoryResponse | None:
+    """
+    Phase 2: Emotion 생성
 
-    # === Phase 2: AI 호출 (Emotion 추가) - 세션 밖에서 실행, 재시도 포함 ===
+    Returns:
+        StoryResponse 또는 실패 시 None
+    """
+
     async def _generate_emotion():
-        """감정 표현 생성 (재시도용 래퍼)"""
-        emotion_prefixed_prompt = EnhanceAudioPrompt(
+        emotion_prompt = EnhanceAudioPrompt(
             stories=dialogues, title=book_title
         ).render()
         return await story_provider.generate_story(
-            prompt=emotion_prefixed_prompt,
+            prompt=emotion_prompt,
             response_schema=TTSExpressionResponse,
         )
 
     try:
-        response_with_emotion = await retry_with_config(
+        return await retry_with_config(
             func=_generate_emotion,
             max_retries=max_retries,
             error_message_prefix=f"[Story Task] [Book: {book_id}] Emotion generation",
         )
     except RuntimeError as e:
         logger.error(f"[Story Task] Emotion generation failed: {e}")
+        await _mark_book_failed(book_id, "Emotion generation failed", str(e))
+        return None
 
-        async with AsyncSessionLocal() as error_session:
-            error_repo = BookRepository(error_session)
-            await error_repo.update(
-                id=uuid.UUID(book_id),
-                pipeline_stage="failed",
-                error_message=f"Emotion generation failed: {str(e)}",
-                status=BookStatus.FAILED,
-            )
-            await error_session.commit()
 
-        return TaskResult(status=TaskStatus.FAILED, error=str(e))
-
-    logger.info(f"[Story Task] Generating story with emotions: {response_with_emotion}")
-    dialogues_with_emotions = response_with_emotion.stories
-
-    # 페이지 구조 복원: dialogues의 페이지별 대사 수에 맞춰 재구성
+def _restructure_dialogues(dialogues: list, flat_emotions: list) -> list:
+    """Emotion을 원본 페이지 구조에 맞게 재구성"""
     page_sizes = [len(page) for page in dialogues]
-    flat_emotions = dialogues_with_emotions if dialogues_with_emotions else []
-
-    restructured_dialogues = []
+    result = []
     idx = 0
     for size in page_sizes:
-        restructured_dialogues.append(flat_emotions[idx : idx + size])
+        result.append(flat_emotions[idx : idx + size])
         idx += size
+    return result
 
-    logger.info(
-        f"[Story Task] Restructured dialogues: {len(restructured_dialogues)} pages"
-    )
 
-    # === Phase 3: Redis 저장 - 세션 밖에서 실행 ===
+async def _save_story_to_db(
+    book_id: str,
+    dialogues: list,
+    book_title: str,
+    restructured_dialogues: list,
+    target_language: str,
+    context: TaskContext,
+    max_retries: int,
+    story_key: str,
+) -> TaskResult:
+    """
+    Phase 3-4: Redis 저장 + DB 저장
+
+    Returns:
+        TaskResult (성공 또는 실패)
+    """
+    # Redis 저장
     task_store = TaskStore()
-    story_key = f"story:{book_id}"
-    await task_store.set(
-        story_key, {"dialogues": restructured_dialogues, "title": book_title}, ttl=3600
+    logger.info(
+        f"[Story Task] [Book: {book_id}] Saving to Redis: key={story_key}, "
+        f"dialogues count={len(restructured_dialogues)}, title={book_title}"
     )
+    await task_store.set(
+        story_key,
+        {"dialogues": restructured_dialogues, "title": book_title},
+        ttl=3600,
+    )
+    logger.info(f"[Story Task] [Book: {book_id}] Redis save completed")
 
-    # === Phase 4: DB 작업만 세션 안에서 실행 ===
+    # DB 저장
     async with AsyncSessionLocal() as session:
         try:
             repo = BookRepository(session)
             book_uuid = uuid.UUID(book_id)
 
-            # Get book with pages
             book = await repo.get_with_pages(book_uuid)
             if not book or not book.pages:
                 raise ValueError(f"Book {book_id} has no pages for dialogues creation")
 
-            pages = book.pages
-
-            # Create Dialogue + DialogueTranslation for each page
+            # Dialogue + Translation 생성
             for page_idx, page_dialogues in enumerate(dialogues):
-                page = next((p for p in pages if p.sequence == page_idx + 1), None)
+                page = next((p for p in book.pages if p.sequence == page_idx + 1), None)
                 if not page:
                     logger.info(
-                        f"[Story Task] [Book: {book_id}] Page {page_idx + 1} not found, skipping dialogues"
+                        f"[Story Task] [Book: {book_id}] Page {page_idx + 1} not found, skipping"
                     )
                     continue
+
                 for dialogue_idx, dialogue_text in enumerate(page_dialogues):
                     await repo.add_dialogue_with_translation(
                         page_id=page.id,
-                        speaker="Narrator",  # test 이거 무슨 의미?
+                        speaker="Narrator",
                         sequence=dialogue_idx + 1,
                         translations=[
                             {
-                                "language_code": "en",
+                                "language_code": target_language,
                                 "text": dialogue_text,
                                 "is_primary": True,
                             }
                         ],
                     )
 
-            # Update DB with title and progress
-            # task_metadata 업데이트
+            # Book 메타데이터 업데이트
             task_metadata = book.task_metadata or {}
             task_metadata["story"] = {
                 "status": "completed",
@@ -264,9 +359,10 @@ async def generate_story_task(
             )
             if not updated:
                 raise ValueError(f"Book {book_id} not found for update")
-            await session.commit()
 
+            await session.commit()
             logger.info(f"[Story Task] Completed for book_id={book_id}")
+
             return TaskResult(
                 status=TaskStatus.COMPLETED,
                 result={
@@ -280,22 +376,101 @@ async def generate_story_task(
             logger.error(
                 f"[Story Task] Failed for book_id={book_id}: {e}", exc_info=True
             )
-
-            # Update DB error
-            try:
-                async with AsyncSessionLocal() as error_session:
-                    error_repo = BookRepository(error_session)
-                    updated_book = await error_repo.update(
-                        id=uuid.UUID(book_id),
-                        pipeline_stage="failed",
-                        error_message=f"Story generation failed: {str(e)}",
-                        status=BookStatus.FAILED,
-                    )
-                    if updated_book:
-                        await error_session.commit()
-            except Exception as db_error:
-                logger.error(f"[Story Task] Failed to update error in DB: {db_error}")
+            await _mark_book_failed(book_id, "DB save failed", str(e))
             return TaskResult(status=TaskStatus.FAILED, error=str(e))
+
+
+# ============================================================
+# Story Task Main Function
+# ============================================================
+
+
+async def generate_story_task(
+    book_id: str,
+    stories: List[str],
+    level: int,
+    num_pages: int,
+    context: TaskContext,
+    target_language: str = "en",
+) -> TaskResult:
+    """
+    Task 1: Story 생성 (AI 호출) with 레벨별 난이도 조절
+
+    Args:
+        book_id: Book UUID (string)
+        stories: 사용자 일기 항목 리스트
+        level: 난이도 레벨 (1: 4-5세, 2: 5-6세, 3: 6-8세)
+        num_pages: 페이지 수
+        context: Task 실행 컨텍스트
+        target_language: 목표 언어 코드 (en, ko, zh, vi, ru, th)
+
+    Returns:
+        TaskResult: 성공 시 story_data_key 반환
+    """
+    logger.info(
+        f"[Story Task] Starting for book_id={book_id}, target_language={target_language}. level={level}, num_pages={num_pages}"
+    )
+
+    # === 준비 ===
+    ai_factory = get_ai_factory()
+    story_provider = ai_factory.get_story_provider()
+    max_retries = settings.task_story_max_retries
+
+    # 레벨 검증
+    if not (settings.min_level <= level <= settings.max_level):
+        logger.warning(
+            f"[Story Task] Invalid level {level}, using default level {settings.min_level}"
+        )
+        level = settings.min_level
+
+    # === Phase 1: Story 생성 ===
+    result = await _generate_story_phase(
+        story_provider=story_provider,
+        book_id=book_id,
+        stories=stories,
+        level=level,
+        target_language=target_language,
+        num_pages=num_pages,
+        max_retries=max_retries,
+    )
+    if result is None:
+        return TaskResult(status=TaskStatus.FAILED, error="Story generation failed")
+
+    book_title, dialogues = result
+    # === Phase 2: Emotion 생성 ===
+    emotion_result = await _generate_emotion_phase(
+        story_provider, dialogues, book_title, book_id, max_retries
+    )
+    if emotion_result is None:
+        return TaskResult(status=TaskStatus.FAILED, error="Emotion generation failed")
+
+    logger.info(f"[Story Task] Emotion generated: {emotion_result}")
+    flat_emotions = emotion_result.stories if emotion_result.stories else []
+    restructured_dialogues = _restructure_dialogues(dialogues, flat_emotions)
+    logger.info(
+        f"[Story Task] Restructured dialogues: {len(restructured_dialogues)} pages"
+    )
+
+    # === Phase 3.5: 페이지별 대화 통합 (2D 구조 유지) ===
+    merged_dialogues = _merge_page_dialogues(dialogues)
+    merged_restructured = _merge_page_dialogues(restructured_dialogues)
+    logger.info(
+        f"[Story Task] [Book: {book_id}] Merged dialogues: {len(merged_dialogues)} pages, "
+        f"each with 1 dialogue"
+    )
+
+    # === Phase 4: 저장 (Redis + DB) ===
+    story_key = f"story:{book_id}"
+    return await _save_story_to_db(
+        book_id=book_id,
+        dialogues=merged_dialogues,
+        book_title=book_title,
+        restructured_dialogues=merged_restructured,
+        target_language=target_language,
+        context=context,
+        max_retries=max_retries,
+        story_key=story_key,
+    )
 
 
 async def generate_image_task(
@@ -304,9 +479,22 @@ async def generate_image_task(
     context: TaskContext,
 ) -> TaskResult:
     """
-    Task 2: Image 생성 (배치 처리 - 모든 페이지, 재시도 지원)
+    Task 2: Image 생성 (Async Mode + Polling)
 
-    실패한 이미지만 재시도하며, 성공한 이미지는 Redis에 보존
+    비동기 모드로 이미지 생성 요청을 제출하고 폴링으로 결과를 수집합니다.
+    Cloudflare 타임아웃 문제를 해결하기 위해 동기 방식에서 변경되었습니다.
+
+    Flow:
+        Phase 1: Initialize trackers + Redis cache recovery
+        Phase 2: Generate prompts from dialogues
+        Phase 3: MAIN RETRY LOOP
+            Phase 3a: Submit async requests (get task_uuids)
+            Phase 3b: Polling loop (check_image_status)
+            Phase 3c: Handle timeouts + Save to Redis
+        Phase 4: Evaluate results (all/partial/failed)
+        Phase 5: Download images from CDN → Save to S3
+        Phase 6: Update database (Page.storybook_image_url)
+        Phase 7: Save final results to Redis
 
     Args:
         book_id: Book UUID (string)
@@ -317,30 +505,40 @@ async def generate_image_task(
         TaskResult: 성공 시 모든 페이지의 image_urls 반환
     """
     logger.info(
-        f"[Image Task] [Book: {book_id}] Starting batch processing, {len(images)} images"
+        f"[Image Task] [Book: {book_id}] Starting async batch processing, {len(images)} images"
     )
+    # return ""
 
+    # === Dependencies ===
     storage_service = get_storage_service()
     task_store = TaskStore()
     story_key = f"story:{book_id}"
     story_data = await task_store.get(story_key)
     dialogues = story_data.get("dialogues", []) if story_data else []
 
-    # === Phase 1: 재시도 추적기 초기화 ===
+    # 디버깅: Redis에서 가져온 데이터 확인
+    logger.info(
+        f"[Image Task] [Book: {book_id}] Redis story_data exists: {story_data is not None}, "
+        f"dialogues count: {len(dialogues)}, images count: {len(images)}"
+    )
+
+    # === Phase 1: Initialize Trackers ===
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 1: Initializing trackers")
     max_retries = settings.task_image_max_retries
     tracker = BatchRetryTracker(total_items=len(images), max_retries=max_retries)
 
-    # Redis 캐시 복구 (재시도 시)
+    # Redis cache recovery (for restart scenarios)
     image_cache_key = f"images_cache:{book_id}"
     cached_data = await task_store.get(image_cache_key)
     if cached_data:
         for idx_str, img_info in cached_data.get("completed", {}).items():
             tracker.mark_success(int(idx_str), img_info)
         logger.info(
-            f"[Image Task] [Book: {book_id}] Recovered {len(tracker.completed)} cached images"
+            f"[Image Task] [Book: {book_id}] Recovered {len(tracker.completed)} cached images from Redis"
         )
 
     # === Phase 2: Prompt 생성 ===
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 2: Generating prompts")
     prompts = [
         GenerateImagePrompt(stories=dialogue, style_keyword="cartoon").render()
         for dialogue in dialogues
@@ -348,7 +546,7 @@ async def generate_image_task(
     ai_factory = get_ai_factory()
     image_provider = ai_factory.get_image_provider()
 
-    # === Phase 3: 재시도 루프 ===
+    # === Phase 3: Async Request + Polling Loop ===
     while not tracker.is_all_completed():
         pending_indices = tracker.get_pending_indices()
 
@@ -356,11 +554,15 @@ async def generate_image_task(
             break
 
         logger.info(
-            f"[Image Task] [Book: {book_id}] Processing {len(pending_indices)} images "
+            f"[Image Task] [Book: {book_id}] Phase 3: Processing {len(pending_indices)} images "
             f"(completed: {len(tracker.completed)}/{tracker.total_items})"
         )
 
-        # 실패한 이미지만 재시도
+        # === Phase 3a: Submit Async Requests ===
+        logger.info(
+            f"[Image Task] [Book: {book_id}] Phase 3a: Submitting async requests"
+        )
+
         tasks = [
             image_provider.generate_image_from_image(
                 image_data=images[idx], prompt=prompts[idx]
@@ -369,24 +571,102 @@ async def generate_image_task(
         ]
 
         # return_exceptions=True로 개별 실패 허용
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        task_uuid_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 결과 처리
-        for idx, result in zip(pending_indices, results):
+        # Map successful submissions to pending_to_task_uuid
+        pending_to_task_uuid: dict[int, str] = {}
+        for idx, result in zip(pending_indices, task_uuid_results):
             if isinstance(result, Exception):
-                tracker.mark_failure(idx, str(result))
+                tracker.mark_failure(idx, f"Request failed: {result}")
                 logger.error(
-                    f"[Image Task] [Book: {book_id}] Page {idx} failed: {result}"
+                    f"[Image Task] [Book: {book_id}] Page {idx} request failed: {result}"
                 )
             else:
-                image_info = {
-                    "imageUUID": result["data"][0]["imageUUID"],
-                    "imageURL": result["data"][0]["imageURL"],
-                }
-                tracker.mark_success(idx, image_info)
-                logger.info(f"[Image Task] [Book: {book_id}] Page {idx} completed")
+                task_uuid = result.get("task_uuid")
+                if task_uuid:
+                    pending_to_task_uuid[idx] = task_uuid
+                    logger.info(
+                        f"[Image Task] [Book: {book_id}] Page {idx} submitted: task_uuid={task_uuid}"
+                    )
+                else:
+                    tracker.mark_failure(idx, "No task_uuid in response")
+                    logger.error(
+                        f"[Image Task] [Book: {book_id}] Page {idx}: no task_uuid in response"
+                    )
 
-        # Redis에 중간 결과 저장 (재시도 복구용)
+        if not pending_to_task_uuid:
+            logger.warning(
+                f"[Image Task] [Book: {book_id}] All requests failed, breaking loop"
+            )
+            break
+
+        # === Phase 3b: Polling Loop ===
+        logger.info(
+            f"[Image Task] [Book: {book_id}] Phase 3b: Starting polling for {len(pending_to_task_uuid)} tasks"
+        )
+
+        max_wait_time = settings.task_image_max_wait_time  # 300 seconds
+        poll_interval = settings.task_image_poll_interval  # 5 seconds
+        elapsed_time = 0
+
+        while elapsed_time < max_wait_time and pending_to_task_uuid:
+            logger.info(
+                f"[Image Task] [Book: {book_id}] Polling: {len(pending_to_task_uuid)} pending, "
+                f"elapsed={elapsed_time}s/{max_wait_time}s"
+            )
+
+            for idx in list(pending_to_task_uuid.keys()):
+                task_uuid = pending_to_task_uuid[idx]
+
+                try:
+                    status_response = await image_provider.check_image_status(task_uuid)
+                    status = status_response["status"]
+                    progress = status_response.get("progress", 0)
+
+                    if status == "completed":
+                        image_info = {
+                            "imageUUID": status_response.get("image_uuid"),
+                            "imageURL": status_response.get("image_url"),
+                        }
+                        tracker.mark_success(idx, image_info)
+                        del pending_to_task_uuid[idx]
+                        logger.info(
+                            f"[Image Task] [Book: {book_id}] Page {idx} ✅ completed: "
+                            f"imageURL={image_info['imageURL'][:50] if image_info['imageURL'] else 'None'}..."
+                        )
+
+                    elif status == "failed":
+                        error_msg = status_response.get("error", "Unknown error")
+                        tracker.mark_failure(idx, error_msg)
+                        del pending_to_task_uuid[idx]
+                        logger.error(
+                            f"[Image Task] [Book: {book_id}] Page {idx} ❌ failed: {error_msg}"
+                        )
+
+                    else:
+                        # processing/pending 상태
+                        logger.info(
+                            f"[Image Task] [Book: {book_id}] Page {idx} ⏳ {status} (progress={progress}%)"
+                        )
+
+                except Exception as e:
+                    logger.error(
+                        f"[Image Task] [Book: {book_id}] Page {idx} ⚠️ status check error: {e}"
+                    )
+
+            if pending_to_task_uuid:
+                await asyncio.sleep(poll_interval)
+                elapsed_time += poll_interval
+
+        # Handle timed-out tasks
+        for idx in list(pending_to_task_uuid.keys()):
+            tracker.mark_failure(idx, "Image generation timeout")
+            logger.warning(f"[Image Task] [Book: {book_id}] Page {idx} timed out")
+
+        # === Phase 3c: Save Intermediate Results to Redis ===
+        logger.info(
+            f"[Image Task] [Book: {book_id}] Phase 3c: Saving intermediate results"
+        )
         await task_store.set(
             image_cache_key,
             {
@@ -397,17 +677,18 @@ async def generate_image_task(
             ttl=3600,
         )
 
-        # 재시도 대기 (마지막이 아니면)
+        # Wait before retry (if needed)
         if not tracker.is_all_completed() and tracker.get_pending_indices():
             delay = await calculate_retry_delay(max(tracker.retry_counts.values()))
             logger.info(f"[Image Task] [Book: {book_id}] Retrying in {delay:.1f}s...")
             await asyncio.sleep(delay)
 
-    # === Phase 4: 결과 평가 ===
+    # === Phase 4: Evaluate Results ===
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 4: Evaluating results")
     if tracker.is_all_completed():
         status = TaskStatus.COMPLETED
         logger.info(
-            f"[Image Task] [Book: {book_id}] All {tracker.total_items} images completed"
+            f"[Image Task] [Book: {book_id}] All {tracker.total_items} images completed successfully"
         )
     elif tracker.is_partial_failure():
         status = TaskStatus.COMPLETED  # 부분 성공도 COMPLETED로 처리
@@ -419,81 +700,163 @@ async def generate_image_task(
         status = TaskStatus.FAILED
         logger.error(f"[Image Task] [Book: {book_id}] All images failed")
 
-    # === Phase 5: Cover Image 다운로드 및 저장 ===
-    cover_image_info = tracker.completed.get(0)  # 첫 페이지를 커버로 사용
+    # === Phase 5: Download and Store ALL Images ===
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 5: Starting image storage phase")
 
-    if cover_image_info:
+    # Get book for base_path
+    async with AsyncSessionLocal() as session:
+        repo = BookRepository(session)
+        book = await repo.get(uuid.UUID(book_id))
+        if not book:
+            raise ValueError(f"Book {book_id} not found")
+        base_path = book.base_path
+
+    # Storage tracker (separate from generation tracker)
+    storage_tracker = BatchRetryTracker(total_items=tracker.total_items, max_retries=2)
+
+    # Pre-mark failed generation items as storage failed
+    for idx in tracker.get_failed_indices():
+        storage_tracker.mark_failure(idx, "Generation failed - skipping storage")
+
+    # Download and store image
+    async def download_and_store_image(idx: int, image_info: dict) -> str:
+        """Download from Runware CDN and save to permanent storage"""
+        image_url = image_info.get("imageURL")
+
+        # Download with timeout
         timeout = httpx.Timeout(settings.http_timeout, read=settings.http_read_timeout)
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(cover_image_info["imageURL"])
+            response = await client.get(image_url)
             response.raise_for_status()
             image_bytes = response.content
 
-        async with AsyncSessionLocal() as session:
-            try:
-                repo = BookRepository(session)
-                book_uuid = uuid.UUID(book_id)
-                book = await repo.get(book_uuid)
-                if not book:
-                    raise ValueError(f"Book {book_id} not found")
+        # Save to storage
+        file_name = f"{base_path}/images/page_{idx + 1}.png"
+        await storage_service.save(image_bytes, file_name, content_type="image/png")
 
-                file_name = f"{book.base_path}/images/cover.png"
-                logger.info(
-                    f"[Image Task] [Book: {book_id}] Using base_path: {book.base_path}, is_default: {book.is_default}"
-                )
-                storage_url = await storage_service.save(
-                    image_bytes, file_name, content_type="image/png"
-                )
+        logger.info(
+            f"[Image Task] [Book: {book_id}] Page {idx + 1}: "
+            f"Saved to {file_name} ({len(image_bytes)} bytes)"
+        )
 
-                # task_metadata 업데이트
-                task_metadata = book.task_metadata or {}
-                task_metadata["image"] = tracker.get_summary()
+        return file_name
 
-                updated = await repo.update(
-                    book_uuid,
-                    pipeline_stage="image",
-                    progress_percentage=60,
-                    cover_image=file_name,
-                    task_metadata=task_metadata,
-                )
-                if not updated:
-                    raise ValueError(f"Book {book_id} not found for update")
-                await session.commit()
+    # Process images sequentially for memory management
+    for idx, image_info in tracker.completed.items():
+        try:
+            storage_path = await download_and_store_image(idx, image_info)
+            storage_tracker.mark_success(idx, storage_path)
+        except Exception as e:
+            storage_tracker.mark_failure(idx, str(e))
+            logger.error(
+                f"[Image Task] [Book: {book_id}] Page {idx + 1} storage failed: {e}"
+            )
 
-                logger.info(
-                    f"[Image Task] [Book: {book_id}] Updated book with cover image and metadata"
-                )
+    logger.info(
+        f"[Image Task] [Book: {book_id}] Phase 5 completed: "
+        f"{len(storage_tracker.completed)}/{storage_tracker.total_items} images stored"
+    )
 
-            except Exception as e:
-                logger.error(
-                    f"[Image Task] [Book: {book_id}] DB update failed: {e}",
-                    exc_info=True,
-                )
-                return TaskResult(status=TaskStatus.FAILED, error=str(e))
+    # === Phase 6: DB Update (Page.image_url + Book metadata) ===
+    logger.info(f"[Image Task] [Book: {book_id}] Phase 6: Updating database")
+    async with AsyncSessionLocal() as session:
+        try:
+            repo = BookRepository(session)
+            book_uuid = uuid.UUID(book_id)
+            book = await repo.get_with_pages(book_uuid)
 
-    # === Phase 6: Redis에 최종 결과 저장 ===
-    # 순서 보장을 위해 인덱스 순으로 정렬
+            if not book:
+                raise ValueError(f"Book {book_id} not found")
+
+            # Update each page with storybook image path and prompt
+            for page_idx, storage_path in storage_tracker.completed.items():
+                page = next((p for p in book.pages if p.sequence == page_idx + 1), None)
+                if page:
+                    page.storybook_image_url = storage_path
+                    # 이미지 생성에 사용된 프롬프트 저장
+                    page.image_prompt = prompts[page_idx]
+                    session.add(page)
+                    logger.debug(
+                        f"[Image Task] [Book: {book_id}] Updated Page {page_idx + 1} "
+                        f"storybook_image_url={storage_path}"
+                    )
+
+            # Update book with cover and metadata
+            task_metadata = book.task_metadata or {}
+            task_metadata["image"] = {
+                **tracker.get_summary(),
+                "storage": storage_tracker.get_summary(),
+            }
+
+            # Cover is first page image
+            cover_path = storage_tracker.completed.get(0)
+
+            updated = await repo.update(
+                book_uuid,
+                pipeline_stage="image",
+                progress_percentage=60,
+                cover_image=cover_path,
+                task_metadata=task_metadata,
+            )
+
+            if not updated:
+                raise ValueError(f"Book {book_id} not found for update")
+
+            await session.commit()
+
+            logger.info(
+                f"[Image Task] [Book: {book_id}] Updated {len(storage_tracker.completed)} "
+                f"page images, cover={cover_path is not None}"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"[Image Task] [Book: {book_id}] DB update failed: {e}",
+                exc_info=True,
+            )
+            return TaskResult(status=TaskStatus.FAILED, error=str(e))
+
+    # === Phase 7: Save Final Results to Redis ===
+    logger.info(
+        f"[Image Task] [Book: {book_id}] Phase 7: Saving final results to Redis"
+    )
+    # Order preservation: build arrays using range(total_items)
+    # 중요: None을 유지하여 Video Task에서 인덱스가 일치하도록 함
     image_infos = [tracker.completed.get(i) for i in range(tracker.total_items)]
+    storage_paths = [
+        storage_tracker.completed.get(i) for i in range(tracker.total_items)
+    ]
 
     await task_store.set(
         f"images:{book_id}",
         {
-            "images": [info for info in image_infos if info is not None],
+            # None 유지하여 순서 보존 (Video Task에서 인덱스 매칭 필요)
+            "images": image_infos,
+            "storage_paths": storage_paths,
             "page_count": len(images),
             "failed_pages": tracker.get_failed_indices(),
+            "storage_failed_pages": storage_tracker.get_failed_indices(),
         },
         ttl=3600,
     )
 
-    logger.info(f"[Image Task] [Book: {book_id}] Image task completed")
+    logger.info(
+        f"[Image Task] [Book: {book_id}] All phases completed. "
+        f"Generated: {len(tracker.completed)}/{tracker.total_items}, "
+        f"Stored: {len(storage_tracker.completed)}/{storage_tracker.total_items}"
+    )
     return TaskResult(
         status=status,
         result={
             "image_infos": image_infos,
+            "storage_paths": storage_paths,
             "page_count": len(images),
             "completed_count": len(tracker.completed),
             "failed_count": len(tracker.get_failed_indices()),
+            "storage_completed_count": len(storage_tracker.completed),
+            "storage_failed_count": len(storage_tracker.get_failed_indices()),
             "summary": tracker.get_summary(),
+            "storage_summary": storage_tracker.get_summary(),
         },
     )
 
@@ -514,6 +877,7 @@ async def generate_tts_task(
         TaskResult: 성공 시 모든 audio_urls 반환
     """
     logger.info(f"[TTS Task] Starting batch processing for book_id={book_id}")
+    # return ""
     async with AsyncSessionLocal() as session:
         try:
             # === Phase 1: Data Retrieval & Validation ===
@@ -542,8 +906,21 @@ async def generate_tts_task(
             # === Phase 2: Build Task List ===
             tasks_to_generate = []
             tasks_to_enqueue = []
+
+            # Redis에서 감정 포함 대화 텍스트 가져오기
+            dialogues_with_emotion = (
+                story_data.get("dialogues", []) if story_data else []
+            )
+            logger.info(f"[TTS Task] dialogues_with_emotion: {dialogues_with_emotion}")
+            logger.info(
+                f"[TTS Task] [Book: {book_id}] Loaded {len(dialogues_with_emotion)} pages with emotion from Redis"
+            )
+
             for page in book.pages:
+                page_idx = page.sequence - 1  # 0-indexed
                 for dialogue in page.dialogues:
+                    dialogue_idx = dialogue.sequence - 1  # 0-indexed
+
                     primary_translation = next(
                         (t for t in dialogue.translations if t.is_primary), None
                     )
@@ -559,6 +936,20 @@ async def generate_tts_task(
                             f"[TTS Task] [Book: {book_id}] Empty text for dialogue {dialogue.id}, skipping"
                         )
                         continue
+
+                    # 감정 포함 텍스트 가져오기 (fallback: DB 원본 텍스트)
+                    try:
+                        emotion_text = dialogues_with_emotion[page_idx][dialogue_idx]
+                        if not emotion_text or not emotion_text.strip():
+                            raise ValueError("Empty emotion text")
+                        logger.info(
+                            f"[TTS Task] [Book: {book_id}] Using emotion text for page {page_idx + 1}, dialogue {dialogue_idx + 1}"
+                        )
+                    except (IndexError, TypeError, ValueError) as e:
+                        emotion_text = primary_translation.text
+                        logger.warning(
+                            f"[TTS Task] [Book: {book_id}] Fallback to DB text for page {page_idx + 1}, dialogue {dialogue_idx + 1}: {e}"
+                        )
 
                     # file_name = f"users/{book.user_id}/audios/standalone/{uuid.uuid4()}.mp3"
                     audio_uuid = uuid.uuid4()
@@ -578,17 +969,16 @@ async def generate_tts_task(
                             f"[TTS Task] Failed to create DialogueAudio record for dialogue {dialogue.id}, skipping"
                         )
                         continue
-
                     logger.info(
                         f"[TTS Task] [Book: {book_id}] Enqueuing TTS for dialogue {dialogue.id}, audio_id={audio.id}"
                     )
                     logger.info(
-                        f"[TTS Task] [Book: {book_id}] Text: {primary_translation.text}"
+                        f"[TTS Task] [Book: {book_id}] Text (with emotion): {emotion_text}"
                     )
                     tasks_to_enqueue.append(
                         {
                             "audio_id": audio.id,
-                            "text": primary_translation.text,
+                            "text": emotion_text,
                             "dialogue_id": dialogue.id,
                         }
                     )
@@ -674,29 +1064,52 @@ async def generate_video_task(
         TaskResult: 성공 시 video_url 반환
     """
     logger.info(f"[Video Task] [Book: {book_id}] Starting video generation")
+    # return ""
     ai_factory = get_ai_factory()
     video_provider = ai_factory.get_video_provider()
 
     task_store = TaskStore()
     story_key = f"story:{book_id}"
     story_data = await task_store.get(story_key)
-    prompts = []
     dialogues = story_data.get("dialogues", []) if story_data else []
-    for dialogue in dialogues:
-        prompt = " ".join(dialogue)
-        prompts.append(prompt)
+    prompts = [
+        GenerateVideoPrompt(dialogues=page_dialogues).render()
+        for page_dialogues in dialogues
+    ]
 
     image_key = f"images:{book_id}"
     image_data = await task_store.get(image_key)
-    image_uuids = (
-        [img_info["imageUUID"] for img_info in image_data.get("images", [])]
-        if image_data
-        else []
-    )
+
+    # 이미지 정보 추출 (None 포함하여 순서 유지)
+    image_infos = image_data.get("images", []) if image_data else []
+
+    # imageUUID 추출 (None인 경우 None 유지)
+    image_uuids = [
+        img_info["imageUUID"] if img_info is not None else None
+        for img_info in image_infos
+    ]
+
+    # 이미지 생성 실패한 페이지 인덱스
+    failed_image_indices = [idx for idx, uuid in enumerate(image_uuids) if uuid is None]
+
+    if failed_image_indices:
+        logger.warning(
+            f"[Video Task] [Book: {book_id}] Skipping pages with failed images: {failed_image_indices}"
+        )
 
     # === Phase 1: 재시도 추적기 초기화 ===
     max_retries = settings.task_video_max_retries
-    tracker = BatchRetryTracker(total_items=len(image_uuids), max_retries=max_retries)
+    total_pages = len(image_uuids)
+    tracker = BatchRetryTracker(total_items=total_pages, max_retries=max_retries)
+
+    # 이미지 생성 실패한 페이지는 영구 실패 처리 (재시도 불가)
+    # retry_counts를 max_retries로 설정하여 get_pending_indices()에서 제외
+    for idx in failed_image_indices:
+        tracker.retry_counts[idx] = max_retries  # 최대 재시도 초과로 설정
+        tracker.last_errors[idx] = "Image generation failed - skipping video"
+        logger.debug(
+            f"[Video Task] [Book: {book_id}] Page {idx} permanently failed: no image available"
+        )
 
     # Redis 캐시 복구
     video_cache_key = f"videos_cache:{book_id}"
@@ -891,6 +1304,7 @@ async def generate_video_task(
                     )
                     continue
                 page.image_url = video_url
+                page.video_prompt = prompts[page_idx]
                 session.add(page)
 
             # task_metadata 업데이트
@@ -974,7 +1388,6 @@ async def finalize_book_task(
         TaskResult: 성공 시 book_id 반환
     """
     logger.info(f"[Finalize Task] Starting for book_id={book_id}")
-
     # === Phase 1: Redis 조회 - 세션 밖에서 실행 ===
     task_store = TaskStore()
     story_key = f"story:{book_id}"
@@ -1085,25 +1498,35 @@ async def finalize_book_task(
     )
 
 
-def validate_generated_story(data) -> tuple[str, list]:
+def validate_generated_story(data: StoryResponse) -> tuple[str, list]:
     """
-    generated_data 검증
-    Returns: (title, dialogues)
-    Raises: ValueError
+    StoryResponse 검증
+
+    Args:
+        data: AI Provider에서 반환된 StoryResponse
+
+    Returns:
+        (title, stories) 튜플
+
+    Raises:
+        ValueError: 검증 실패 시
+
+    Note:
+        길이 검증은 _generate_story_phase()에서 처리됨.
+        초과 시 _shorten_title()로 AI 축약 요청.
     """
     if data is None:
-        raise ValueError("generated_data is None")
+        raise ValueError(
+            "StoryResponse is None - AI returned empty response (check logs for details)"
+        )
 
-    title = getattr(data, "title", None)
-    stories = getattr(data, "stories", None)
+    # StoryResponse는 이미 파싱된 상태이므로 타입 체크만
+    if not data.title or not isinstance(data.title, str):
+        raise ValueError(f"Invalid title in StoryResponse. Got title={data.title}")
 
-    if not title or not isinstance(title, str):
-        raise ValueError("Missing or invalid title")
+    if not data.stories or not isinstance(data.stories, list):
+        raise ValueError(
+            f"Invalid stories in StoryResponse. Got stories={data.stories}"
+        )
 
-    if not stories or not isinstance(stories, list):
-        raise ValueError("Missing or invalid stories")
-
-    if len(title) > 20:
-        raise ValueError("Title too long")
-
-    return title, stories
+    return data.title, data.stories

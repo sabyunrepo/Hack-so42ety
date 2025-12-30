@@ -89,7 +89,8 @@ class BookRepository(AbstractRepository[Book]):
                 .selectinload(Dialogue.audios)
             )
             .where(or_(Book.user_id == user_id, Book.is_default == True))
-            .order_by(Book.created_at.desc())
+            .where(Book.is_deleted == False)  # 삭제된 책 제외
+            .order_by(Book.created_at.asc())
             .offset(skip)
             .limit(limit)
             .execution_options(populate_existing=False)  # 캐시 사용
@@ -102,6 +103,26 @@ class BookRepository(AbstractRepository[Book]):
             self._detach_book_from_session(book)
 
         return books
+
+    async def count_user_created_books(self, user_id: uuid.UUID) -> int:
+        """
+        사용자가 생성한 책 개수만 카운트 (샘플 제외)
+
+        Args:
+            user_id: 사용자 UUID
+
+        Returns:
+            int: 사용자가 생성한 책 개수
+        """
+        query = (
+            select(func.count())
+            .select_from(Book)
+            .where(Book.user_id == user_id)
+            .where(Book.is_default == False)
+            .where(Book.is_deleted == False)  # 삭제된 책 제외
+        )
+        result = await self.session.execute(query)
+        return result.scalar() or 0
 
     async def get_user_books_summary(
         self, user_id: uuid.UUID, skip: int = 0, limit: int = 100
@@ -124,7 +145,8 @@ class BookRepository(AbstractRepository[Book]):
         query = (
             select(Book)
             .where(or_(Book.user_id == user_id, Book.is_default == True))
-            .order_by(Book.created_at.desc())
+            .where(Book.is_deleted == False)  # 삭제된 책 제외
+            .order_by(Book.created_at.asc())
             .offset(skip)
             .limit(limit)
         )

@@ -3,12 +3,18 @@ Auth Service
 인증 비즈니스 로직
 """
 
-from typing import Optional, Tuple, Any
+import hashlib
+import logging
+from typing import Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.auth.jwt_manager import JWTManager
+
+logger = logging.getLogger(__name__)
 from ...core.auth.providers.credentials import CredentialsAuthProvider
 from ...core.auth.providers.google_oauth import GoogleOAuthProvider
+from ...core.cache.service import CacheService
+from ...core.config import settings
 from .models import User
 from .repository import UserRepository
 from .exceptions import (
@@ -36,7 +42,7 @@ class AuthService:
         google_oauth_provider: GoogleOAuthProvider,
         jwt_manager: JWTManager,
         db: AsyncSession,
-        cache_service: Any,  # CacheService (Circular import avoidance or use generic)
+        cache_service: CacheService,
     ):
         """
         Args:
@@ -45,7 +51,7 @@ class AuthService:
             google_oauth_provider: Google OAuth 제공자
             jwt_manager: JWT 토큰 관리자
             db: 비동기 데이터베이스 세션
-            cache_service: 캐시 서비스 (Redis)
+            cache_service: Redis 캐시 서비스
         """
         self.user_repo = user_repo
         self.credentials_provider = credentials_provider
@@ -54,34 +60,16 @@ class AuthService:
         self.db = db
         self.cache_service = cache_service
 
-    async def _store_refresh_token(self, refresh_token: str, user_id: str):
-        """Refresh Token 저장 (RTR) - Helper"""
-        payload = self.jwt_manager.decode_token(refresh_token)
-        if "jti" not in payload:
-            return # Should not happen if generated correctly
-        
-        jti = payload["jti"]
-        # TTL: settings.jwt_refresh_token_expire_days (days) -> convert to seconds
-        ttl = getattr(self.jwt_manager, "refresh_token_expire_seconds", 7 * 24 * 60 * 60)
-        # We can calculate based on exp - now, but using fixed setting is safer/easier
-        # Actually better to use exp from token
-        exp_timestamp = payload.get("exp")
-        if exp_timestamp:
-            import time
-            current_timestamp = time.time()
-            ttl = int(exp_timestamp - current_timestamp)
-        else:
-             from ..core.config import settings
-             ttl = settings.jwt_refresh_token_expire_days * 24 * 60 * 60
-
-        if ttl > 0:
-            await self.cache_service.set(f"refresh_token:{jti}", str(user_id), ttl=ttl)
+    def _hash_token(self, token: str) -> str:
+        """토큰 해시 생성 (Redis 키용)"""
+        return hashlib.sha256(token.encode()).hexdigest()[:16]
 
     async def register(self, email: str, password: str) -> Tuple[User, str, str]:
         """
         회원가입
         """
-        # ... (Previous validation logic)
+        logger.info(f"📝 [REGISTER] Starting registration", extra={"email": email})
+
         # 이메일 중복 확인
         if await self.user_repo.exists_by_email(email):
             raise EmailAlreadyExistsException(email)
@@ -108,8 +96,16 @@ class AuthService:
             data={"sub": str(user.id), "email": user.email}
         )
 
-        # RTR: Redis 저장
-        await self._store_refresh_token(refresh_token, str(user.id))
+        # Refresh Token Redis 저장 (화이트리스트)
+        cache_key = f"refresh_token:{user.id}"
+        ttl = settings.jwt_refresh_token_expire_days * 24 * 3600
+        await self.cache_service.set(cache_key, refresh_token, ttl=ttl)
+
+        logger.info(
+            "💾 [REDIS] Refresh token stored",
+            extra={"user_id": str(user.id), "cache_key": cache_key, "ttl": ttl}
+        )
+        logger.info(f"✅ [REGISTER] Registration successful", extra={"user_id": str(user.id)})
 
         return user, access_token, refresh_token
 
@@ -117,6 +113,8 @@ class AuthService:
         """
         로그인
         """
+        logger.info(f"🔐 [LOGIN] Attempting login", extra={"email": email})
+
         # 사용자 조회
         user = await self.user_repo.get_by_email(email)
 
@@ -145,8 +143,16 @@ class AuthService:
             data={"sub": str(user.id), "email": user.email}
         )
 
-        # RTR: Redis 저장
-        await self._store_refresh_token(refresh_token, str(user.id))
+        # Refresh Token Redis 저장 (화이트리스트)
+        cache_key = f"refresh_token:{user.id}"
+        ttl = settings.jwt_refresh_token_expire_days * 24 * 3600
+        await self.cache_service.set(cache_key, refresh_token, ttl=ttl)
+
+        logger.info(
+            "💾 [REDIS] Refresh token stored",
+            extra={"user_id": str(user.id), "cache_key": cache_key}
+        )
+        logger.info(f"✅ [LOGIN] Login successful", extra={"user_id": str(user.id)})
 
         return user, access_token, refresh_token
 
@@ -183,9 +189,16 @@ class AuthService:
         refresh_token = self.jwt_manager.create_refresh_token(
             data={"sub": str(user.id), "email": user.email}
         )
-        
-        # RTR: Redis 저장
-        await self._store_refresh_token(refresh_token, str(user.id))
+
+        # Refresh Token Redis 저장 (화이트리스트)
+        cache_key = f"refresh_token:{user.id}"
+        ttl = settings.jwt_refresh_token_expire_days * 24 * 3600
+        await self.cache_service.set(cache_key, refresh_token, ttl=ttl)
+
+        logger.info(
+            "💾 [REDIS] Refresh token stored",
+            extra={"user_id": str(user.id), "cache_key": cache_key}
+        )
 
         return user, access_token, refresh_token
 
@@ -196,47 +209,104 @@ class AuthService:
         Returns:
             Tuple[str, str]: (New Access Token, New Refresh Token)
         """
-        # 1. 서명 검증
+        logger.info("🔄 [REFRESH] Starting token refresh")
+
+        # 1. JWT 검증
         payload = self.jwt_manager.verify_token(refresh_token, token_type="refresh")
 
-        user_id = payload["sub"]
-        email = payload.get("email")
-        jti = payload.get("jti")
+        if payload is None:
+            logger.error("❌ [REFRESH] Invalid refresh token (JWT decode failed)")
+            raise InvalidRefreshTokenException()
 
-        # 2. Redis 검증 (RTR)
-        if jti:
-            # JTI가 있는 경우 (RTR 적용 토큰)
-            stored_user_id = await self.cache_service.get(f"refresh_token:{jti}")
-            
-            if not stored_user_id:
-                # Key가 없음 -> 만료되었거나 이미 사용됨(탈취 의심)
-                # 보안상 로그아웃 처리 등을 할 수 있음
-                raise InvalidRefreshTokenException()
-            
-            # 3. 토큰 사용 처리 (Delete Old)
-            await self.cache_service.delete(f"refresh_token:{jti}")
+        user_id = payload.get("sub")
+
+        # 2. 블랙리스트 확인 (로그아웃된 토큰)
+        blacklist_key = f"blacklist:refresh:{self._hash_token(refresh_token)}"
+        is_blacklisted = await self.cache_service.get(blacklist_key)
+
+        if is_blacklisted:
+            logger.warning(
+                "⚠️ [REDIS] Refresh token is blacklisted",
+                extra={"user_id": user_id, "blacklist_key": blacklist_key}
+            )
+            raise InvalidRefreshTokenException()
+
+        # 3. 화이트리스트 확인 (유효한 토큰)
+        cache_key = f"refresh_token:{user_id}"
+        cached_token = await self.cache_service.get(cache_key)
         
-        # legacy token without jti is accepted once but rotates to new system
-        
-        # 4. 새 토큰 발급 (Rotate)
-        new_access_token = self.jwt_manager.create_access_token(
-            data={"sub": user_id, "email": email}
+        # DEBUG LOGGING start
+        logger.debug(
+            f"🔍 [DEBUG] Checking whitelist for user {user_id}",
+            extra={
+                "cache_key": cache_key,
+                "cached_token_exists": cached_token is not None,
+                "cached_token_prefix": cached_token[:10] if cached_token else "None",
+                "request_token_prefix": refresh_token[:10]
+            }
+        )
+        # DEBUG LOGGING end
+
+        if cached_token != refresh_token:
+            logger.warning(
+                "⚠️ [REDIS] Refresh token not in whitelist or mismatch",
+                extra={"user_id": user_id, "cache_key": cache_key}
+            )
+            raise InvalidRefreshTokenException()
+
+        logger.info(
+            "✅ [REDIS] Refresh token validated from whitelist",
+            extra={"user_id": user_id}
+        )
+
+        # 4. 새로운 Access Token 생성
+        access_token = self.jwt_manager.create_access_token(
+            data={"sub": payload["sub"], "email": payload.get("email")}
         )
         # 새 Refresh Token (새 JTI 포함)
         new_refresh_token = self.jwt_manager.create_refresh_token(
-            data={"sub": user_id, "email": email}
+            data={"sub": user_id, "email": payload.get("email")}
         )
-        
-        # 5. 새 토큰 저장
-        await self._store_refresh_token(new_refresh_token, user_id)
 
-        return new_access_token, new_refresh_token
-    
-    async def logout(self, refresh_token: str) -> None:
+        # 5. 새 Refresh Token Redis 저장 (화이트리스트 갱신)
+        cache_key = f"refresh_token:{user_id}"
+        ttl = settings.jwt_refresh_token_expire_days * 24 * 3600
+        await self.cache_service.set(cache_key, new_refresh_token, ttl=ttl)
+
+        logger.info(
+            "💾 [REDIS] New refresh token stored",
+            extra={"user_id": user_id, "ttl": ttl}
+        )
+        logger.info(f"🔑 [REFRESH] New access token created", extra={"user_id": user_id})
+
+        return access_token, new_refresh_token
+
+    async def logout(self, user_id: str, access_token: str, refresh_token: str) -> None:
         """
-        로그아웃 (Refresh Token 무효화)
+        로그아웃 - 토큰 무효화
+
+        Args:
+            user_id: 사용자 UUID
+            access_token: Access Token (블랙리스트 추가)
+            refresh_token: Refresh Token (블랙리스트 추가 + 화이트리스트 삭제)
         """
-        payload = self.jwt_manager.decode_token(refresh_token)
-        if "jti" in payload:
-            jti = payload["jti"]
-            await self.cache_service.delete(f"refresh_token:{jti}")
+        logger.info(f"🚪 [LOGOUT] Starting logout", extra={"user_id": user_id})
+
+        # 1. Refresh Token 화이트리스트에서 삭제
+        whitelist_key = f"refresh_token:{user_id}"
+        await self.cache_service.delete(whitelist_key)
+        logger.info(f"🗑️ [REDIS] Refresh token removed from whitelist", extra={"user_id": user_id})
+
+        # 2. Access Token 블랙리스트 추가 (남은 만료 시간만큼 TTL)
+        access_blacklist_key = f"blacklist:access:{self._hash_token(access_token)}"
+        access_ttl = settings.jwt_access_token_expire_minutes * 60
+        await self.cache_service.set(access_blacklist_key, "1", ttl=access_ttl)
+        logger.info(f"🚫 [REDIS] Access token blacklisted", extra={"ttl": access_ttl})
+
+        # 3. Refresh Token 블랙리스트 추가
+        refresh_blacklist_key = f"blacklist:refresh:{self._hash_token(refresh_token)}"
+        refresh_ttl = settings.jwt_refresh_token_expire_days * 24 * 3600
+        await self.cache_service.set(refresh_blacklist_key, "1", ttl=refresh_ttl)
+        logger.info(f"🚫 [REDIS] Refresh token blacklisted", extra={"ttl": refresh_ttl})
+
+        logger.info(f"✅ [LOGOUT] Logout successful", extra={"user_id": user_id})

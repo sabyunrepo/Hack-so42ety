@@ -26,14 +26,7 @@ class GenerateImagePrompt:
         diary_text = "\n".join(f"* {entry}" for entry in self.stories)
 
         return f"""
-Create a whimsical, storybook-style illustration in the style of {STYLE_PROMPTS[self.style_keyword]} based on the story: {diary_text}.
-Depict the main human characters as they are, and transform all other characters or background figures into animals appropriate for the scene.
-Show characters and key elements in dynamic motion, illustrating their actions and interactions with lively expressions and gestures.
-Do not include any text, letters, numbers, captions, speech bubbles, or signs in the image.
-Use vivid, magical, and charming details to enhance the fairy tale atmosphere.
-Focus on composition, lighting, and perspective as if using a low-angle or wide-angle camera to make the scene more immersive.
-Optionally, generate the illustration step by step: first background, then main characters, then additional animal characters, and finally magical effects or props.
-only one image per story.
+Transform the provided image into a children’s picture book illustration. Reference Image Rule: - Use the provided image as the single and exact reference. - Do not introduce new characters, objects, or background elements. Subject Preservation: - If a person is present, preserve the same facial features, hairstyle, proportions, pose, and expression. - Maintain the same clothing, accessories, and overall silhouette. - Do not redesign, idealize, or stylize the face beyond simplification. Style Transformation: - Change only the illustration style to a children’s storybook aesthetic. - Simplified shapes and forms - Flat or minimally layered perspective - Bold, clean outlines - Soft, warm, symbolic color palette - Gentle and calm mood suitable for a children’s book Cultural & Artistic Direction: - Soft, hand-painted picture-book illustration with a gentle, nostalgic warmth, designed for modern children’s books - Decorative composition with balanced visual rhythm - Avoid realism; favor illustrative clarity and warmth Background Treatment: - Keep the original background structure, but simplify details - Lower contrast and saturation in the background so the main subject stands out Constraints: - Do not change the scene composition - Do not alter facial identity - No photorealism - No text - No watermarks
 """
 
 

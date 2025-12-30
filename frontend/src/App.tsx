@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Bookshelf from "./pages/Bookshelf";
@@ -7,14 +7,19 @@ import Creator from "./pages/Creator";
 import Viewer from "./pages/Viewer";
 import LoginPage from "./pages/LoginPage";
 // import RegisterPage from "./pages/RegisterPage";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider } from "./components/AuthProvider";
 import RequireAuth from "./components/RequireAuth";
 
 function App() {
+  const location = useLocation();
+
+  // /shared/ 경로에서는 헤더와 푸터를 숨김
+  const isSharedPage = location.pathname.startsWith("/shared/");
+
   return (
     <AuthProvider>
       <div className="flex flex-col w-full h-screen bg-orange-50 overflow-auto">
-        <Header />
+        {!isSharedPage && <Header />}
         <div className="flex-1 max-w-7xl mx-auto w-full ">
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -53,10 +58,16 @@ function App() {
                 </RequireAuth>
               }
             />
+            <Route
+              path="/shared/:bookId"
+              element={
+                  <Viewer />
+              }
+            />
             <Route path="*" element={<div>404</div>} />
           </Routes>
         </div>
-        <Footer />
+        {!isSharedPage && <Footer />}
       </div>
     </AuthProvider>
   );

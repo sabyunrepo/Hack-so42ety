@@ -40,6 +40,7 @@ class TaskNode:
         kwargs: 함수 키워드 인자
         depends_on: 의존하는 Task ID 리스트
     """
+
     task_id: str
     name: str
     func: Callable[..., Awaitable[TaskResult]]
@@ -103,7 +104,6 @@ class TaskRunner:
         )
 
         self.tasks[task_id] = task_node
-        print(f"[TaskRunner] Submitted task: {name} (id={task_id[:8]}...)")
 
         return task_id
 
@@ -124,10 +124,6 @@ class TaskRunner:
 
         if not task.depends_on:
             return []
-
-        print(
-            f"[TaskRunner] Task {task.name} waiting for {len(task.depends_on)} dependencies"
-        )
 
         # Wait for all dependency tasks to complete
         dep_futures = [self.futures[dep_id] for dep_id in task.depends_on]
@@ -152,7 +148,6 @@ class TaskRunner:
 
             results.append(dep_result)
 
-        print(f"[TaskRunner] Task {task.name} dependencies satisfied")
         return results
 
     async def _execute_task(self, task_id: str) -> TaskResult:
@@ -168,8 +163,6 @@ class TaskRunner:
         task = self.tasks[task_id]
 
         try:
-            print(f"[TaskRunner] Executing task: {task.name} (id={task_id[:8]}...)")
-
             # 1. Wait for dependencies
             dependency_results = await self._wait_for_dependencies(task_id)
 
@@ -185,7 +178,7 @@ class TaskRunner:
             self.results[task_id] = result
 
             if result.status == TaskStatus.COMPLETED:
-                print(
+                logger.info(
                     f"[TaskRunner] Task completed: {task.name} (id={task_id[:8]}...)"
                 )
             elif result.status == TaskStatus.FAILED:
@@ -201,7 +194,9 @@ class TaskRunner:
                 f"[TaskRunner] Task cancelled (shutdown): {task.name} (id={task_id[:8]}...)"
             )
             # Create cancelled result
-            result = TaskResult(status=TaskStatus.FAILED, error="Task cancelled by shutdown")
+            result = TaskResult(
+                status=TaskStatus.FAILED, error="Task cancelled by shutdown"
+            )
             await self.task_store.set_task_result(task_id, result, ttl=3600)
             self.results[task_id] = result
             raise  # Re-raise to propagate cancellation
@@ -246,7 +241,6 @@ class TaskRunner:
         Returns:
             Dict[str, TaskResult]: Task ID → TaskResult 매핑
         """
-        print(f"[TaskRunner] Starting DAG execution with {len(task_ids)} tasks")
 
         # Create asyncio tasks for all nodes
         # ⭐ 여기서는 모든 task를 "시작"만 함 (실제 실행은 의존성 대기 후)
@@ -261,7 +255,6 @@ class TaskRunner:
         # 각 task는 자신의 의존성을 내부에서 await하므로 순서가 보장됨
         await asyncio.gather(*self.futures.values(), return_exceptions=True)
 
-        print(f"[TaskRunner] DAG execution completed")
 
         return self.results
 
@@ -298,6 +291,7 @@ async def create_storybook_dag(
     tts_producer: TTSProducer,
     voice_id: str,
     level: int,
+    target_language: str = "en",
 ) -> Dict[str, Any]:
     """
     동화책 생성 DAG 생성 및 실행
@@ -334,8 +328,6 @@ async def create_storybook_dag(
                 "finalize_task": str,
             }
     """
-    print("#######################################################################")
-    print("[create_storybook_dag] Creating DAG for book_id:", book_id, "\n시작한다잉~~~")
     runner = TaskRunner()
 
     # Task Context
@@ -357,6 +349,7 @@ async def create_storybook_dag(
             level,
             len(stories),
             context,
+            target_language,
         ),
     )
 
@@ -395,22 +388,17 @@ async def create_storybook_dag(
     # DAG 실행 (백그라운드)
     all_task_ids = [t_story, t_image, t_tts, t_video, t_finalize]
 
-    print(
-        f"[create_storybook_dag] Submitting {len(all_task_ids)} tasks to background"
-    )
-
     # 백그라운드 실행
     asyncio.create_task(
-        runner.execute_dag(all_task_ids),
-        name=f"storybook_dag_{book_id}"
+        runner.execute_dag(all_task_ids), name=f"storybook_dag_{book_id}"
     )
 
     # Task IDs 반환
     return {
         "execution_id": execution_id,
         "story_task": t_story,
-        "image_task": t_image,       # 단일 태스크 (기존: image_tasks 리스트)
-        "tts_task": t_tts,            # 단일 태스크 (기존: tts_tasks 리스트)
+        "image_task": t_image,  # 단일 태스크 (기존: image_tasks 리스트)
+        "tts_task": t_tts,  # 단일 태스크 (기존: tts_tasks 리스트)
         "video_task": t_video,
         "finalize_task": t_finalize,
         "all_tasks": all_task_ids,
