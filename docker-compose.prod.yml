@@ -69,7 +69,7 @@ services:
     build:
       context: .
       dockerfile: ./docker/backend/Dockerfile
-    image: ghcr.io/sabyunrepo/moriai-backend:${BACKEND_TAG:-latest}
+    image: ghcr.io/sabyunrepo/moriai-backend:${BACKEND_TAG:-prod}
     container_name: moriai-backend-prod
     restart: unless-stopped
     init: true
