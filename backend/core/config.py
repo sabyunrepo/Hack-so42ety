@@ -3,6 +3,7 @@ Core Configuration Module
 환경변수 및 애플리케이션 설정 중앙 관리
 """
 
+import json
 from typing import List, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -122,7 +123,7 @@ class Settings(BaseSettings):
     )
     runware_img2img_steps: int = Field(default=30, env="RUNWARE_IMG2IMG_STEPS")
     runware_img2img_model: str = Field(
-        default="google:4@1", env="RUNWARE_IMG2IMG_MODEL"
+        default="openai:4@1", env="RUNWARE_IMG2IMG_MODEL"
     )
     # runware_img2img_model: str = Field(default="civitai:102438@133677", env="RUNWARE_IMG2IMG_MODEL")
 
@@ -165,6 +166,18 @@ class Settings(BaseSettings):
     )
     cors_allow_headers: str = Field(default="*", env="CORS_ALLOW_HEADERS")
 
+    # ==================== Language Settings ====================
+    supported_languages_str: str = Field(
+        default="en,ko,zh,vi,ru,th",
+        env="SUPPORTED_LANGUAGES",
+        description="Comma-separated list of supported language codes",
+    )
+
+    @property
+    def supported_languages(self) -> List[str]:
+        """지원 언어 목록 (쉼표로 구분된 문자열 → 리스트)"""
+        return [lang.strip() for lang in self.supported_languages_str.split(",")]
+
     # ==================== Business Logic ====================
     max_books_per_user: int = Field(default=3, env="MAX_BOOKS_PER_USER")
     max_pages_per_book: int = Field(default=5, env="MAX_PAGES_PER_BOOK")
@@ -184,6 +197,33 @@ class Settings(BaseSettings):
         env="FK_TOLERANCE",
         description="Flesch-Kincaid Grade Level tolerance for difficulty validation",
     )
+
+    # ==================== Level Settings ====================
+    # 레벨별 대상 연령 (JSON 형식, 동적으로 레벨 추가 가능)
+    target_ages_json: str = Field(
+        default='{"1":"3-5","2":"5-7","3":"7-9"}',
+        env="TARGET_AGES",
+        description="Level-to-target-age mapping in JSON format",
+    )
+
+    @property
+    def target_ages(self) -> dict[int, str]:
+        """레벨별 대상 연령 딕셔너리"""
+        return {int(k): v for k, v in json.loads(self.target_ages_json).items()}
+
+    @property
+    def min_level(self) -> int:
+        """최소 레벨 (자동 계산)"""
+        return min(self.target_ages.keys())
+
+    @property
+    def max_level(self) -> int:
+        """최대 레벨 (자동 계산)"""
+        return max(self.target_ages.keys())
+
+    def get_target_age(self, level: int) -> str:
+        """레벨별 대상 연령 반환"""
+        return self.target_ages.get(level, self.target_ages[self.min_level])
 
     # ==================== Feature Flags ====================
     use_template_mode: bool = Field(default=False, env="USE_TEMPLATE_MODE")
@@ -216,6 +256,19 @@ class Settings(BaseSettings):
         env="TASK_VIDEO_MAX_RETRIES",
         description="Video generation task maximum retry attempts (per video)",
     )
+
+    # Image generation async polling settings
+    task_image_poll_interval: int = Field(
+        default=5,
+        env="TASK_IMAGE_POLL_INTERVAL",
+        description="Polling interval for async image generation status check (seconds)",
+    )
+    task_image_max_wait_time: int = Field(
+        default=300,
+        env="TASK_IMAGE_MAX_WAIT_TIME",
+        description="Maximum wait time for async image generation (seconds)",
+    )
+
     task_retry_delay: float = Field(
         default=2.0,
         env="TASK_RETRY_DELAY",
