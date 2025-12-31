@@ -66,19 +66,6 @@ async function validateSignedUrl(url, signingKey) {
 }
 
 /**
- * CORS 헤더 추가
- * @param {Response} response - 원본 응답
- * @returns {Response} - CORS 헤더가 추가된 응답
- */
-function addCorsHeaders(response) {
-  const newResponse = new Response(response.body, response);
-  newResponse.headers.set('Access-Control-Allow-Origin', '*');
-  newResponse.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-  newResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-  return newResponse;
-}
-
-/**
  * R2에서 파일 가져오기
  * @param {R2Bucket} bucket - R2 버킷 바인딩
  * @param {string} pathname - 파일 경로 (예: /shared/books/test.mp4)
@@ -109,6 +96,17 @@ async function fetchFromR2(bucket, pathname) {
   headers.set('Access-Control-Allow-Origin', '*');
   headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
   headers.set('Access-Control-Allow-Headers', 'Content-Type');
+
+  // CDN 캐시 최적화 헤더 추가
+  // 공개 콘텐츠는 30일, 비공개는 6시간 캐싱
+  const isPublic = pathname.startsWith('/shared/');
+  if (isPublic) {
+    // 공개 콘텐츠: 장기 캐싱 (30일)
+    headers.set('Cache-Control', 'public, max-age=2592000, immutable');
+  } else {
+    // 비공개 콘텐츠: 토큰 만료 시간과 동일 (6시간)
+    headers.set('Cache-Control', 'private, max-age=21600');
+  }
 
   console.log(`[R2] Found: ${key}, size: ${object.size} bytes, type: ${object.httpMetadata?.contentType || 'unknown'}`);
 
@@ -142,7 +140,7 @@ export default {
     // R2 바인딩 확인
     if (!R2_BUCKET) {
       console.error('[ERROR] R2_BUCKET binding not found');
-      return new Response('Internal Server Error: R2 bucket not configured', {
+      return new Response('Service temporarily unavailable', {
         status: 500,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' }
       });
