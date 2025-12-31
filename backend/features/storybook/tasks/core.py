@@ -15,6 +15,8 @@ from backend.core.dependencies import (
     get_cache_service,
     get_event_bus,
 )
+from backend.core.events.publisher import EventPublisher
+from backend.core.events.types import EventType
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.infrastructure.ai.base import StoryResponse
@@ -48,6 +50,47 @@ from .retry import retry_with_config, BatchRetryTracker, calculate_retry_delay
 import asyncio
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# Media Optimization Event Helper
+# ============================================================
+
+
+async def publish_media_optimization_event(
+    file_type: str,
+    input_path: str,
+    output_path: str,
+    file_id: str,
+):
+    """
+    미디어 최적화 이벤트 발행
+    
+    Args:
+        file_type: "image_webp" 또는 "video_compress"
+        input_path: 원본 파일 경로
+        output_path: 최적화된 파일 경로
+        file_id: 파일 ID (page_id 등)
+    """
+    try:
+        event_publisher = EventPublisher()
+        await event_publisher.publish_event(
+            event_type=EventType.MEDIA_OPTIMIZATION,
+            payload={
+                "type": file_type,
+                "input_path": input_path,
+                "output_path": output_path,
+                "file_id": file_id,
+            },
+        )
+        logger.info(
+            f"[Media Optimization] Event published: {file_type} for {input_path}"
+        )
+    except Exception as e:
+        logger.error(
+            f"[Media Optimization] Failed to publish event: {e}",
+            exc_info=True,
+        )
 
 
 # ============================================================
@@ -738,6 +781,15 @@ async def generate_image_task(
             f"[Image Task] [Book: {book_id}] Page {idx + 1}: "
             f"Saved to {file_name} ({len(image_bytes)} bytes)"
         )
+        
+        # Publish media optimization event for WebP conversion
+        webp_file_name = file_name.replace('.png', '.webp')
+        await publish_media_optimization_event(
+            file_type="image_webp",
+            input_path=file_name,
+            output_path=webp_file_name,
+            file_id=f"{book_id}_page_{idx + 1}",
+        )
 
         return file_name
 
@@ -1276,6 +1328,15 @@ async def generate_video_task(
             logger.info(
                 f"[Video Task] [Book: {book_id}] Page {page_idx + 1}: Uploaded to {storage_url} (size: {video_size} bytes)"
             )
+            
+            # Publish media optimization event for H.265 compression
+            await publish_media_optimization_event(
+                file_type="video_compress",
+                input_path=file_name,
+                output_path=file_name,  # Same path (replace original)
+                file_id=f"{book_id}_page_{page_idx + 1}",
+            )
+            
             s3_video_urls.append(file_name)
         else:
             # 실패한 비디오: None 추가 (순서 유지)
