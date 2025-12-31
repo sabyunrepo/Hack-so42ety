@@ -35,13 +35,20 @@ class R2StorageService(AbstractStorageService):
         self.access_key = settings.r2_access_key_id
         self.secret_key = settings.r2_secret_access_key
         self.endpoint_url = settings.r2_endpoint_url
-        
+
         # CDN 설정
         self.cdn_domain = settings.cloudflare_cdn_domain
         self.signing_key = settings.cloudflare_signing_key
-        
+
         if not self.endpoint_url:
             raise ValueError("R2_ENDPOINT_URL is not set")
+
+        # CDN 도메인이 설정된 경우 Signing Key 필수 검증
+        if self.cdn_domain and not self.signing_key:
+            raise ValueError(
+                "CLOUDFLARE_SIGNING_KEY is required when CLOUDFLARE_CDN_DOMAIN is set. "
+                "Please set CLOUDFLARE_SIGNING_KEY environment variable."
+            )
             
         self.s3_client = boto3.client(
             "s3",

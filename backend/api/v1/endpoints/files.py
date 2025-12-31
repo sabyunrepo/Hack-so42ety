@@ -36,7 +36,6 @@ from backend.core.cache.service import CacheService
 from backend.features.tts.service import TTSService
 from backend.api.v1.endpoints.files_helper import (
     get_cdn_url_with_permission,
-    get_content_type_from_path,
 )
 
 logger = logging.getLogger(__name__)

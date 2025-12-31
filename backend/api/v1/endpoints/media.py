@@ -4,6 +4,7 @@ Media URL Refresh API
 
 프론트엔드에서 URL 만료 시 새로운 Signed URL을 받기 위한 경량 API
 """
+
 import logging
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,10 +14,9 @@ from pydantic import BaseModel
 from backend.core.database.session import get_db_readonly
 from backend.core.auth.dependencies import get_current_user_object
 from backend.core.dependencies import get_storage_service
-from backend.core.exceptions import NotFoundException, ErrorCode
+from backend.core.exceptions import NotFoundException, ErrorCode, AuthorizationException
 from backend.features.auth.models import User
 from backend.infrastructure.storage.base import AbstractStorageService
-from backend.api.v1.endpoints.files_helper import get_content_type_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ router = APIRouter()
 
 class MediaUrlsResponse(BaseModel):
     """미디어 URL 응답"""
+
     page_id: str
     urls: dict
     expires_at: datetime
@@ -74,18 +75,21 @@ async def refresh_page_media_urls(
     if not book:
         raise NotFoundException(
             error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
-            message=f"Book not found: {book_id}"
+            message=f"Book not found: {book_id}",
         )
 
     # 2. 비공개 책이면 소유자 확인
     if not book.is_shared and book.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied: You are not the owner of this book")
+        raise AuthorizationException(
+            error_code=ErrorCode.AUTH_ACCESS_DENIED,
+            message="Access denied: You are not the owner of this book",
+        )
 
     # 3. 공개 책이면 URL 갱신 불필요 (토큰 없는 URL이므로)
     if book.is_shared:
         raise HTTPException(
             status_code=400,
-            detail="Public content does not require URL refresh (no token expiration)"
+            detail="Public content does not require URL refresh (no token expiration)",
         )
 
     # 4. 페이지 찾기
@@ -95,7 +99,7 @@ async def refresh_page_media_urls(
     if not page or str(page.book_id) != book_id:
         raise NotFoundException(
             error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
-            message=f"Page not found: {page_id}"
+            message=f"Page not found: {page_id}",
         )
 
     # 5. 새로운 URL 생성 (새 토큰 포함)
@@ -106,17 +110,13 @@ async def refresh_page_media_urls(
     # 비디오 URL
     if page.video_path:
         refreshed_urls["video_url"] = storage.get_url(
-            page.video_path,
-            is_shared=is_shared,
-            content_type='video'
+            page.video_path, is_shared=is_shared, content_type="video"
         )
 
     # 이미지 URL
     if page.image_path:
         refreshed_urls["image_url"] = storage.get_url(
-            page.image_path,
-            is_shared=is_shared,
-            content_type='image'
+            page.image_path, is_shared=is_shared, content_type="image"
         )
 
     # 오디오 URL들
@@ -124,21 +124,25 @@ async def refresh_page_media_urls(
     for dialogue in page.dialogues:
         for audio in dialogue.audios:
             if audio.audio_path:
-                audios.append({
-                    "dialogue_id": str(dialogue.id),
-                    "language_code": audio.language_code,
-                    "audio_url": storage.get_url(
-                        audio.audio_path,
-                        is_shared=is_shared,
-                        content_type='audio'
-                    )
-                })
+                audios.append(
+                    {
+                        "dialogue_id": str(dialogue.id),
+                        "language_code": audio.language_code,
+                        "audio_url": storage.get_url(
+                            audio.audio_path, is_shared=is_shared, content_type="audio"
+                        ),
+                    }
+                )
 
     if audios:
         refreshed_urls["audios"] = audios
 
-    # 6. 만료 시간 (비디오 기준 6시간)
-    expires_at = datetime.utcnow() + timedelta(hours=6)
+    # 6. 만료 시간: 가장 짧은 만료 시간 (오디오 기준 3시간)
+    # 비공개 책의 경우 콘텐츠 타입별로 만료 시간이 다름:
+    # - 오디오: 3시간 (10800초) - 가장 짧음
+    # - 비디오: 6시간 (21600초)
+    # - 이미지: 24시간 (86400초)
+    expires_at = datetime.now() + timedelta(hours=3)
 
     logger.info(
         f"Refreshed media URLs for book={book_id}, page={page_id}, "
@@ -146,7 +150,5 @@ async def refresh_page_media_urls(
     )
 
     return MediaUrlsResponse(
-        page_id=page_id,
-        urls=refreshed_urls,
-        expires_at=expires_at
+        page_id=page_id, urls=refreshed_urls, expires_at=expires_at
     )
