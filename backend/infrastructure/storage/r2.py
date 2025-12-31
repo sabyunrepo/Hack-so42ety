@@ -134,16 +134,24 @@ class R2StorageService(AbstractStorageService):
         except ClientError:
             return False
 
-    def get_url(self, path: str, expires_in: Optional[int] = None, bypass_cdn: bool = False) -> str:
+    def get_url(
+        self,
+        path: str,
+        expires_in: Optional[int] = None,
+        bypass_cdn: bool = False,
+        is_shared: bool = True,
+        content_type: str = 'default'
+    ) -> str:
         """
-        Cloudflare Signed URL 생성 (또는 Backend Redirect URL)
-        
+        Cloudflare CDN URL 생성 (공개/비공개 구분)
+
         Args:
             path: 파일 경로
             expires_in: 만료 시간 (초)
             bypass_cdn: True면 Backend API(/api/v1/files/...) URL 반환 (On-demand 생성용)
-                        False면 Cloudflare Signed URL 반환 (직접 접근)
-        
+            is_shared: 공개 여부 (True: 공개, False: 비공개)
+            content_type: 콘텐츠 타입 ('video', 'audio', 'image', 'metadata', 'default')
+
         Returns:
             str: URL
         """
@@ -153,41 +161,48 @@ class R2StorageService(AbstractStorageService):
         # Client -> Backend -> R2/Generate -> CDN
         if bypass_cdn:
              return f"{settings.storage_base_url}/{key}"
-        
+
         # CDN 도메인이 설정되지 않았으면 원본 키 반환 (Fail safe)
-        if not self.cdn_domain or not self.signing_key:
-            logger.warning("Cloudflare CDN settings missing, returning raw key")
+        if not self.cdn_domain:
+            logger.warning("Cloudflare CDN domain not configured, using R2 endpoint")
             return f"{self.endpoint_url}/{self.bucket_name}/{key}"
-            
+
+        base_url = self.cdn_domain.rstrip('/')
+        url_path = f"/{key}"
+
+        # 공개 콘텐츠: 토큰 없는 간단한 URL
+        if is_shared:
+            return f"{base_url}{url_path}"
+
+        # 비공개 콘텐츠: Signed URL 생성
+        # 콘텐츠 타입별 만료 시간 설정
         if expires_in is None:
-            expires_in = settings.cloudflare_url_expiration
-            
+            expiration_times = {
+                'video': 21600,      # 6시간 (동화책 하루 사용량 커버)
+                'audio': 10800,      # 3시간
+                'image': 86400,      # 24시간 (거의 변경 없음)
+                'metadata': 3600,    # 1시간
+                'default': 3600      # 기본 1시간
+            }
+            expires_in = expiration_times.get(content_type, 3600)
+
         # 1. 만료 시간 설정
         expiration = int(time.time() + expires_in)
-        
-        # 2. 서명 대상 문자열 생성
-        # URL의 경로 부분 (쿼리 스트링 제외) + 만료 시간
-        # Cloudflare Token Auth 예시: path + timestamp
-        # 실제 구현은 Cloudflare 대시보드의 'Token Auth' 설정에 따라 다를 수 있음
-        # 여기서는 가장 일반적인 HMAC(path + expiration) 방식을 사용
-        # Path는 반드시 '/'로 시작해야 함
-        url_path = f"/{key}"
+
+        # 2. 서명 문자열 생성
         sign_string = f"{url_path}-{expiration}"
-        
-        # 3. HMAC-SHA256 생성
+
+        # 3. HMAC-SHA256 서명 생성
         signature = hmac.new(
             self.signing_key.encode('utf-8'),
             sign_string.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
-        
-        # 4. URL 조합
-        # cdn_domain은 'https://cdn.example.com' 형태라고 가정
-        base_url = self.cdn_domain.rstrip('/')
-        
+
+        # 4. Signed URL 조합
         params = {
             'verify': expiration,
             'token': signature
         }
-        
+
         return f"{base_url}{url_path}?{urlencode(params)}"

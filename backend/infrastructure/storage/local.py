@@ -86,17 +86,27 @@ class LocalStorageService(AbstractStorageService):
         full_path = self.base_path / path
         return full_path.exists()
 
-    def get_url(self, path: str, bypass_cdn: bool = False) -> str:
+    def get_url(
+        self,
+        path: str,
+        expires_in: Optional[int] = None,
+        bypass_cdn: bool = False,
+        is_shared: bool = True,
+        content_type: str = 'default'
+    ) -> str:
         """
-        파일 접근 URL 반환
-        
+        파일 접근 URL 반환 (R2/S3 호환)
+
         Local 스토리지는 /api/v1/files/ 엔드포인트를 통해 접근
         상대 경로를 반환하여 프론트엔드에서 사용 가능하게 함
-        
+
         Args:
             path: 파일 경로
+            expires_in: (Local에서는 무시됨)
             bypass_cdn: (Local에서는 무시됨)
-        
+            is_shared: (Local에서는 무시됨, 항상 Backend 경유)
+            content_type: (Local에서는 무시됨)
+
         Returns:
             str: /api/v1/files/{path} 형식의 상대 URL
         """
