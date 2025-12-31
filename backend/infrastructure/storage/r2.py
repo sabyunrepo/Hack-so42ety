@@ -149,7 +149,7 @@ class R2StorageService(AbstractStorageService):
             path: 파일 경로
             expires_in: 만료 시간 (초)
             bypass_cdn: True면 Backend API(/api/v1/files/...) URL 반환 (On-demand 생성용)
-            is_shared: 공개 여부 (True: 공개, False: 비공개)
+            is_shared: 공개 여부 (True: 공개 - 긴 만료시간, False: 비공개 - 짧은 만료시간)
             content_type: 콘텐츠 타입 ('video', 'audio', 'image', 'metadata', 'default')
 
         Returns:
@@ -170,20 +170,27 @@ class R2StorageService(AbstractStorageService):
         base_url = self.cdn_domain.rstrip('/')
         url_path = f"/{key}"
 
-        # 공개 콘텐츠: 토큰 없는 간단한 URL
-        if is_shared:
-            return f"{base_url}{url_path}"
-
-        # 비공개 콘텐츠: Signed URL 생성
+        # Signed URL 생성 (공개/비공개 모두)
         # 콘텐츠 타입별 만료 시간 설정
         if expires_in is None:
-            expiration_times = {
-                'video': 21600,      # 6시간 (동화책 하루 사용량 커버)
-                'audio': 10800,      # 3시간
-                'image': 86400,      # 24시간 (거의 변경 없음)
-                'metadata': 3600,    # 1시간
-                'default': 3600      # 기본 1시간
-            }
+            if is_shared:
+                # 공유된 책: 매우 긴 만료 시간 (30일)
+                expiration_times = {
+                    'video': 2592000,    # 30일
+                    'audio': 2592000,    # 30일
+                    'image': 2592000,    # 30일
+                    'metadata': 2592000, # 30일
+                    'default': 2592000   # 30일
+                }
+            else:
+                # 비공개 책: 짧은 만료 시간
+                expiration_times = {
+                    'video': 21600,      # 6시간
+                    'audio': 10800,      # 3시간
+                    'image': 86400,      # 24시간
+                    'metadata': 3600,    # 1시간
+                    'default': 3600      # 기본 1시간
+                }
             expires_in = expiration_times.get(content_type, 3600)
 
         # 1. 만료 시간 설정

@@ -107,12 +107,12 @@ class DialogueAudioResponse(BaseModel):
         }
 
     @classmethod
-    def from_orm_with_url(cls, audio: "DialogueAudio", storage_service: "AbstractStorageService") -> "DialogueAudioResponse":
+    def from_orm_with_url(cls, audio: "DialogueAudio", storage_service: "AbstractStorageService", is_shared: bool = False) -> "DialogueAudioResponse":
         """ORM 모델 → DTO 변환 + URL 변환"""
         return cls(
             language_code=audio.language_code,
             voice_id=audio.voice_id,
-            audio_url=storage_service.get_url(audio.audio_url) if audio.audio_url else "",
+            audio_url=storage_service.get_url(audio.audio_url, is_shared=is_shared, content_type='audio') if audio.audio_url else "",
             duration=audio.duration
         )
 
@@ -161,7 +161,7 @@ class DialogueResponse(BaseModel):
         }
 
     @classmethod
-    def from_orm_with_urls(cls, dialogue: "Dialogue", storage_service: "AbstractStorageService") -> "DialogueResponse":
+    def from_orm_with_urls(cls, dialogue: "Dialogue", storage_service: "AbstractStorageService", is_shared: bool = False) -> "DialogueResponse":
         """ORM 모델 → DTO 변환 + URL 변환"""
         return cls(
             id=dialogue.id,
@@ -172,7 +172,7 @@ class DialogueResponse(BaseModel):
                 for t in dialogue.translations
             ],
             audios=[
-                DialogueAudioResponse.from_orm_with_url(a, storage_service)
+                DialogueAudioResponse.from_orm_with_url(a, storage_service, is_shared)
                 for a in dialogue.audios
             ]
         )
@@ -207,16 +207,16 @@ class PageResponse(BaseModel):
         }
 
     @classmethod
-    def from_orm_with_urls(cls, page: "Page", storage_service: "AbstractStorageService") -> "PageResponse":
+    def from_orm_with_urls(cls, page: "Page", storage_service: "AbstractStorageService", is_shared: bool = False) -> "PageResponse":
         """ORM 모델 → DTO 변환 + URL 변환"""
         return cls(
             id=page.id,
             sequence=page.sequence,
-            image_url=storage_service.get_url(page.image_url) if page.image_url else None,
+            image_url=storage_service.get_url(page.image_url, is_shared=is_shared, content_type='image') if page.image_url else None,
             image_prompt=page.image_prompt,
             video_prompt=page.video_prompt,
             dialogues=[
-                DialogueResponse.from_orm_with_urls(d, storage_service)
+                DialogueResponse.from_orm_with_urls(d, storage_service, is_shared)
                 for d in page.dialogues
             ]
         )
@@ -243,13 +243,14 @@ class BookSummaryResponse(BaseModel):
         return cls(
             id=book.id,
             title=book.title,
-            cover_image=storage_service.get_url(book.cover_image) if book.cover_image else None,
+            cover_image=storage_service.get_url(book.cover_image, is_shared=book.is_shared, content_type='image') if book.cover_image else None,
             status=book.status,
             created_at=book.created_at,
             pipeline_stage=book.pipeline_stage,
             progress_percentage=book.progress_percentage,
             error_message=book.error_message,
             retry_count=book.retry_count,
+            is_shared=book.is_shared,
         )
 
 
@@ -306,6 +307,7 @@ class BookResponse(BaseModel):
 
         ✅ ORM 객체를 직접 수정하지 않고 DTO로 변환
         ✅ URL 변환 로직을 Schema 레이어에 위임
+        ✅ is_shared 값에 따라 공개/비공개 URL 생성
 
         Args:
             book: Book ORM 모델
@@ -317,11 +319,11 @@ class BookResponse(BaseModel):
         return cls(
             id=book.id,
             title=book.title,
-            cover_image=storage_service.get_url(book.cover_image) if book.cover_image else None,
+            cover_image=storage_service.get_url(book.cover_image, is_shared=book.is_shared, content_type='image') if book.cover_image else None,
             status=book.status,
             created_at=book.created_at,
             pages=[
-                PageResponse.from_orm_with_urls(page, storage_service)
+                PageResponse.from_orm_with_urls(page, storage_service, is_shared=book.is_shared)
                 for page in book.pages
             ],
             pipeline_stage=book.pipeline_stage,

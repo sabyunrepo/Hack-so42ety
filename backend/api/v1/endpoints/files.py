@@ -34,6 +34,10 @@ from backend.features.auth.models import User
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.core.cache.service import CacheService
 from backend.features.tts.service import TTSService
+from backend.api.v1.endpoints.files_helper import (
+    get_cdn_url_with_permission,
+    get_content_type_from_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -279,16 +283,19 @@ async def get_file(
         
         # 2. 파일 캐싱 서비스 초기화
         file_cache = FileCacheService(cache_service)
-        
-        # 3. Redis 캐시 확인 (공개 파일만)
+
+        # 3. Redis 캐시 확인 (공개 파일만, 단어 TTS 제외)
+        # 단어 TTS는 CDN 캐싱으로 처리하므로 Redis 캐싱 불필요
         cached_file = None
-        if not current_user_id:  # 공개 파일만 Redis 캐싱
+        is_word_audio = is_word_audio_path(file_path)
+
+        if not current_user_id and not is_word_audio:  # 공개 파일만 Redis 캐싱 (단어 TTS 제외)
             cached_file = await file_cache.get_file(file_path)
-            
+
             if cached_file:
                 # ETag 생성
                 etag = file_cache.get_etag(cached_file)
-                
+
                 # 304 Not Modified 확인
                 if_none_match = request.headers.get("If-None-Match")
                 if if_none_match and if_none_match.strip('"') == etag:
@@ -300,7 +307,7 @@ async def get_file(
                             "X-Cache": "HIT",
                         }
                     )
-                
+
                 # 캐시된 파일 반환
                 return Response(
                     content=cached_file,
@@ -320,8 +327,10 @@ async def get_file(
         try:
             # Smart Redirect: R2 사용 시 파일이 존재하면 바로 CDN으로 리다이렉트 (Zero Egress)
             if settings.storage_provider != "local" and await storage_service.exists(file_path):
-                 cdn_url = storage_service.get_url(file_path, bypass_cdn=False)
-                 return RedirectResponse(url=cdn_url, status_code=307)
+                # 모든 파일 (단어 TTS 포함) CDN 리다이렉트
+                # DB 조회 후 올바른 CDN URL 생성 (공개/비공개 구분)
+                cdn_url = await get_cdn_url_with_permission(file_path, db, storage_service)
+                return RedirectResponse(url=cdn_url, status_code=307)
 
             file_data = await storage_service.get(file_path)
         except FileNotFoundError:
@@ -353,43 +362,40 @@ async def get_file(
                         voice_id=voice_id
                     )
 
-                    # 캐시 무효화 후 재설정 (공개 파일만)
-                    if not current_user_id:
-                        cache_key = f"file:{file_path}"
-                        await cache_service.delete(cache_key)
-                        # FileCacheService를 사용하여 새로 캐싱
-                        file_cache = FileCacheService(cache_service)
-                        await file_cache.cache_file(file_path, file_data, ttl=86400)
-
                     logger.info(f"Successfully generated word audio on-demand: {file_path}, word={word}")
 
-                    # Smart Redirect: 생성된 파일을 CDN에서 다운로드하도록 리다이렉트 (Zero Egress)
-                    if settings.storage_provider != "local":
-                        # CDN URL 생성 (bypass_cdn=False)
-                        cdn_url = storage_service.get_url(file_path, bypass_cdn=False)
-                        return RedirectResponse(url=cdn_url, status_code=307)
-                    
-                    # Local 환경이면 파일 반환
-                    etag = FileCacheService(cache_service).get_etag(file_data)
-                    cache_control = (
-                        "private, max-age=3600, must-revalidate"
-                        if current_user_id
-                        else "public, max-age=86400, immutable"
-                    )
+                    # 단어 TTS 생성 후 CDN 리다이렉트 (개선된 전략)
+                    # - R2에 저장 완료 → CDN으로 리다이렉트
+                    # - CDN 글로벌 캐싱 활용 (Redis 캐싱 제거)
+                    # - 일반 미디어와 동일한 방식으로 처리
 
-                    return Response(
-                        content=file_data,
-                        media_type=get_content_type(file_path),
-                        headers={
-                            "X-Cache": "GENERATED",
-                            "ETag": f'"{etag}"',
-                            "Cache-Control": cache_control,
-                            "Content-Disposition": f'inline; filename="{get_filename(file_path)}"',
-                            "Accept-Ranges": "bytes",
-                            "Access-Control-Allow-Origin": "*",
-                            "Access-Control-Expose-Headers": "Content-Length, Content-Type, Accept-Ranges, ETag",
-                        }
-                    )
+                    if settings.storage_provider != "local":
+                        # R2/S3 환경: CDN 리다이렉트
+                        cdn_url = await get_cdn_url_with_permission(file_path, db, storage_service)
+                        logger.info(f"Word audio generated, redirecting to CDN: {cdn_url[:80]}...")
+                        return RedirectResponse(url=cdn_url, status_code=307)
+                    else:
+                        # Local 환경: 파일 직접 반환
+                        etag = FileCacheService(cache_service).get_etag(file_data)
+                        cache_control = (
+                            "private, max-age=3600, must-revalidate"
+                            if current_user_id
+                            else "public, max-age=86400, immutable"
+                        )
+
+                        return Response(
+                            content=file_data,
+                            media_type=get_content_type(file_path),
+                            headers={
+                                "X-Cache": "GENERATED",
+                                "ETag": f'"{etag}"',
+                                "Cache-Control": cache_control,
+                                "Content-Disposition": f'inline; filename="{get_filename(file_path)}"',
+                                "Accept-Ranges": "bytes",
+                                "Access-Control-Allow-Origin": "*",
+                                "Access-Control-Expose-Headers": "Content-Length, Content-Type, Accept-Ranges, ETag",
+                            }
+                        )
 
                 except Exception as e:
                     logger.error(f"Failed to generate word audio on-demand: {file_path}, error: {e}", exc_info=True)
@@ -405,8 +411,9 @@ async def get_file(
                 message=f"File not found: {file_path}"
             )
         
-        # 5. Redis 캐시에 저장 (공개 파일만)
-        if not current_user_id:
+        # 5. Redis 캐시에 저장 (공개 파일만, 단어 TTS 제외)
+        # 단어 TTS는 CDN 캐싱으로 처리
+        if not current_user_id and not is_word_audio:
             await file_cache.cache_file(file_path, file_data, ttl=86400)  # 24시간
         
         # 6. ETag 생성

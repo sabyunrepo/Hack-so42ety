@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from backend.api.v1.endpoints import auth, storybook, tts, user, metrics, files
+from backend.api.v1.endpoints import auth, storybook, tts, user, metrics, files, media
 
 api_router = APIRouter()
 
@@ -9,3 +9,4 @@ api_router.include_router(tts.router, prefix="/tts", tags=["TTS"])
 api_router.include_router(user.router, prefix="/user", tags=["User"])
 api_router.include_router(metrics.router, prefix="/metrics", tags=["Metrics"])
 api_router.include_router(files.router, tags=["Files"])
+api_router.include_router(media.router, prefix="/media", tags=["Media"])
