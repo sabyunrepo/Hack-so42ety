@@ -107,3 +107,6 @@ Thumbs.db
 
 # ==================== infisical ====================
 infisical-*
+
+# ==================== Secrets & Setup Scripts ====================
+cloudflare-workers/signed-url-validator/setup-secret.sh
