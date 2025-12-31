@@ -152,6 +152,7 @@ services:
       - BACKEND_PORT=8000
     networks:
       - moriai-network
+      - cloudflare-network
     depends_on:
       backend:
         condition: service_healthy
@@ -162,22 +163,6 @@ services:
         max-file: "5"
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-
-  # ==================== Cloudflare Tunnel ====================
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: moriai-cloudflared-prod
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
-    networks:
-      - moriai-network
-    depends_on:
-      - frontend
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   # ==================== Watchtower (Auto-Updater) ====================
   watchtower:
@@ -203,6 +188,9 @@ networks:
   moriai-network:
     driver: bridge
     name: moriai-network
+  cloudflare-network:
+    external: true
+    name: cloudflare-network
 
 # ==================== Volumes ====================
 volumes:
