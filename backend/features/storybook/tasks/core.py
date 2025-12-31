@@ -297,7 +297,6 @@ async def _generate_story_phase(
     await _mark_book_failed(book_id, "Story generation failed", error_msg)
     return None
 
-
 async def _generate_emotion_phase(
     story_provider,
     dialogues: list,

@@ -254,7 +254,6 @@ class TaskRunner:
         # Wait for all tasks to complete
         # 각 task는 자신의 의존성을 내부에서 await하므로 순서가 보장됨
         await asyncio.gather(*self.futures.values(), return_exceptions=True)
-
         return self.results
 
     def get_result(self, task_id: str) -> Optional[TaskResult]:
@@ -417,8 +416,6 @@ async def create_storybook_dag(
                     logger.error(f"[TaskRunner] Failed tasks: {failed}")
 
     asyncio.create_task(_run_dag(), name=f"storybook_dag_{book_id}")
-
-    # Task IDs 반환
     return {
         "execution_id": execution_id,
         "story_task": t_story,

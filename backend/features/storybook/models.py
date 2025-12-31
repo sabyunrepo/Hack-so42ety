@@ -1,8 +1,3 @@
-"""
-Book Domain Models
-동화책 관련 ORM 모델 (Book, Page, Dialogue)
-"""
-
 import uuid
 from datetime import datetime
 from typing import List, Optional
