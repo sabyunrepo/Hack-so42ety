@@ -25,7 +25,7 @@ const AudioPlayer = ({ src }: AudioPlayerProps) => {
 
   return (
     <div
-      className="inline-flex items-center  absolute bottom-0 right-0"
+      className="inline-flex items-center  absolute bottom-0 left-0"
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
@@ -40,7 +40,7 @@ const AudioPlayer = ({ src }: AudioPlayerProps) => {
       <button
         onClick={togglePlay}
         onMouseDown={(e) => e.stopPropagation()}
-        className="w-8 h-8 flex items-center justify-center transition-all cursor-pointer hover:text-white hover:bg-amber-300 rounded-3xl"
+        className="w-8 h-8 flex items-center justify-center transition-all transition-transform translate-y-4 cursor-pointer hover:text-white hover:bg-amber-300 rounded-3xl"
       >
         <Volume2 />
       </button>

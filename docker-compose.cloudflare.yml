@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # ==================== Cloudflare Tunnel ====================
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      - cloudflare-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - TZ=Asia/Seoul
+
+# ==================== Networks ====================
+networks:
+  cloudflare-network:
+    driver: bridge
+    name: cloudflare-network
