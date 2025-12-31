@@ -238,7 +238,7 @@ async def _generate_story_phase(
                     settings.max_title_length,
                 )
             except ValueError as shorten_error:
-                # _shorten_title이 30자 초과로 실패한 경우
+                # _shorten_title이 50자 초과로 실패한 경우
                 logger.warning(
                     f"[Story Task] [Book: {book_id}] Attempt {attempt}/{max_retries}: "
                     f"Title shortening failed: {shorten_error}, skipping"
@@ -246,8 +246,8 @@ async def _generate_story_phase(
                 continue
 
             # 축약 후 검증
-            if len(title) <= settings.max_title_length + 5:
-                # 25자 이하로 축약 성공 → 즉시 반환
+            if len(title) <= settings.max_title_length + 10:
+                # 30자 이하로 축약 성공 → 즉시 반환
                 logger.info(
                     f"[Story Task] [Book: {book_id}] Title shortened to {len(title)} chars, "
                     f"returning immediately"
@@ -756,9 +756,9 @@ async def generate_image_task(
             f"[Image Task] [Book: {book_id}] All {tracker.total_items} images completed successfully"
         )
     elif tracker.is_partial_failure():
-        status = TaskStatus.COMPLETED  # 부분 성공도 COMPLETED로 처리
-        logger.warning(
-            f"[Image Task] [Book: {book_id}] Partial completion: "
+        status = TaskStatus.FAILED  # 부분 실패는 실패로 처리
+        logger.error(
+            f"[Image Task] [Book: {book_id}] Partial failure: "
             f"{len(tracker.completed)}/{tracker.total_items} images"
         )
     else:
@@ -1303,9 +1303,9 @@ async def generate_video_task(
             f"[Video Task] [Book: {book_id}] All {tracker.total_items} videos completed"
         )
     elif tracker.is_partial_failure():
-        status = TaskStatus.COMPLETED  # 부분 성공도 허용
-        logger.warning(
-            f"[Video Task] [Book: {book_id}] Partial completion: "
+        status = TaskStatus.FAILED  # 부분 실패는 실패로 처리
+        logger.error(
+            f"[Video Task] [Book: {book_id}] Partial failure: "
             f"{len(tracker.completed)}/{tracker.total_items} videos"
         )
     else:
@@ -1488,7 +1488,7 @@ async def finalize_book_task(
 
             # 상태 결정
             if has_partial_failure:
-                final_status = BookStatus.PARTIALLY_COMPLETED
+                final_status = BookStatus.FAILED  # 부분 실패도 실패로 처리
             else:
                 final_status = BookStatus.COMPLETED
 

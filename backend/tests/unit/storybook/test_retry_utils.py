@@ -248,8 +248,8 @@ class TestBatchRetryTracker:
         assert summary["max_retries"] == 2
         assert len(summary["failed_items"]) == 0
 
-    def test_get_summary_partially_completed(self):
-        """요약 정보 (부분 완료) 테스트"""
+    def test_get_summary_partial_failure(self):
+        """요약 정보 (부분 실패) 테스트"""
         # Given
         tracker = BatchRetryTracker(total_items=3, max_retries=2)
 
@@ -262,8 +262,8 @@ class TestBatchRetryTracker:
 
         summary = tracker.get_summary()
 
-        # Then
-        assert summary["status"] == "partially_completed"
+        # Then - 부분 실패도 failed로 처리
+        assert summary["status"] == "failed"
         assert summary["total_items"] == 3
         assert summary["completed_items"] == 1
         assert summary["max_retries"] == 2
