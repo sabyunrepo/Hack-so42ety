@@ -103,6 +103,40 @@ services:
       retries: 3
       start_period: 40s
 
+  # ==================== Media Optimization Worker (Standalone) ====================
+  media-worker:
+    build:
+      context: .
+      dockerfile: ./docker/media-worker/Dockerfile
+    image: moriai-media-worker:latest
+    container_name: moriai-media-worker
+    restart: unless-stopped
+    init: true
+    devices:
+      - /dev/dri:/dev/dri  # Quick Sync GPU access
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - R2_ENDPOINT_URL=${R2_ENDPOINT_URL}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-moriai-storybook-prod}
+      - LIBVA_DRIVER_NAME=iHD  # Intel Media Driver
+    env_file:
+      - .env
+    networks:
+      - moriai-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+
+
   # ==================== Frontend (Nginx + Static Files) ====================
   # frontend:
   #   build:
