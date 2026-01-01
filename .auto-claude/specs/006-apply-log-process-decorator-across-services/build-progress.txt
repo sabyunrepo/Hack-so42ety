@@ -43,10 +43,15 @@ Last Updated: 2026-01-01
   ```
 - **Commit**: 01a0f23
 
-### ⏳ Subtask 1.5 - Apply @log_process to refresh_access_token method
-- **Status**: Pending
-- **Location**: backend/features/auth/service.py, line 208
-- **Next**: Apply decorator to refresh_access_token() method
+### ✅ Subtask 1.5 - Apply @log_process to refresh_access_token method (COMPLETED)
+- **Status**: Completed
+- **Location**: backend/features/auth/service.py, line 209
+- **Implementation**: Successfully added decorator
+  ```python
+  @log_process(step='Token Refresh', desc='Access Token 갱신 (RTR)')
+  async def refresh_access_token(self, refresh_token: str) -> Tuple[str, str]:
+  ```
+- **Commit**: 9e52226
 
 ### ⏳ Subtask 1.6 - Apply @log_process to logout method
 - **Status**: Pending
@@ -66,6 +71,6 @@ Last Updated: 2026-01-01
 ---
 
 ## Summary
-- **Completed**: 4/9 subtasks (44%)
-- **Next Action**: Apply @log_process to refresh_access_token method (subtask 1.5)
+- **Completed**: 5/9 subtasks (56%)
+- **Next Action**: Apply @log_process to logout method (subtask 1.6)
 - **Blockers**: None

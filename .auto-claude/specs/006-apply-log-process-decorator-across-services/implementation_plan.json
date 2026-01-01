@@ -50,9 +50,9 @@
           "subtask_id": "1.5",
           "title": "Apply @log_process to refresh_access_token method",
           "description": "Add @log_process(step='Token Refresh', desc='Access Token 갱신 (RTR)') decorator to the refresh_access_token() method",
-          "status": "pending",
+          "status": "completed",
           "file_path": "backend/features/auth/service.py",
-          "notes": ""
+          "notes": "Successfully added @log_process(step='Token Refresh', desc='Access Token 갱신 (RTR)') decorator to refresh_access_token() method at line 209. Follows the same pattern as register(), login(), and google_oauth_login() methods."
         },
         {
           "subtask_id": "1.6",
