@@ -65,6 +65,7 @@ class AuthService:
         """토큰 해시 생성 (Redis 키용)"""
         return hashlib.sha256(token.encode()).hexdigest()[:16]
 
+    @log_process(step='User Registration', desc='새 사용자 회원가입')
     async def register(self, email: str, password: str) -> Tuple[User, str, str]:
         """
         회원가입
