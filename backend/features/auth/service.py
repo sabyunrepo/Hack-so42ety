@@ -206,6 +206,7 @@ class AuthService:
 
         return user, access_token, refresh_token
 
+    @log_process(step='Token Refresh', desc='Access Token 갱신 (RTR)')
     async def refresh_access_token(self, refresh_token: str) -> Tuple[str, str]:
         """
         Access Token 갱신 (RTR 적용)
