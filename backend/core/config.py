@@ -143,6 +143,19 @@ class Settings(BaseSettings):
         default=3600, env="AWS_S3_PRESIGNED_URL_EXPIRATION"
     )  # Pre-signed URL 만료 시간 (초, 기본 1시간)
 
+    # Cloudflare R2 (if STORAGE_PROVIDER=r2)
+    r2_endpoint_url: Optional[str] = Field(default=None, env="R2_ENDPOINT_URL")
+    r2_access_key_id: Optional[str] = Field(default=None, env="R2_ACCESS_KEY_ID")
+    r2_secret_access_key: Optional[str] = Field(default=None, env="R2_SECRET_ACCESS_KEY")
+    r2_bucket_name: Optional[str] = Field(default=None, env="R2_BUCKET_NAME")
+    r2_region_name: str = Field(default="auto", env="R2_REGION_NAME")
+
+    # Cloudflare CDN (Signed URL)
+    cloudflare_cdn_domain: Optional[str] = Field(default=None, env="CLOUDFLARE_CDN_DOMAIN")
+    cloudflare_signing_key: Optional[str] = Field(default=None, env="CLOUDFLARE_SIGNING_KEY")
+    cloudflare_url_expiration: int = Field(default=3600, env="CLOUDFLARE_URL_EXPIRATION")
+
+
     # ==================== Redis Cache & Event Bus ====================
     redis_host: str = Field(default="redis", env="REDIS_HOST")
     redis_port: int = Field(default=6379, env="REDIS_PORT")

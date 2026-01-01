@@ -9,8 +9,17 @@ File Access API Endpoints
 import logging
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.core.config import settings
+from backend.core.exceptions import (
+    NotFoundException, 
+    AuthorizationException, 
+    InternalServerException, 
+    ErrorCode
+)
 
 from backend.core.database.session import get_db_readonly
 from backend.core.auth.dependencies import get_optional_user_object
@@ -25,6 +34,9 @@ from backend.features.auth.models import User
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.core.cache.service import CacheService
 from backend.features.tts.service import TTSService
+from backend.api.v1.endpoints.files_helper import (
+    get_cdn_url_with_permission,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +183,13 @@ async def head_file(
     Returns:
         Response: 파일 메타데이터 (헤더만, 본문 없음)
     """
+    # 보안: 운영 환경(R2/S3)에서는 로컬 파일 엔드포인트 접근 차단
+    if settings.storage_provider != "local":
+        raise NotFoundException(
+            error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+            message=f"File not found: {file_path}"
+        )
+
     current_user_id = current_user.id if current_user else None
     
     try:
@@ -198,13 +217,13 @@ async def head_file(
             }
         )
     
-    except HTTPException:
+    except NotFoundException:
         raise
     except Exception as e:
         logger.error(f"HEAD request error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error"
+        raise InternalServerException(
+            error_code=ErrorCode.SYS_INTERNAL_ERROR,
+            message="Internal server error"
         )
 
 
@@ -246,6 +265,14 @@ async def get_file(
     Returns:
         Response: 파일 데이터 또는 304 Not Modified
     """
+    # 보안: 운영 환경(R2/S3)에서는 로컬 파일 엔드포인트 접근 차단
+    # Exception: Word Audio (On-demand generation 때문에 허용)
+    if settings.storage_provider != "local" and not is_word_audio_path(file_path):
+        raise NotFoundException(
+            error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+            message=f"File not found: {file_path}"
+        )
+
     current_user_id = current_user.id if current_user else None
     
     try:
@@ -255,16 +282,19 @@ async def get_file(
         
         # 2. 파일 캐싱 서비스 초기화
         file_cache = FileCacheService(cache_service)
-        
-        # 3. Redis 캐시 확인 (공개 파일만)
+
+        # 3. Redis 캐시 확인 (공개 파일만, 단어 TTS 제외)
+        # 단어 TTS는 CDN 캐싱으로 처리하므로 Redis 캐싱 불필요
         cached_file = None
-        if not current_user_id:  # 공개 파일만 Redis 캐싱
+        is_word_audio = is_word_audio_path(file_path)
+
+        if not current_user_id and not is_word_audio:  # 공개 파일만 Redis 캐싱 (단어 TTS 제외)
             cached_file = await file_cache.get_file(file_path)
-            
+
             if cached_file:
                 # ETag 생성
                 etag = file_cache.get_etag(cached_file)
-                
+
                 # 304 Not Modified 확인
                 if_none_match = request.headers.get("If-None-Match")
                 if if_none_match and if_none_match.strip('"') == etag:
@@ -276,7 +306,7 @@ async def get_file(
                             "X-Cache": "HIT",
                         }
                     )
-                
+
                 # 캐시된 파일 반환
                 return Response(
                     content=cached_file,
@@ -294,6 +324,13 @@ async def get_file(
         
         # 4. 스토리지에서 파일 읽기
         try:
+            # Smart Redirect: R2 사용 시 파일이 존재하면 바로 CDN으로 리다이렉트 (Zero Egress)
+            if settings.storage_provider != "local" and await storage_service.exists(file_path):
+                # 모든 파일 (단어 TTS 포함) CDN 리다이렉트
+                # DB 조회 후 올바른 CDN URL 생성 (공개/비공개 구분)
+                cdn_url = await get_cdn_url_with_permission(file_path, db, storage_service)
+                return RedirectResponse(url=cdn_url, status_code=307)
+
             file_data = await storage_service.get(file_path)
         except FileNotFoundError:
             # 단어 오디오 파일이면 자동 생성 시도
@@ -307,9 +344,9 @@ async def get_file(
 
                     if not word:
                         logger.error(f"Failed to extract word from path: {file_path}")
-                        raise HTTPException(
-                            status_code=404,
-                            detail=f"Invalid word audio path: {file_path}"
+                        raise NotFoundException(
+                            error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+                            message=f"Invalid word audio path: {file_path}"
                         )
 
                     if not voice_id:
@@ -324,54 +361,58 @@ async def get_file(
                         voice_id=voice_id
                     )
 
-                    # 캐시 무효화 후 재설정 (공개 파일만)
-                    if not current_user_id:
-                        cache_key = f"file:{file_path}"
-                        await cache_service.delete(cache_key)
-                        # FileCacheService를 사용하여 새로 캐싱
-                        file_cache = FileCacheService(cache_service)
-                        await file_cache.cache_file(file_path, file_data, ttl=86400)
-
                     logger.info(f"Successfully generated word audio on-demand: {file_path}, word={word}")
 
-                    # 생성된 파일 반환
-                    etag = FileCacheService(cache_service).get_etag(file_data)
-                    cache_control = (
-                        "private, max-age=3600, must-revalidate"
-                        if current_user_id
-                        else "public, max-age=86400, immutable"
-                    )
+                    # 단어 TTS 생성 후 CDN 리다이렉트 (개선된 전략)
+                    # - R2에 저장 완료 → CDN으로 리다이렉트
+                    # - CDN 글로벌 캐싱 활용 (Redis 캐싱 제거)
+                    # - 일반 미디어와 동일한 방식으로 처리
 
-                    return Response(
-                        content=file_data,
-                        media_type=get_content_type(file_path),
-                        headers={
-                            "X-Cache": "GENERATED",
-                            "ETag": f'"{etag}"',
-                            "Cache-Control": cache_control,
-                            "Content-Disposition": f'inline; filename="{get_filename(file_path)}"',
-                            "Accept-Ranges": "bytes",
-                            "Access-Control-Allow-Origin": "*",
-                            "Access-Control-Expose-Headers": "Content-Length, Content-Type, Accept-Ranges, ETag",
-                        }
-                    )
+                    if settings.storage_provider != "local":
+                        # R2/S3 환경: CDN 리다이렉트
+                        cdn_url = await get_cdn_url_with_permission(file_path, db, storage_service)
+                        logger.info(f"Word audio generated, redirecting to CDN: {cdn_url[:80]}...")
+                        return RedirectResponse(url=cdn_url, status_code=307)
+                    else:
+                        # Local 환경: 파일 직접 반환
+                        etag = FileCacheService(cache_service).get_etag(file_data)
+                        cache_control = (
+                            "private, max-age=3600, must-revalidate"
+                            if current_user_id
+                            else "public, max-age=86400, immutable"
+                        )
+
+                        return Response(
+                            content=file_data,
+                            media_type=get_content_type(file_path),
+                            headers={
+                                "X-Cache": "GENERATED",
+                                "ETag": f'"{etag}"',
+                                "Cache-Control": cache_control,
+                                "Content-Disposition": f'inline; filename="{get_filename(file_path)}"',
+                                "Accept-Ranges": "bytes",
+                                "Access-Control-Allow-Origin": "*",
+                                "Access-Control-Expose-Headers": "Content-Length, Content-Type, Accept-Ranges, ETag",
+                            }
+                        )
 
                 except Exception as e:
                     logger.error(f"Failed to generate word audio on-demand: {file_path}, error: {e}", exc_info=True)
                     # TTS 생성 실패 시에도 404가 아닌 500 에러 반환
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to generate audio: {str(e)}"
+                    raise InternalServerException(
+                        error_code=ErrorCode.BIZ_TTS_GENERATION_FAILED,
+                        message=f"Failed to generate audio: {str(e)}"
                     )
 
             # 단어 오디오가 아니면 404 반환
-            raise HTTPException(
-                status_code=404,
-                detail=f"File not found: {file_path}"
+            raise NotFoundException(
+                error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+                message=f"File not found: {file_path}"
             )
         
-        # 5. Redis 캐시에 저장 (공개 파일만)
-        if not current_user_id:
+        # 5. Redis 캐시에 저장 (공개 파일만, 단어 TTS 제외)
+        # 단어 TTS는 CDN 캐싱으로 처리
+        if not current_user_id and not is_word_audio:
             await file_cache.cache_file(file_path, file_data, ttl=86400)  # 24시간
         
         # 6. ETag 생성
@@ -412,20 +453,20 @@ async def get_file(
     
     except PermissionError as e:
         logger.warning(f"File access denied: {file_path}, user: {current_user_id}, error: {e}")
-        raise HTTPException(
-            status_code=403,
-            detail=str(e)
+        raise AuthorizationException(
+            error_code=ErrorCode.authz_forbidden,
+            message=str(e)
         )
     except FileNotFoundError as e:
         logger.warning(f"File not found: {file_path}, error: {e}")
-        raise HTTPException(
-            status_code=404,
-            detail=str(e)
+        raise NotFoundException(
+            error_code=ErrorCode.BIZ_RESOURCE_NOT_FOUND,
+            message=str(e)
         )
     except Exception as e:
         logger.error(f"File access error: {file_path}, error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error"
+        raise InternalServerException(
+            error_code=ErrorCode.SYS_INTERNAL_ERROR,
+            message="Internal server error"
         )
 

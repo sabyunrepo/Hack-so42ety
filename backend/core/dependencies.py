@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.config import settings
 from backend.infrastructure.storage.local import LocalStorageService
 from backend.infrastructure.storage.s3 import S3StorageService
+from backend.infrastructure.storage.r2 import R2StorageService
 from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.core.events.redis_streams_bus import RedisStreamsEventBus
 from backend.core.cache.service import CacheService
@@ -56,6 +57,8 @@ def get_storage_service():
     """
     if settings.storage_provider == "s3":
         return S3StorageService()
+    elif settings.storage_provider == "r2":
+        return R2StorageService()
     return LocalStorageService()
 
 
