@@ -34,9 +34,9 @@
           "subtask_id": "1.3",
           "title": "Apply @log_process to login method",
           "description": "Add @log_process(step='User Login', desc='사용자 로그인 처리') decorator to the login() method",
-          "status": "pending",
+          "status": "completed",
           "file_path": "backend/features/auth/service.py",
-          "notes": ""
+          "notes": "Successfully added @log_process(step='User Login', desc='사용자 로그인 처리') decorator to login() method. Follows the same pattern as the register() method. Committed as 25c6796."
         },
         {
           "subtask_id": "1.4",
