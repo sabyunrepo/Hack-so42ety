@@ -184,6 +184,7 @@ class BookOrchestratorService:
         """사용자의 책 목록 조회 (목록용, 페이지 제외)"""
         return await self.book_repo.get_user_books_summary(user_id)
 
+    @log_process(step='Get Storybook', desc='동화책 상세 조회')
     async def get_book(self, book_id: uuid.UUID, user_id: uuid.UUID = None) -> Book:
         """책 상세 조회"""
         book = await self.book_repo.get_with_pages(book_id)
