@@ -9,8 +9,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database.session import get_db_readonly, get_db_write
-from backend.core.dependencies import get_cache_service
+from backend.core.dependencies import get_cache_service, create_rate_limit_dependency
 from backend.core.cache.service import CacheService
+from backend.core.config import settings
 
 logger = logging.getLogger(__name__)
 from backend.core.auth import get_current_user
@@ -38,6 +39,13 @@ from backend.core.cache.service import CacheService
 
 router = APIRouter()
 security = HTTPBearer()
+
+# Rate limiting dependencies
+rate_limit_login = create_rate_limit_dependency(
+    endpoint="auth:login",
+    limit=settings.auth_login_rate_limit,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+)
 
 
 def get_auth_service_write(
@@ -105,9 +113,11 @@ async def register(
 @router.post(
     "/login",
     response_model=AuthResponse,
+    dependencies=[Depends(rate_limit_login)],
     responses={
         200: {"description": "로그인 성공"},
         401: {"model": ErrorResponse, "description": "인증 실패"},
+        429: {"model": ErrorResponse, "description": "요청 속도 제한 초과"},
     },
 )
 async def login(
