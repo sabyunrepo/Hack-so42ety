@@ -36,12 +36,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class S3Storage:
-    """간단한 S3/R2 Storage 클라이언트"""
+class R2Storage:
+    """Cloudflare R2 Storage 클라이언트 (S3 호환 API 사용)"""
     
     def __init__(self):
         self.client = boto3.client(
-            's3',
+            's3',  # S3 호환 API
             endpoint_url=os.getenv("R2_ENDPOINT_URL"),
             aws_access_key_id=os.getenv("R2_ACCESS_KEY_ID"),
             aws_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY"),
@@ -99,7 +99,7 @@ class MediaOptimizationWorker:
         self.redis = None
         
         # Storage
-        self.storage = S3Storage()
+        self.storage = R2Storage()
         
         # State
         self.running = False

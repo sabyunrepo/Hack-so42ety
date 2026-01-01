@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
 
 # 워커 스크립트 복사
-COPY standalone_media_worker.py /app/worker.py
+COPY worker/standalone_media_worker.py /app/worker.py
 
 WORKDIR /app
 
