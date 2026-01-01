@@ -47,6 +47,12 @@ rate_limit_login = create_rate_limit_dependency(
     window_seconds=settings.auth_rate_limit_window_seconds,
 )
 
+rate_limit_register = create_rate_limit_dependency(
+    endpoint="auth:register",
+    limit=settings.auth_register_rate_limit,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+)
+
 
 def get_auth_service_write(
     db: AsyncSession = Depends(get_db_write),
@@ -72,9 +78,11 @@ def get_auth_service_write(
     "/register",
     response_model=AuthResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit_register)],
     responses={
         201: {"description": "회원가입 성공"},
         409: {"model": ErrorResponse, "description": "이메일 중복"},
+        429: {"model": ErrorResponse, "description": "요청 속도 제한 초과"},
     },
 )
 async def register(
