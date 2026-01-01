@@ -110,6 +110,11 @@ async def register(
 
     Returns:
         AuthResponse: 토큰 + 사용자 정보
+
+    Rate Limiting:
+        - 3 requests per 60 seconds per IP address
+        - Returns 429 Too Many Requests when limit exceeded
+        - Response headers include: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After
     """
     user, access_token, refresh_token = await auth_service.register(
         email=request.email,
@@ -153,6 +158,12 @@ async def login(
 
     Returns:
         AuthResponse: 토큰 + 사용자 정보
+
+    Rate Limiting:
+        - 5 requests per 60 seconds per IP address
+        - Returns 429 Too Many Requests when limit exceeded
+        - Response headers include: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After
+        - Protects against brute force attacks
     """
     user, access_token, refresh_token = await auth_service.login(
         email=request.email,
@@ -196,6 +207,11 @@ async def google_oauth(
 
     Returns:
         AuthResponse: 토큰 + 사용자 정보
+
+    Rate Limiting:
+        - 10 requests per 60 seconds per IP address
+        - Returns 429 Too Many Requests when limit exceeded
+        - Response headers include: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After
     """
     user, access_token, refresh_token = await auth_service.google_oauth_login(
         google_token=request.token
@@ -238,6 +254,12 @@ async def refresh(
 
     Returns:
         TokenResponse: 새로운 Access Token
+
+    Rate Limiting:
+        - 30 requests per 60 seconds per IP address
+        - Returns 429 Too Many Requests when limit exceeded
+        - Response headers include: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After
+        - Higher limit allows frequent token rotation
     """
     logger.info(
         "🔄 [ENDPOINT] /auth/refresh called",
