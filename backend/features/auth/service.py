@@ -159,6 +159,7 @@ class AuthService:
 
         return user, access_token, refresh_token
 
+    @log_process(step='Google OAuth Login', desc='Google OAuth 로그인 처리')
     async def google_oauth_login(self, google_token: str) -> Tuple[User, str, str]:
         """
         Google OAuth 로그인
