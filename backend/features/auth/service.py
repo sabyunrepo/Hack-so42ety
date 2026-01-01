@@ -111,6 +111,7 @@ class AuthService:
 
         return user, access_token, refresh_token
 
+    @log_process(step='User Login', desc='사용자 로그인 처리')
     async def login(self, email: str, password: str) -> Tuple[User, str, str]:
         """
         로그인
