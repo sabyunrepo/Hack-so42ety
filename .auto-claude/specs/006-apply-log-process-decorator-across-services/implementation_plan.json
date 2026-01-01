@@ -58,9 +58,9 @@
           "subtask_id": "1.6",
           "title": "Apply @log_process to logout method",
           "description": "Add @log_process(step='User Logout', desc='사용자 로그아웃 처리') decorator to the logout() method",
-          "status": "pending",
+          "status": "completed",
           "file_path": "backend/features/auth/service.py",
-          "notes": ""
+          "notes": "Successfully added @log_process(step='User Logout', desc='사용자 로그아웃 처리') decorator to logout() method at line 289. Follows the same pattern as register(), login(), google_oauth_login(), and refresh_access_token() methods. Phase 1 (Apply @log_process to AuthService) is now complete."
         }
       ]
     },
@@ -73,9 +73,9 @@
           "subtask_id": "2.1",
           "title": "Apply @log_process to get_book method",
           "description": "Add @log_process(step='Get Storybook', desc='동화책 상세 조회') decorator to the get_book() method",
-          "status": "pending",
+          "status": "completed",
           "file_path": "backend/features/storybook/service.py",
-          "notes": "create_storybook_async already has @log_process applied"
+          "notes": "Successfully added @log_process(step='Get Storybook', desc='동화책 상세 조회') decorator to get_book() method at line 187. Follows the same pattern as create_storybook_async. Commit: 18ce4ec"
         },
         {
           "subtask_id": "2.2",
