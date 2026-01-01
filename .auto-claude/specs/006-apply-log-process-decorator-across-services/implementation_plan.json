@@ -81,9 +81,9 @@
           "subtask_id": "2.2",
           "title": "Apply @log_process to update_book_sharing method",
           "description": "Add @log_process(step='Update Book Sharing', desc='동화책 공유 상태 변경') decorator to the update_book_sharing() method",
-          "status": "pending",
+          "status": "completed",
           "file_path": "backend/features/storybook/service.py",
-          "notes": ""
+          "notes": "Successfully added @log_process(step='Update Book Sharing', desc='동화책 공유 상태 변경') decorator to update_book_sharing() method at line 208. Follows the same pattern as get_book() and create_storybook_async() methods. Commit: cce4748"
         },
         {
           "subtask_id": "2.3",

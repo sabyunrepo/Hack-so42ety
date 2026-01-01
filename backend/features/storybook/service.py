@@ -205,6 +205,7 @@ class BookOrchestratorService:
 
         return book
 
+    @log_process(step='Update Book Sharing', desc='동화책 공유 상태 변경')
     async def update_book_sharing(
         self, book_id: uuid.UUID, is_shared: bool, user_id: uuid.UUID
     ) -> Book:
