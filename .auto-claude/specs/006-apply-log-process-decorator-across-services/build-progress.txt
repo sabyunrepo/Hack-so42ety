@@ -88,19 +88,38 @@ Last Updated: 2026-01-01
   ```
 - **Commit**: cce4748
 
-### 🔄 Subtask 2.3 - Apply @log_process to delete_book method (PENDING)
-- **Status**: Ready to start
-- **Next**: Add decorator to delete_book() method
+### ✅ Subtask 2.3 - Apply @log_process to delete_book method (COMPLETED)
+- **Status**: Completed
+- **Location**: backend/features/storybook/service.py, line 242
+- **Implementation**: Successfully added decorator
+  ```python
+  @log_process(step='Delete Storybook', desc='동화책 삭제 처리')
+  async def delete_book(self, book_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+  ```
+- **Commit**: ed4f49f
+- **Note**: Phase 2 is now complete! All StorybookService methods have @log_process decorators.
+
+---
 
 ## Phase 3: Verification and Testing
-- **Status**: Not started
-- Waiting for all decorators to be applied
+
+### 🔄 Subtask 3.1 - Verify import resolution (PENDING)
+- **Status**: Ready to start
+- **Next**: Run Python import check for modified files
+
+### 🔄 Subtask 3.2 - Run existing auth tests (PENDING)
+- **Status**: Ready to start
+- **Next**: Run pytest for auth-related tests
+
+### 🔄 Subtask 3.3 - Run existing storybook tests (PENDING)
+- **Status**: Ready to start
+- **Next**: Run pytest for storybook-related tests
 
 ---
 
 ## Summary
-- **Completed**: 8/12 subtasks (67%)
+- **Completed**: 9/12 subtasks (75%)
 - **Phase 1 Complete**: All AuthService methods decorated ✅
-- **Phase 2 Progress**: 2/3 StorybookService methods decorated (get_book ✅, update_book_sharing ✅)
-- **Next Action**: Apply @log_process to delete_book() method (Subtask 2.3)
+- **Phase 2 Complete**: All StorybookService methods decorated ✅
+- **Next Action**: Start Phase 3 verification (Subtask 3.1 - Import resolution check)
 - **Blockers**: None

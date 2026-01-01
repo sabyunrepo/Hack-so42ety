@@ -89,9 +89,9 @@
           "subtask_id": "2.3",
           "title": "Apply @log_process to delete_book method",
           "description": "Add @log_process(step='Delete Storybook', desc='동화책 삭제 처리') decorator to the delete_book() method",
-          "status": "pending",
+          "status": "completed",
           "file_path": "backend/features/storybook/service.py",
-          "notes": ""
+          "notes": "Successfully added @log_process(step='Delete Storybook', desc='동화책 삭제 처리') decorator to delete_book() method at line 242. Follows the same pattern as get_book(), update_book_sharing(), and create_storybook_async() methods. Commit: ed4f49f. Phase 2 (Extend @log_process in StorybookService) is now complete!"
         }
       ]
     },
