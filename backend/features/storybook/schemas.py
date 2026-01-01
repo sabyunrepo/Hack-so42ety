@@ -112,7 +112,7 @@ class DialogueAudioResponse(BaseModel):
         return cls(
             language_code=audio.language_code,
             voice_id=audio.voice_id,
-            audio_url=storage_service.get_url(audio.audio_url, is_shared=is_shared, content_type='audio') if audio.audio_url else "",
+            audio_url=storage_service.get_url(audio.audio_url, is_shared=is_shared) if audio.audio_url else "",
             duration=audio.duration
         )
 
@@ -212,7 +212,7 @@ class PageResponse(BaseModel):
         return cls(
             id=page.id,
             sequence=page.sequence,
-            image_url=storage_service.get_url(page.image_url, is_shared=is_shared, content_type='image') if page.image_url else None,
+            image_url=storage_service.get_url(page.image_url, is_shared=is_shared) if page.image_url else None,
             image_prompt=page.image_prompt,
             video_prompt=page.video_prompt,
             dialogues=[
@@ -243,7 +243,7 @@ class BookSummaryResponse(BaseModel):
         return cls(
             id=book.id,
             title=book.title,
-            cover_image=storage_service.get_url(book.cover_image, is_shared=book.is_shared, content_type='image') if book.cover_image else None,
+            cover_image=storage_service.get_url(book.cover_image, is_shared=book.is_shared) if book.cover_image else None,
             status=book.status,
             created_at=book.created_at,
             pipeline_stage=book.pipeline_stage,
@@ -319,7 +319,7 @@ class BookResponse(BaseModel):
         return cls(
             id=book.id,
             title=book.title,
-            cover_image=storage_service.get_url(book.cover_image, is_shared=book.is_shared, content_type='image') if book.cover_image else None,
+            cover_image=storage_service.get_url(book.cover_image, is_shared=book.is_shared) if book.cover_image else None,
             status=book.status,
             created_at=book.created_at,
             pages=[

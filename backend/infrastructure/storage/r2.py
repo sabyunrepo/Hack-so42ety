@@ -146,18 +146,16 @@ class R2StorageService(AbstractStorageService):
         path: str,
         expires_in: Optional[int] = None,
         bypass_cdn: bool = False,
-        is_shared: bool = True,
-        content_type: str = 'default'
+        is_shared: bool = True
     ) -> str:
         """
         Cloudflare CDN URL 생성 (공개/비공개 구분)
 
         Args:
             path: 파일 경로
-            expires_in: 만료 시간 (초)
+            expires_in: 만료 시간 (초), 기본값: 3시간
             bypass_cdn: True면 Backend API(/api/v1/files/...) URL 반환 (On-demand 생성용)
-            is_shared: 공개 여부 (True: 공개 - 긴 만료시간, False: 비공개 - 짧은 만료시간)
-            content_type: 콘텐츠 타입 ('video', 'audio', 'image', 'metadata', 'default')
+            is_shared: 공개 여부 (서명에 포함되어 공개/비공개 전환 시 URL 무효화)
 
         Returns:
             str: URL
@@ -180,31 +178,15 @@ class R2StorageService(AbstractStorageService):
         # Signed URL 생성 (공개/비공개 모두)
         # 콘텐츠 타입별 만료 시간 설정
         if expires_in is None:
-            if is_shared:
-                # 공유된 책: 매우 긴 만료 시간 (30일)
-                expiration_times = {
-                    'video': 2592000,    # 30일
-                    'audio': 2592000,    # 30일
-                    'image': 2592000,    # 30일
-                    'metadata': 2592000, # 30일
-                    'default': 2592000   # 30일
-                }
-            else:
-                # 비공개 책: 짧은 만료 시간
-                expiration_times = {
-                    'video': 21600,      # 6시간
-                    'audio': 10800,      # 3시간
-                    'image': 86400,      # 24시간
-                    'metadata': 3600,    # 1시간
-                    'default': 3600      # 기본 1시간
-                }
-            expires_in = expiration_times.get(content_type, 3600)
+            # /users 경로는 공개/비공개 무관하게 3시간
+            # (is_shared 변경 시 빠른 무효화를 위해)
+            expires_in = 3 * 60 * 60  # 3시간
 
         # 1. 만료 시간 설정
         expiration = int(time.time() + expires_in)
 
-        # 2. 서명 문자열 생성
-        sign_string = f"{url_path}-{expiration}"
+        # 2. 서명 문자열 생성 (is_shared 포함으로 공개/비공개 전환 시 URL 무효화)
+        sign_string = f"{url_path}-{expiration}-{int(is_shared)}"
 
         # 3. HMAC-SHA256 서명 생성
         signature = hmac.new(
@@ -216,7 +198,8 @@ class R2StorageService(AbstractStorageService):
         # 4. Signed URL 조합
         params = {
             'verify': expiration,
-            'token': signature
+            'token': signature,
+            'shared': int(is_shared)  # 공개 상태를 명시적으로 포함
         }
 
         return f"{base_url}{url_path}?{urlencode(params)}"
