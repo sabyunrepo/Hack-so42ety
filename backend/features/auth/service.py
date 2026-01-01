@@ -15,6 +15,7 @@ from ...core.auth.providers.credentials import CredentialsAuthProvider
 from ...core.auth.providers.google_oauth import GoogleOAuthProvider
 from ...core.cache.service import CacheService
 from ...core.config import settings
+from ...core.utils.trace import log_process
 from .models import User
 from .repository import UserRepository
 from .exceptions import (
