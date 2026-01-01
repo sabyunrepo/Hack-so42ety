@@ -53,6 +53,12 @@ rate_limit_register = create_rate_limit_dependency(
     window_seconds=settings.auth_rate_limit_window_seconds,
 )
 
+rate_limit_google = create_rate_limit_dependency(
+    endpoint="auth:google",
+    limit=settings.auth_google_rate_limit,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+)
+
 
 def get_auth_service_write(
     db: AsyncSession = Depends(get_db_write),
@@ -164,9 +170,11 @@ async def login(
 @router.post(
     "/google",
     response_model=AuthResponse,
+    dependencies=[Depends(rate_limit_google)],
     responses={
         200: {"description": "Google OAuth 로그인 성공"},
         401: {"model": ErrorResponse, "description": "토큰 검증 실패"},
+        429: {"model": ErrorResponse, "description": "요청 속도 제한 초과"},
     },
 )
 async def google_oauth(
