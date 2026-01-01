@@ -1,0 +1,13 @@
+{
+  "sourceType": "ideation",
+  "ideationType": "code_improvements",
+  "ideaId": "ci-005",
+  "rationale": "The @log_process decorator in core/utils/trace.py is already used in TTSService (generate_speech, create_voice_clone) to log step execution with timing and structured metadata. AuthService and StorybookService have similar critical operations (login, register, create_book) that would benefit from the same observability pattern.",
+  "category": "feature",
+  "estimatedEffort": "trivial",
+  "complexity": "trivial",
+  "affectedFiles": [
+    "backend/features/auth/service.py",
+    "backend/features/storybook/service.py"
+  ]
+}

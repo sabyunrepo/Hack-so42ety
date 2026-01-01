@@ -1,0 +1,58 @@
+# Build Progress: Apply @log_process Decorator Across Services
+
+## Session 1 - 2026-01-01
+
+### Planning Phase Complete
+
+Analyzed the codebase and created implementation plan:
+
+**Current State:**
+- @log_process decorator exists at `backend/core/utils/trace.py`
+- TTSService already uses @log_process on: generate_speech, create_voice_clone
+- StorybookService already uses @log_process on: create_storybook_async
+- AuthService does NOT use @log_process yet
+
+**Implementation Plan Created:**
+
+### Phase 1: Apply @log_process to AuthService (6 subtasks)
+- 1.1: Add log_process import
+- 1.2: Apply to register()
+- 1.3: Apply to login()
+- 1.4: Apply to google_oauth_login()
+- 1.5: Apply to refresh_access_token()
+- 1.6: Apply to logout()
+
+### Phase 2: Extend @log_process in StorybookService (3 subtasks)
+- 2.1: Apply to get_book()
+- 2.2: Apply to update_book_sharing()
+- 2.3: Apply to delete_book()
+
+### Phase 3: Verification and Testing (3 subtasks)
+- 3.1: Verify import resolution
+- 3.2: Run auth tests
+- 3.3: Run storybook tests
+
+**Total: 12 subtasks across 3 phases**
+
+---
+
+## Implementation Progress
+
+### Subtask 1.1 - COMPLETED ✅
+**Import log_process decorator to AuthService**
+- Added import: `from ...core.utils.trace import log_process`
+- File: `backend/features/auth/service.py`
+- Syntax verification: Passed
+- Commit: 8c1896a
+- Status: Ready for applying decorators to methods
+
+### Subtask 1.2 - COMPLETED ✅
+**Apply @log_process to register method**
+- Added decorator: `@log_process(step='User Registration', desc='새 사용자 회원가입')`
+- File: `backend/features/auth/service.py`
+- Syntax verification: Passed
+- Commit: 79ab978
+- Status: Decorator successfully applied to register() method
+
+---
+Status: In progress - Phase 1 (2/6 subtasks completed)

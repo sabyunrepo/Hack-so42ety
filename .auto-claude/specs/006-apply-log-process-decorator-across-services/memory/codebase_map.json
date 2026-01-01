@@ -1,0 +1,15 @@
+{
+  "discovered_files": {
+    "backend/core/utils/trace.py": {
+      "description": "@log_process decorator provides structured logging with timing, call depth tracking, and visual tree-style output. Already used in TTSService (generate_speech, create_voice_clone), StorybookService (create_storybook_async), and voice_sync task.",
+      "category": "logging",
+      "discovered_at": "2026-01-01T10:43:00.948183+00:00"
+    },
+    "backend/features/auth/service.py": {
+      "description": "AuthService has 5 critical async methods (register, login, google_oauth_login, refresh_access_token, logout) that need @log_process decorator for consistent observability.",
+      "category": "auth",
+      "discovered_at": "2026-01-01T10:43:00.958474+00:00"
+    }
+  },
+  "last_updated": "2026-01-01T10:43:00.958480+00:00"
+}

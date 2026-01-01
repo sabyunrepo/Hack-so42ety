@@ -1,0 +1,141 @@
+{
+  "feature": "Apply @log_process Decorator Across Services",
+  "description": "Extend the usage of the existing @log_process decorator from TTSService to AuthService and StorybookService for consistent structured logging and performance tracing.",
+  "created_at": "2026-01-01T10:40:28.285Z",
+  "updated_at": "2026-01-01T10:50:00.000Z",
+  "status": "in_progress",
+  "planStatus": "approved",
+  "workflow_type": "development",
+  "services_involved": ["AuthService", "StorybookService"],
+  "spec_file": "spec.md",
+  "phases": [
+    {
+      "phase_id": "phase-1",
+      "name": "Apply @log_process to AuthService",
+      "description": "Add the @log_process decorator to all critical authentication methods in AuthService",
+      "subtasks": [
+        {
+          "subtask_id": "1.1",
+          "title": "Add log_process import to AuthService",
+          "description": "Import the log_process decorator from backend.core.utils.trace in auth/service.py",
+          "status": "completed",
+          "file_path": "backend/features/auth/service.py",
+          "notes": "Successfully added import: from ...core.utils.trace import log_process. Syntax verification passed. Committed as 8c1896a."
+        },
+        {
+          "subtask_id": "1.2",
+          "title": "Apply @log_process to register method",
+          "description": "Add @log_process(step='User Registration', desc='새 사용자 회원가입') decorator to the register() method",
+          "status": "completed",
+          "file_path": "backend/features/auth/service.py",
+          "notes": "Successfully added @log_process(step='User Registration', desc='새 사용자 회원가입') decorator to register() method. Syntax verification passed. Committed as 79ab978."
+        },
+        {
+          "subtask_id": "1.3",
+          "title": "Apply @log_process to login method",
+          "description": "Add @log_process(step='User Login', desc='사용자 로그인 처리') decorator to the login() method",
+          "status": "pending",
+          "file_path": "backend/features/auth/service.py",
+          "notes": ""
+        },
+        {
+          "subtask_id": "1.4",
+          "title": "Apply @log_process to google_oauth_login method",
+          "description": "Add @log_process(step='Google OAuth Login', desc='Google OAuth 로그인 처리') decorator to the google_oauth_login() method",
+          "status": "pending",
+          "file_path": "backend/features/auth/service.py",
+          "notes": ""
+        },
+        {
+          "subtask_id": "1.5",
+          "title": "Apply @log_process to refresh_access_token method",
+          "description": "Add @log_process(step='Token Refresh', desc='Access Token 갱신 (RTR)') decorator to the refresh_access_token() method",
+          "status": "pending",
+          "file_path": "backend/features/auth/service.py",
+          "notes": ""
+        },
+        {
+          "subtask_id": "1.6",
+          "title": "Apply @log_process to logout method",
+          "description": "Add @log_process(step='User Logout', desc='사용자 로그아웃 처리') decorator to the logout() method",
+          "status": "pending",
+          "file_path": "backend/features/auth/service.py",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-2",
+      "name": "Extend @log_process in StorybookService",
+      "description": "Add @log_process to additional critical methods in BookOrchestratorService (create_storybook_async already has it)",
+      "subtasks": [
+        {
+          "subtask_id": "2.1",
+          "title": "Apply @log_process to get_book method",
+          "description": "Add @log_process(step='Get Storybook', desc='동화책 상세 조회') decorator to the get_book() method",
+          "status": "pending",
+          "file_path": "backend/features/storybook/service.py",
+          "notes": "create_storybook_async already has @log_process applied"
+        },
+        {
+          "subtask_id": "2.2",
+          "title": "Apply @log_process to update_book_sharing method",
+          "description": "Add @log_process(step='Update Book Sharing', desc='동화책 공유 상태 변경') decorator to the update_book_sharing() method",
+          "status": "pending",
+          "file_path": "backend/features/storybook/service.py",
+          "notes": ""
+        },
+        {
+          "subtask_id": "2.3",
+          "title": "Apply @log_process to delete_book method",
+          "description": "Add @log_process(step='Delete Storybook', desc='동화책 삭제 처리') decorator to the delete_book() method",
+          "status": "pending",
+          "file_path": "backend/features/storybook/service.py",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-3",
+      "name": "Verification and Testing",
+      "description": "Verify the changes work correctly and don't break existing functionality",
+      "subtasks": [
+        {
+          "subtask_id": "3.1",
+          "title": "Verify import resolution",
+          "description": "Run Python import check to ensure no import errors in modified files",
+          "status": "pending",
+          "file_path": "",
+          "notes": "python -c 'from backend.features.auth.service import AuthService; from backend.features.storybook.service import BookOrchestratorService'"
+        },
+        {
+          "subtask_id": "3.2",
+          "title": "Run existing auth tests",
+          "description": "Run pytest for auth-related tests to ensure decorators don't break existing functionality",
+          "status": "pending",
+          "file_path": "backend/tests/unit/auth/",
+          "notes": ""
+        },
+        {
+          "subtask_id": "3.3",
+          "title": "Run existing storybook tests",
+          "description": "Run pytest for storybook-related tests to ensure decorators don't break existing functionality",
+          "status": "pending",
+          "file_path": "backend/tests/unit/storybook/",
+          "notes": ""
+        }
+      ]
+    }
+  ],
+  "final_acceptance": [
+    "All @log_process decorators applied to AuthService methods",
+    "All @log_process decorators applied to remaining StorybookService methods",
+    "No import errors in modified files",
+    "Existing tests pass without modification"
+  ],
+  "qa_signoff": {
+    "status": "pending",
+    "tests_passed": "",
+    "issues": ""
+  }
+}
