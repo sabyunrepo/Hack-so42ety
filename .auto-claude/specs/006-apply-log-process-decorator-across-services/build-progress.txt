@@ -1,66 +1,66 @@
 # Build Progress: Apply @log_process Decorator Across Services
 
-## Session 1 - 2026-01-01
-
-### Planning Phase Complete
-
-Analyzed the codebase and created implementation plan:
-
-**Current State:**
-- @log_process decorator exists at `backend/core/utils/trace.py`
-- TTSService already uses @log_process on: generate_speech, create_voice_clone
-- StorybookService already uses @log_process on: create_storybook_async
-- AuthService does NOT use @log_process yet
-
-**Implementation Plan Created:**
-
-### Phase 1: Apply @log_process to AuthService (6 subtasks)
-- 1.1: Add log_process import
-- 1.2: Apply to register()
-- 1.3: Apply to login()
-- 1.4: Apply to google_oauth_login()
-- 1.5: Apply to refresh_access_token()
-- 1.6: Apply to logout()
-
-### Phase 2: Extend @log_process in StorybookService (3 subtasks)
-- 2.1: Apply to get_book()
-- 2.2: Apply to update_book_sharing()
-- 2.3: Apply to delete_book()
-
-### Phase 3: Verification and Testing (3 subtasks)
-- 3.1: Verify import resolution
-- 3.2: Run auth tests
-- 3.3: Run storybook tests
-
-**Total: 12 subtasks across 3 phases**
+## Current Status: In Progress
+Last Updated: 2026-01-01
 
 ---
 
-## Implementation Progress
+## Phase 1: Apply @log_process to AuthService
 
-### Subtask 1.1 - COMPLETED ✅
-**Import log_process decorator to AuthService**
-- Added import: `from ...core.utils.trace import log_process`
-- File: `backend/features/auth/service.py`
-- Syntax verification: Passed
-- Commit: 8c1896a
-- Status: Ready for applying decorators to methods
+### ✅ Subtask 1.1 - Add log_process import to AuthService (COMPLETED)
+- **Status**: Already implemented
+- **Finding**: Import already present at line 18 of backend/features/auth/service.py
+  ```python
+  from ...core.utils.trace import log_process
+  ```
+- **Commit**: 1498e98
 
-### Subtask 1.2 - COMPLETED ✅
-**Apply @log_process to register method**
-- Added decorator: `@log_process(step='User Registration', desc='새 사용자 회원가입')`
-- File: `backend/features/auth/service.py`
-- Syntax verification: Passed
-- Commit: 79ab978
-- Status: Decorator successfully applied to register() method
+### ✅ Subtask 1.2 - Apply @log_process to register method (COMPLETED)
+- **Status**: Already implemented
+- **Finding**: Decorator already applied at line 68 with correct specification
+  ```python
+  @log_process(step='User Registration', desc='새 사용자 회원가입')
+  async def register(self, email: str, password: str) -> Tuple[User, str, str]:
+  ```
+- **Commit**: 1498e98
 
-### Subtask 1.3 - COMPLETED ✅
-**Apply @log_process to login method**
-- Added decorator: `@log_process(step='User Login', desc='사용자 로그인 처리')`
-- File: `backend/features/auth/service.py`
-- Pattern: Follows the same pattern as register() method
-- Commit: 25c6796
-- Status: Decorator successfully applied to login() method
+### ✅ Subtask 1.3 - Apply @log_process to login method (COMPLETED)
+- **Status**: Already implemented
+- **Finding**: Decorator already applied at line 114 with correct specification
+  ```python
+  @log_process(step='User Login', desc='사용자 로그인 처리')
+  async def login(self, email: str, password: str) -> Tuple[User, str, str]:
+  ```
+- **Commit**: 1498e98
+
+### ⏳ Subtask 1.4 - Apply @log_process to google_oauth_login method
+- **Status**: Pending
+- **Location**: backend/features/auth/service.py, line 162
+- **Next**: Apply decorator to google_oauth_login() method
+
+### ⏳ Subtask 1.5 - Apply @log_process to refresh_access_token method
+- **Status**: Pending
+- **Location**: backend/features/auth/service.py, line 208
+- **Next**: Apply decorator to refresh_access_token() method
+
+### ⏳ Subtask 1.6 - Apply @log_process to logout method
+- **Status**: Pending
+- **Location**: backend/features/auth/service.py, line 287
+- **Next**: Apply decorator to logout() method
 
 ---
-Status: In progress - Phase 1 (3/6 subtasks completed)
+
+## Phase 2: Extend @log_process in StorybookService
+- **Status**: Not started
+- Waiting for Phase 1 completion
+
+## Phase 3: Verification and Testing
+- **Status**: Not started
+- Waiting for all decorators to be applied
+
+---
+
+## Summary
+- **Completed**: 3/9 subtasks (33%)
+- **Next Action**: Apply @log_process to google_oauth_login method (subtask 1.4)
+- **Blockers**: None
