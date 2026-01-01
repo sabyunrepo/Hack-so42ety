@@ -182,6 +182,7 @@ services:
     image: ghcr.io/sabyunrepo/moriai-frontend:${FRONTEND_TAG:-prod}
     container_name: moriai-frontend-prod
     restart: unless-stopped
+    init: true
     ports:
       # 프로덕션: 내부 네트워크만 또는 Cloudflare Tunnel 사용 시 불필요
       - "127.0.0.1:80:80"
