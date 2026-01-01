@@ -286,6 +286,7 @@ class AuthService:
 
         return access_token, new_refresh_token
 
+    @log_process(step='User Logout', desc='사용자 로그아웃 처리')
     async def logout(self, user_id: str, access_token: str, refresh_token: str) -> None:
         """
         로그아웃 - 토큰 무효화
