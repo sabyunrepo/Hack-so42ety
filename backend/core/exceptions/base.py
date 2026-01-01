@@ -170,3 +170,21 @@ class InternalServerException(AppException):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             details=details,
         )
+
+
+class RateLimitExceededException(AppException):
+    """
+    속도 제한 초과 예외 (429 Too Many Requests)
+
+    요청 속도 제한을 초과한 경우 발생
+    """
+
+    def __init__(
+        self, error_code: str, message: str, details: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(
+            error_code=error_code,
+            message=message,
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            details=details,
+        )

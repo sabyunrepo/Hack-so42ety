@@ -11,6 +11,7 @@ from .base import (
     ConflictException,
     BusinessLogicException,
     InternalServerException,
+    RateLimitExceededException,
 )
 from .codes import ErrorCode
 from .schemas import ErrorResponse, ErrorDetail, ValidationErrorResponse
@@ -25,6 +26,7 @@ __all__ = [
     "ConflictException",
     "BusinessLogicException",
     "InternalServerException",
+    "RateLimitExceededException",
     # Error Codes
     "ErrorCode",
     # Schemas
