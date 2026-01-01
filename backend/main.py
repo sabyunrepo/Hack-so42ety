@@ -412,13 +412,17 @@ async def root():
 
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from backend.core.exceptions import AppException
+from backend.core.exceptions import AppException, RateLimitExceededException
 from backend.core.exceptions.handlers import (
     app_exception_handler,
+    rate_limit_exception_handler,
     validation_exception_handler,
     http_exception_handler,
     generic_exception_handler,
 )
+
+# 속도 제한 예외 (AppException의 서브클래스이므로 먼저 등록)
+app.add_exception_handler(RateLimitExceededException, rate_limit_exception_handler)
 
 # 커스텀 애플리케이션 예외
 app.add_exception_handler(AppException, app_exception_handler)
