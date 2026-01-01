@@ -42,9 +42,9 @@
           "subtask_id": "1.4",
           "title": "Apply @log_process to google_oauth_login method",
           "description": "Add @log_process(step='Google OAuth Login', desc='Google OAuth 로그인 처리') decorator to the google_oauth_login() method",
-          "status": "pending",
+          "status": "completed",
           "file_path": "backend/features/auth/service.py",
-          "notes": ""
+          "notes": "Successfully added @log_process(step='Google OAuth Login', desc='Google OAuth 로그인 처리') decorator to google_oauth_login() method at line 162. Follows the same pattern as register() and login() methods."
         },
         {
           "subtask_id": "1.5",

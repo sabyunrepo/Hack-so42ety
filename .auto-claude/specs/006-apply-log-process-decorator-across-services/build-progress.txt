@@ -33,10 +33,15 @@ Last Updated: 2026-01-01
   ```
 - **Commit**: 1498e98
 
-### ⏳ Subtask 1.4 - Apply @log_process to google_oauth_login method
-- **Status**: Pending
+### ✅ Subtask 1.4 - Apply @log_process to google_oauth_login method (COMPLETED)
+- **Status**: Completed
 - **Location**: backend/features/auth/service.py, line 162
-- **Next**: Apply decorator to google_oauth_login() method
+- **Implementation**: Successfully added decorator
+  ```python
+  @log_process(step='Google OAuth Login', desc='Google OAuth 로그인 처리')
+  async def google_oauth_login(self, google_token: str) -> Tuple[User, str, str]:
+  ```
+- **Commit**: 01a0f23
 
 ### ⏳ Subtask 1.5 - Apply @log_process to refresh_access_token method
 - **Status**: Pending
@@ -61,6 +66,6 @@ Last Updated: 2026-01-01
 ---
 
 ## Summary
-- **Completed**: 3/9 subtasks (33%)
-- **Next Action**: Apply @log_process to google_oauth_login method (subtask 1.4)
+- **Completed**: 4/9 subtasks (44%)
+- **Next Action**: Apply @log_process to refresh_access_token method (subtask 1.5)
 - **Blockers**: None
