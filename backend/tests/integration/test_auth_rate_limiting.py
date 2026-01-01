@@ -54,7 +54,9 @@ class TestLoginRateLimiting:
         assert response.headers["X-RateLimit-Remaining"] == "0"
 
         data = response.json()
-        assert "detail" in data
+        assert "error_code" in data
+        assert data["error_code"] == "RATE_001"
+        assert "message" in data  # Correct field name
         assert "retry_after" in data["details"]
 
     @pytest.mark.asyncio
