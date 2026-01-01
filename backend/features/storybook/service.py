@@ -239,6 +239,7 @@ class BookOrchestratorService:
         # Reload with pages for response schema
         return await self.book_repo.get_with_pages(book_id)
 
+    @log_process(step='Delete Storybook', desc='동화책 삭제 처리')
     async def delete_book(self, book_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """책 삭제"""
         # 본인 책인지 확인 로직은 Repository나 Service 레벨에서 수행
