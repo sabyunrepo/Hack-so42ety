@@ -15,7 +15,7 @@ from backend.core.dependencies import (
     get_cache_service,
     get_event_bus,
 )
-from backend.core.events.publisher import EventPublisher
+from backend.core.events.redis_streams_bus import RedisStreamsEventBus as EventPublisher
 from backend.core.events.types import EventType
 from backend.infrastructure.storage.base import AbstractStorageService
 from backend.infrastructure.ai.factory import AIProviderFactory
