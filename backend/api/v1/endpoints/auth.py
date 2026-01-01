@@ -59,6 +59,12 @@ rate_limit_google = create_rate_limit_dependency(
     window_seconds=settings.auth_rate_limit_window_seconds,
 )
 
+rate_limit_refresh = create_rate_limit_dependency(
+    endpoint="auth:refresh",
+    limit=settings.auth_refresh_rate_limit,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+)
+
 
 def get_auth_service_write(
     db: AsyncSession = Depends(get_db_write),
@@ -212,9 +218,11 @@ async def google_oauth(
 @router.post(
     "/refresh",
     response_model=TokenResponse,
+    dependencies=[Depends(rate_limit_refresh)],
     responses={
         200: {"description": "토큰 갱신 성공"},
         401: {"model": ErrorResponse, "description": "Refresh Token 검증 실패"},
+        429: {"model": ErrorResponse, "description": "요청 속도 제한 초과"},
     },
 )
 async def refresh(
