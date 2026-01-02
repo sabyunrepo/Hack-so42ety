@@ -163,7 +163,7 @@ async def login(
 
 @router.post(
     "/google",
-    response_model=AuthResponse,
+    response_model=AuthResponseCookie,
     responses={
         200: {"description": "Google OAuth 로그인 성공"},
         401: {"model": ErrorResponse, "description": "토큰 검증 실패"},
@@ -171,6 +171,7 @@ async def login(
 )
 async def google_oauth(
     request: GoogleOAuthRequest,
+    response: Response,
     auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
@@ -178,18 +179,25 @@ async def google_oauth(
 
     Args:
         request: Google OAuth 요청 (Google ID Token)
+        response: FastAPI Response 객체 (쿠키 설정용)
         auth_service: 인증 서비스
 
     Returns:
-        AuthResponse: 토큰 + 사용자 정보
+        AuthResponseCookie: 사용자 정보 (토큰은 httpOnly 쿠키에 저장)
     """
     user, access_token, refresh_token = await auth_service.google_oauth_login(
         google_token=request.token
     )
 
-    return AuthResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
+    # Set tokens as httpOnly cookies
+    set_auth_cookies(response, access_token, refresh_token)
+
+    logger.info(
+        "✅ [ENDPOINT] Google OAuth login successful - tokens set in httpOnly cookies",
+        extra={"user_id": str(user.id), "email": user.email}
+    )
+
+    return AuthResponseCookie(
         token_type="bearer",
         user=UserResponse(
             id=str(user.id),
