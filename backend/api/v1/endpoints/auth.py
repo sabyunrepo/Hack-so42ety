@@ -18,7 +18,7 @@ from backend.core.dependencies import get_cache_service
 from backend.core.auth.jwt_manager import JWTManager
 from backend.core.auth.providers.credentials import CredentialsAuthProvider
 from backend.core.auth.providers.google_oauth import GoogleOAuthProvider
-from backend.core.auth.cookies import set_auth_cookies
+from backend.core.auth.cookies import set_auth_cookies, clear_auth_cookies
 from backend.core.exceptions import NotFoundException, AuthenticationException, ErrorCode
 from backend.features.auth.schemas import (
     UserRegisterRequest,
@@ -276,38 +276,54 @@ async def refresh(
     },
 )
 async def logout(
-    request: LogoutRequest,
-    current_user: dict = Depends(get_current_user),
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    response: Response,
     auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
     로그아웃 - 토큰 무효화
 
     Args:
-        request: 로그아웃 요청 (Refresh Token)
-        current_user: 현재 사용자 (JWT에서 추출)
-        credentials: Authorization Bearer 토큰
+        request: FastAPI Request 객체 (쿠키에서 토큰 추출)
+        response: FastAPI Response 객체 (쿠키 삭제용)
         auth_service: 인증 서비스
 
     Returns:
         LogoutResponse: 로그아웃 성공 메시지
     """
+    # Read tokens from cookies
+    access_token = request.cookies.get("access_token")
+    refresh_token = request.cookies.get("refresh_token")
+
+    if not access_token or not refresh_token:
+        raise AuthenticationException(
+            error_code=ErrorCode.AUTH_003,
+            message="Authentication tokens not found in cookies"
+        )
+
     logger.info(
         "🚪 [ENDPOINT] /auth/logout called",
-        extra={"user_id": current_user["user_id"]}
+        extra={
+            "access_token_length": len(access_token),
+            "refresh_token_length": len(refresh_token)
+        }
     )
 
     try:
-        access_token = credentials.credentials
+        # Decode access token to get user_id
+        jwt_manager = JWTManager()
+        token_data = jwt_manager.decode_access_token(access_token)
 
         await auth_service.logout(
-            user_id=current_user["user_id"],
+            user_id=token_data["user_id"],
             access_token=access_token,
-            refresh_token=request.refresh_token,
+            refresh_token=refresh_token,
         )
 
-        logger.info("✅ [ENDPOINT] Logout successful")
+        # Clear auth cookies
+        clear_auth_cookies(response)
+
+        logger.info("✅ [ENDPOINT] Logout successful - auth cookies cleared")
 
         return LogoutResponse(message="Logout successful")
     except Exception as e:

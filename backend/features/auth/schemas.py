@@ -67,9 +67,9 @@ class RefreshTokenRequest(BaseModel):
 
 
 class LogoutRequest(BaseModel):
-    """로그아웃 요청"""
+    """로그아웃 요청 (레거시 - 쿠키 기반 인증으로 변경됨)"""
 
-    refresh_token: str = Field(..., description="Refresh Token", example="eyJhbGciOiJIUzI1NiIsInR5cCI6...")
+    refresh_token: Optional[str] = Field(None, description="Refresh Token (현재는 httpOnly 쿠키에서 자동으로 추출됨)", example="eyJhbGciOiJIUzI1NiIsInR5cCI6...")
 
     class Config:
         json_schema_extra = {
