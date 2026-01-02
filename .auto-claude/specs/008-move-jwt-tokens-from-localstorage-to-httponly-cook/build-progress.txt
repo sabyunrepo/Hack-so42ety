@@ -98,3 +98,11 @@ Created: 2025-01-02
   - Tokens now automatically set as httpOnly cookies by backend via withCredentials: true
   - All three auth functions include comments explaining cookie-based token handling
   - Follows cookie-based authentication pattern established in previous backend and frontend subtasks
+[2026-01-02] - Subtask 5.2 completed: Modified logout() function in frontend/src/components/AuthProvider.tsx
+  - Removed localStorage reads for refresh_token and access_token - tokens now stored as httpOnly cookies
+  - Call /auth/logout with no request body - cookies sent automatically via withCredentials: true
+  - Removed Authorization header - backend reads tokens from cookies
+  - Clear only user info from localStorage in finally block (no access_token or refresh_token)
+  - Backend clears httpOnly cookies automatically via clear_auth_cookies()
+  - Added clear comments explaining cookie-based token handling
+  - Pattern follows same implementation as login/register/googleLogin functions in subtask 5.1
