@@ -137,7 +137,7 @@ Return ONLY the shortened title, nothing else."""
             # ShortenedTitle 객체
             shortened = result.title.strip()
 
-        if 0 < len(shortened) <= max_length:
+        if 0 < len(shortened) <= max_length + 10:
             logger.info(
                 f"[Story Task] Title shortened: '{title}' ({len(title)} chars) "
                 f"→ '{shortened}' ({len(shortened)} chars)"
@@ -151,11 +151,11 @@ Return ONLY the shortened title, nothing else."""
     except Exception as e:
         logger.warning(f"[Story Task] Title shortening failed: {e}")
 
-    # Fallback: 30자 이하면 단순 자르기, 초과면 에러
-    max_fallback_length = max_length + 10  # 20 + 10 = 30
+    # Fallback: 100자 이하면 단순 자르기, 초과면 에러
+    max_fallback_length = max_length + 80  # 20 + 80 = 100
 
     if len(shortened) > max_fallback_length:
-        # 30자 초과: 자르면 의미 손실이 큼 → 에러
+        # 100자 초과: 자르면 의미 손실이 큼 → 에러
         raise ValueError(
             f"Title too long for truncation ({len(shortened)} > {max_fallback_length} chars): '{shortened}'"
         )
@@ -172,7 +172,10 @@ async def _generate_story_phase(
     max_retries: int,
 ) -> tuple[str, list] | None:
     """
-    Phase 1: Story 생성 + 검증
+    Phase 1: Story 생성 + 검증 (후보 누적 방식)
+
+    재시도 시 생성된 (title, dialogues) 쌍을 누적 저장하고,
+    마지막에 가장 짧은 제목을 가진 후보를 선택하여 에러 발생을 최소화합니다.
 
     Returns:
         (book_title, dialogues) 또는 실패 시 None
@@ -193,44 +196,106 @@ async def _generate_story_phase(
         target_language=target_language,
     ).render()
 
-    async def _generate_and_validate():
-        generated_data = await story_provider.generate_story(
-            prompt=prompt,
-            response_schema=response_schema,
-        )
+    # 후보 저장 리스트: (title, dialogues) 쌍
+    candidates: list[tuple[str, list]] = []
+    last_error: Exception | None = None
+    max_fallback_length = settings.max_title_length + 80  # 100자
 
-        title, dialogues = validate_generated_story(generated_data)
-
-        # 페이지 수 검증 (불일치 시 재시도)
-        if len(dialogues) != num_pages:
-            raise ValueError(
-                f"Page count mismatch: expected {num_pages}, got {len(dialogues)}"
+    for attempt in range(1, max_retries + 1):
+        try:
+            # AI 스토리 생성
+            generated_data = await story_provider.generate_story(
+                prompt=prompt,
+                response_schema=response_schema,
             )
+            title, dialogues = validate_generated_story(generated_data)
 
-        # Title 길이 초과 시 AI 축약 요청 (1회)
-        if len(title) > settings.max_title_length:
+            # 페이지 수 검증 (불일치 시 후보에서 제외)
+            if len(dialogues) != num_pages:
+                logger.warning(
+                    f"[Story Task] [Book: {book_id}] Attempt {attempt}/{max_retries}: "
+                    f"Page count mismatch (expected {num_pages}, got {len(dialogues)}), skipping"
+                )
+                continue
+
+            # Early Return: 30자 이하면 즉시 반환
+            if len(title) <= settings.max_title_length + 10:
+                logger.info(
+                    f"[Story Task] [Book: {book_id}] Title within limit "
+                    f"({len(title)} chars), returning immediately"
+                )
+                return (title, dialogues)
+
+            # 제목 축약 시도 (30자 초과인 경우)
             logger.info(
-                f"[Story Task] [Book: {book_id}] Title: {title} too long ({len(title)} chars), "
-                f"requesting AI shortening..."
+                f"[Story Task] [Book: {book_id}] Title: '{title}' too long "
+                f"({len(title)} chars), requesting AI shortening..."
             )
-            title = await _shorten_title(
-                story_provider,
-                title,
-                settings.max_title_length,
+            try:
+                title = await _shorten_title(
+                    story_provider,
+                    title,
+                    settings.max_title_length,
+                )
+            except ValueError as shorten_error:
+                # _shorten_title이 100자 초과로 실패한 경우
+                logger.warning(
+                    f"[Story Task] [Book: {book_id}] Attempt {attempt}/{max_retries}: "
+                    f"Title shortening failed: {shorten_error}, skipping"
+                )
+                continue
+
+            # 축약 후 검증
+            if len(title) <= settings.max_title_length + 10:
+                # 30자 이하로 축약 성공 → 즉시 반환
+                logger.info(
+                    f"[Story Task] [Book: {book_id}] Title shortened to {len(title)} chars, "
+                    f"returning immediately"
+                )
+                return (title, dialogues)
+            elif len(title) <= max_fallback_length:
+                # 100자 이하: 후보에 추가
+                candidates.append((title, dialogues))
+                logger.info(
+                    f"[Story Task] [Book: {book_id}] Added candidate: title='{title}' "
+                    f"({len(title)} chars), total candidates: {len(candidates)}"
+                )
+            else:
+                # 100자 초과: 후보에서 제외
+                logger.warning(
+                    f"[Story Task] [Book: {book_id}] Attempt {attempt}/{max_retries}: "
+                    f"Title still too long after shortening ({len(title)} chars), skipping"
+                )
+
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                f"[Story Task] [Book: {book_id}] Attempt {attempt}/{max_retries} failed: {e}"
             )
 
-        return title, dialogues
+        # 대기 (마지막 시도가 아닌 경우)
+        if attempt < max_retries:
+            delay = await calculate_retry_delay(attempt)
+            logger.info(f"[Story Task] [Book: {book_id}] Retrying in {delay:.1f}s...")
+            await asyncio.sleep(delay)
 
-    try:
-        return await retry_with_config(
-            func=_generate_and_validate,
-            max_retries=max_retries,
-            error_message_prefix=f"[Story Task] [Book: {book_id}]",
+    # 모든 시도 완료 후: 후보 중 최선 선택
+    if candidates:
+        best = min(candidates, key=lambda c: len(c[0]))
+        logger.info(
+            f"[Story Task] [Book: {book_id}] Selected best candidate: title='{best[0]}' "
+            f"({len(best[0])} chars) from {len(candidates)} candidates"
         )
-    except RuntimeError as e:
-        logger.error(f"[Story Task] All retries failed: {e}")
-        await _mark_book_failed(book_id, "Story generation failed", str(e))
-        return None
+        return best
+
+    # 후보 없음: 실패 처리
+    error_msg = str(last_error) if last_error else "No valid title candidates"
+    logger.error(
+        f"[Story Task] [Book: {book_id}] All {max_retries} attempts failed, "
+        f"no valid candidates. Last error: {error_msg}"
+    )
+    await _mark_book_failed(book_id, "Story generation failed", error_msg)
+    return None
 
 
 async def _generate_emotion_phase(
@@ -691,9 +756,9 @@ async def generate_image_task(
             f"[Image Task] [Book: {book_id}] All {tracker.total_items} images completed successfully"
         )
     elif tracker.is_partial_failure():
-        status = TaskStatus.COMPLETED  # 부분 성공도 COMPLETED로 처리
-        logger.warning(
-            f"[Image Task] [Book: {book_id}] Partial completion: "
+        status = TaskStatus.FAILED  # 부분 실패는 실패로 처리
+        logger.error(
+            f"[Image Task] [Book: {book_id}] Partial failure: "
             f"{len(tracker.completed)}/{tracker.total_items} images"
         )
     else:
@@ -1238,9 +1303,9 @@ async def generate_video_task(
             f"[Video Task] [Book: {book_id}] All {tracker.total_items} videos completed"
         )
     elif tracker.is_partial_failure():
-        status = TaskStatus.COMPLETED  # 부분 성공도 허용
-        logger.warning(
-            f"[Video Task] [Book: {book_id}] Partial completion: "
+        status = TaskStatus.FAILED  # 부분 실패는 실패로 처리
+        logger.error(
+            f"[Video Task] [Book: {book_id}] Partial failure: "
             f"{len(tracker.completed)}/{tracker.total_items} videos"
         )
     else:
@@ -1423,7 +1488,7 @@ async def finalize_book_task(
 
             # 상태 결정
             if has_partial_failure:
-                final_status = BookStatus.PARTIALLY_COMPLETED
+                final_status = BookStatus.FAILED  # 부분 실패도 실패로 처리
             else:
                 final_status = BookStatus.COMPLETED
 

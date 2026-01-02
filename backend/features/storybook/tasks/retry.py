@@ -167,7 +167,7 @@ class BatchRetryTracker:
         if self.is_all_completed():
             status = "completed"
         elif self.is_partial_failure():
-            status = "partially_completed"
+            status = "failed"  # 부분 실패도 실패로 처리
         else:
             status = "failed"
 
