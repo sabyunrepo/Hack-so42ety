@@ -16,6 +16,7 @@ class EventType(str, Enum):
     VOICE_UPDATED = "voice.updated"
     VOICE_DELETED = "voice.deleted"
     TTS_CREATION = "tts.creation"
+    MEDIA_OPTIMIZATION = "media.optimization"
 
 
 class Event(BaseModel):

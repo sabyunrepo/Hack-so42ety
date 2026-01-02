@@ -22,10 +22,6 @@ from .exceptions import (
     BookQuotaExceededException,
 )
 
-# test
-from PIL import Image
-from io import BytesIO
-
 logger = logging.getLogger(__name__)
 
 

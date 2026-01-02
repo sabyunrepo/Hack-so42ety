@@ -35,6 +35,10 @@ jobs:
             context: .
             file: ./docker/frontend/Dockerfile
             image_name: moriai-frontend
+          - service: media-worker
+            context: .
+            file: ./docker/media-worker/Dockerfile
+            image_name: moriai-media-worker
 
     steps:
       - name: Checkout code
@@ -85,6 +89,10 @@ jobs:
             frontend:
               - 'frontend/**'
               - 'docker/frontend/**'
+              - '.github/workflows/**'
+            media-worker:
+              - 'standalone_media_worker.py'
+              - 'docker/media-worker/**'
               - '.github/workflows/**'
 
       - name: Install Infisical
