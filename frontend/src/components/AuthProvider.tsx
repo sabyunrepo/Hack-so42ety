@@ -14,11 +14,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing token and user data
-    const token = localStorage.getItem("access_token");
+    // Check for existing user data in localStorage
+    // Tokens are now stored in httpOnly cookies and not accessible via JavaScript
     const storedUser = localStorage.getItem("user");
 
-    if (token && storedUser) {
+    if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
     setIsLoading(false);
@@ -26,20 +26,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (data: LoginRequest) => {
     const response = await apiClient.post<AuthResponse>("/auth/login", data);
-    const { user, access_token, refresh_token } = response.data;
+    const { user } = response.data;
 
-    localStorage.setItem("access_token", access_token);
-    localStorage.setItem("refresh_token", refresh_token);
+    // Tokens are now set as httpOnly cookies by the backend
+    // Only store user info in localStorage for quick access
     localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
   };
 
   const register = async (data: RegisterRequest) => {
     const response = await apiClient.post<AuthResponse>("/auth/register", data);
-    const { user, access_token, refresh_token } = response.data;
+    const { user } = response.data;
 
-    localStorage.setItem("access_token", access_token);
-    localStorage.setItem("refresh_token", refresh_token);
+    // Tokens are now set as httpOnly cookies by the backend
+    // Only store user info in localStorage for quick access
     localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
   };
@@ -48,10 +48,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const response = await apiClient.post<AuthResponse>("/auth/google", {
       token,
     });
-    const { user, access_token, refresh_token } = response.data;
+    const { user } = response.data;
 
-    localStorage.setItem("access_token", access_token);
-    localStorage.setItem("refresh_token", refresh_token);
+    // Tokens are now set as httpOnly cookies by the backend
+    // Only store user info in localStorage for quick access
     localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
   };
