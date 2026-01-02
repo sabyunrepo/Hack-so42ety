@@ -33,19 +33,13 @@ apiClient.interceptors.response.use(
         !originalRequest?.url?.includes("/auth/logout");
 
       if (isAuthEndpoint) {
-        console.log(
-          "⏭️ [REFRESH] Skipping refresh for auth endpoint:",
-          originalRequest.url
-        );
         return Promise.reject(error);
       }
 
       // 이미 재발급 진행중인 경우 대기
       if (isRefreshing && refreshPromise) {
-        // console.log("⏳ [REFRESH] Already refreshing, waiting...");
         try {
           await refreshPromise;
-          // console.log("✅ [REFRESH] Got new token from queue, retrying request");
           return apiClient(originalRequest);
         } catch (err) {
           return Promise.reject(err);
@@ -54,7 +48,6 @@ apiClient.interceptors.response.use(
 
       // 재발급 로직  시작
       isRefreshing = true;
-      // console.log("🔄 [REFRESH] Starting token refresh...");
 
       refreshPromise = (async () => {
         try {
@@ -69,12 +62,7 @@ apiClient.interceptors.response.use(
             }
           );
 
-          // console.log("🔄 [REFRESH] Response status:", response.status);
-          // console.log("🔄 [REFRESH] Response data:", response.data);
-          // console.log("✅ [REFRESH] Token refreshed successfully (cookies updated by backend)");
         } catch (refreshError) {
-          // console.error("❌ [REFRESH] Token refresh failed:", refreshError);
-
           // Log detailed error information
           if (axios.isAxiosError(refreshError)) {
             console.error(
@@ -102,15 +90,10 @@ apiClient.interceptors.response.use(
 
       try {
         await refreshPromise;
-        console.log(
-          "🔄 [REFRESH] Retrying original request to:",
-          originalRequest.url
-        );
         return apiClient(originalRequest);
       } catch (_err) {
         // Return a promise that never resolves to prevent error propagation during redirect
         // 리디렉션 중 오류 전파를 방지하기 위해 절대 해결되지 않는 프로미스를 반환
-        console.log(_err);
         return new Promise(() => {});
       }
     }
