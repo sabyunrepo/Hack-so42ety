@@ -115,6 +115,10 @@ class ErrorCode(str, Enum):
     BIZ_TTS_VOICE_LIMIT_EXCEEDED = "BIZ_207"
     """Voice Clone 생성 한도를 초과했습니다"""
 
+    # ==================== Rate Limiting (RATE_xxx) ====================
+    RATE_LIMIT_EXCEEDED = "RATE_001"
+    """요청 속도 제한을 초과했습니다"""
+
     # ==================== System (SYS_xxx) ====================
     SYS_INTERNAL_ERROR = "SYS_001"
     """서버 내부 오류가 발생했습니다"""

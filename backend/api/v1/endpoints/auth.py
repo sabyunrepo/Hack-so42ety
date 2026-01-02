@@ -9,8 +9,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database.session import get_db_readonly, get_db_write
-from backend.core.dependencies import get_cache_service
+from backend.core.dependencies import get_cache_service, create_rate_limit_dependency
 from backend.core.cache.service import CacheService
+from backend.core.config import settings
 
 logger = logging.getLogger(__name__)
 from backend.core.auth import get_current_user
@@ -39,6 +40,31 @@ from backend.core.cache.service import CacheService
 router = APIRouter()
 security = HTTPBearer()
 
+# Rate limiting dependencies
+rate_limit_login = create_rate_limit_dependency(
+    endpoint="auth:login",
+    limit=settings.auth_login_rate_limit,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+)
+
+rate_limit_register = create_rate_limit_dependency(
+    endpoint="auth:register",
+    limit=settings.auth_register_rate_limit,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+)
+
+rate_limit_google = create_rate_limit_dependency(
+    endpoint="auth:google",
+    limit=settings.auth_google_rate_limit,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+)
+
+rate_limit_refresh = create_rate_limit_dependency(
+    endpoint="auth:refresh",
+    limit=settings.auth_refresh_rate_limit,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+)
+
 
 def get_auth_service_write(
     db: AsyncSession = Depends(get_db_write),
@@ -64,9 +90,11 @@ def get_auth_service_write(
     "/register",
     response_model=AuthResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit_register)],
     responses={
         201: {"description": "회원가입 성공"},
         409: {"model": ErrorResponse, "description": "이메일 중복"},
+        429: {"model": ErrorResponse, "description": "요청 속도 제한 초과"},
     },
 )
 async def register(
@@ -82,6 +110,11 @@ async def register(
 
     Returns:
         AuthResponse: 토큰 + 사용자 정보
+
+    Rate Limiting:
+        - 3 requests per 60 seconds per IP address
+        - Returns 429 Too Many Requests when limit exceeded
+        - Response headers include: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After
     """
     user, access_token, refresh_token = await auth_service.register(
         email=request.email,
@@ -105,9 +138,11 @@ async def register(
 @router.post(
     "/login",
     response_model=AuthResponse,
+    dependencies=[Depends(rate_limit_login)],
     responses={
         200: {"description": "로그인 성공"},
         401: {"model": ErrorResponse, "description": "인증 실패"},
+        429: {"model": ErrorResponse, "description": "요청 속도 제한 초과"},
     },
 )
 async def login(
@@ -123,6 +158,12 @@ async def login(
 
     Returns:
         AuthResponse: 토큰 + 사용자 정보
+
+    Rate Limiting:
+        - 5 requests per 60 seconds per IP address
+        - Returns 429 Too Many Requests when limit exceeded
+        - Response headers include: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After
+        - Protects against brute force attacks
     """
     user, access_token, refresh_token = await auth_service.login(
         email=request.email,
@@ -146,9 +187,11 @@ async def login(
 @router.post(
     "/google",
     response_model=AuthResponse,
+    dependencies=[Depends(rate_limit_google)],
     responses={
         200: {"description": "Google OAuth 로그인 성공"},
         401: {"model": ErrorResponse, "description": "토큰 검증 실패"},
+        429: {"model": ErrorResponse, "description": "요청 속도 제한 초과"},
     },
 )
 async def google_oauth(
@@ -164,6 +207,11 @@ async def google_oauth(
 
     Returns:
         AuthResponse: 토큰 + 사용자 정보
+
+    Rate Limiting:
+        - 10 requests per 60 seconds per IP address
+        - Returns 429 Too Many Requests when limit exceeded
+        - Response headers include: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After
     """
     user, access_token, refresh_token = await auth_service.google_oauth_login(
         google_token=request.token
@@ -186,9 +234,11 @@ async def google_oauth(
 @router.post(
     "/refresh",
     response_model=TokenResponse,
+    dependencies=[Depends(rate_limit_refresh)],
     responses={
         200: {"description": "토큰 갱신 성공"},
         401: {"model": ErrorResponse, "description": "Refresh Token 검증 실패"},
+        429: {"model": ErrorResponse, "description": "요청 속도 제한 초과"},
     },
 )
 async def refresh(
@@ -204,6 +254,12 @@ async def refresh(
 
     Returns:
         TokenResponse: 새로운 Access Token
+
+    Rate Limiting:
+        - 30 requests per 60 seconds per IP address
+        - Returns 429 Too Many Requests when limit exceeded
+        - Response headers include: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After
+        - Higher limit allows frequent token rotation
     """
     logger.info(
         "🔄 [ENDPOINT] /auth/refresh called",

@@ -241,6 +241,40 @@ class Settings(BaseSettings):
     # ==================== Feature Flags ====================
     use_template_mode: bool = Field(default=False, env="USE_TEMPLATE_MODE")
 
+    # ==================== Rate Limiting ====================
+    rate_limit_enabled: bool = Field(
+        default=True,
+        env="RATE_LIMIT_ENABLED",
+        description="Enable/disable rate limiting for authentication endpoints",
+    )
+    # Rate limit window (applies to all auth endpoints)
+    auth_rate_limit_window_seconds: int = Field(
+        default=60,
+        env="AUTH_RATE_LIMIT_WINDOW_SECONDS",
+        description="Time window in seconds for rate limiting",
+    )
+    # Per-endpoint rate limits (requests per window)
+    auth_login_rate_limit: int = Field(
+        default=5,
+        env="AUTH_LOGIN_RATE_LIMIT",
+        description="Maximum login attempts per window (most restrictive for brute force protection)",
+    )
+    auth_register_rate_limit: int = Field(
+        default=3,
+        env="AUTH_REGISTER_RATE_LIMIT",
+        description="Maximum registration attempts per window (prevents automated account creation)",
+    )
+    auth_google_rate_limit: int = Field(
+        default=10,
+        env="AUTH_GOOGLE_RATE_LIMIT",
+        description="Maximum Google OAuth attempts per window (higher as OAuth has built-in protections)",
+    )
+    auth_refresh_rate_limit: int = Field(
+        default=30,
+        env="AUTH_REFRESH_RATE_LIMIT",
+        description="Maximum token refresh attempts per window (higher as it's called frequently)",
+    )
+
     # ==================== HTTP Client ====================
     http_timeout: float = Field(default=60.0, env="HTTP_TIMEOUT")
     http_read_timeout: float = Field(default=300.0, env="HTTP_READ_TIMEOUT")

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .base import AppException
+from .base import AppException, RateLimitExceededException
 from .schemas import ErrorResponse, ValidationErrorResponse, ErrorDetail
 from .codes import ErrorCode
 
@@ -61,6 +61,68 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 
     return JSONResponse(
         status_code=exc.status_code, content=error_response.model_dump(mode="json")
+    )
+
+
+async def rate_limit_exception_handler(
+    request: Request, exc: RateLimitExceededException
+) -> JSONResponse:
+    """
+    속도 제한 초과 예외 핸들러 (429 Too Many Requests)
+
+    Args:
+        request: FastAPI Request 객체
+        exc: RateLimitExceededException 인스턴스
+
+    Returns:
+        JSONResponse: Retry-After 헤더를 포함한 429 응답
+    """
+    # 요청 ID 생성
+    request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+
+    # 로깅
+    logger.warning(
+        f"Rate limit exceeded: [{exc.error_code}] {exc.message}",
+        extra={
+            "error_code": exc.error_code,
+            "status_code": exc.status_code,
+            "path": request.url.path,
+            "method": request.method,
+            "request_id": request_id,
+            "details": exc.details,
+        },
+    )
+
+    # 에러 응답 생성
+    error_response = ErrorResponse(
+        error_code=exc.error_code,
+        message=exc.message,
+        status_code=exc.status_code,
+        request_id=request_id,
+        path=str(request.url.path),
+        details=exc.details if exc.details else None,
+    )
+
+    # Retry-After 헤더 추가를 위한 헤더 딕셔너리 생성
+    headers = {}
+
+    # details에서 retry_after 추출
+    if exc.details and "retry_after" in exc.details:
+        headers["Retry-After"] = str(exc.details["retry_after"])
+
+    # details에서 rate limit 메타데이터 추출 (있으면 헤더에 추가)
+    if exc.details:
+        if "limit" in exc.details:
+            headers["X-RateLimit-Limit"] = str(exc.details["limit"])
+        if "window_seconds" in exc.details:
+            headers["X-RateLimit-Reset"] = str(exc.details.get("reset_at", 0))
+        # remaining은 항상 0 (제한 초과 상태)
+        headers["X-RateLimit-Remaining"] = "0"
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_response.model_dump(mode="json"),
+        headers=headers,
     )
 
 
