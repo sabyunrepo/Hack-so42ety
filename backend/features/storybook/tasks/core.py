@@ -137,7 +137,7 @@ Return ONLY the shortened title, nothing else."""
             # ShortenedTitle 객체
             shortened = result.title.strip()
 
-        if 0 < len(shortened) <= max_length:
+        if 0 < len(shortened) <= max_length + 10:
             logger.info(
                 f"[Story Task] Title shortened: '{title}' ({len(title)} chars) "
                 f"→ '{shortened}' ({len(shortened)} chars)"
@@ -151,11 +151,11 @@ Return ONLY the shortened title, nothing else."""
     except Exception as e:
         logger.warning(f"[Story Task] Title shortening failed: {e}")
 
-    # Fallback: 30자 이하면 단순 자르기, 초과면 에러
-    max_fallback_length = max_length + 30  # 20 + 30 = 50
+    # Fallback: 100자 이하면 단순 자르기, 초과면 에러
+    max_fallback_length = max_length + 80  # 20 + 80 = 100
 
     if len(shortened) > max_fallback_length:
-        # 30자 초과: 자르면 의미 손실이 큼 → 에러
+        # 100자 초과: 자르면 의미 손실이 큼 → 에러
         raise ValueError(
             f"Title too long for truncation ({len(shortened)} > {max_fallback_length} chars): '{shortened}'"
         )
@@ -199,7 +199,7 @@ async def _generate_story_phase(
     # 후보 저장 리스트: (title, dialogues) 쌍
     candidates: list[tuple[str, list]] = []
     last_error: Exception | None = None
-    max_fallback_length = settings.max_title_length + 30  # 50자
+    max_fallback_length = settings.max_title_length + 80  # 100자
 
     for attempt in range(1, max_retries + 1):
         try:
@@ -218,15 +218,15 @@ async def _generate_story_phase(
                 )
                 continue
 
-            # Early Return: 20자 이하면 즉시 반환
-            if len(title) <= settings.max_title_length:
+            # Early Return: 30자 이하면 즉시 반환
+            if len(title) <= settings.max_title_length + 10:
                 logger.info(
                     f"[Story Task] [Book: {book_id}] Title within limit "
                     f"({len(title)} chars), returning immediately"
                 )
                 return (title, dialogues)
 
-            # 제목 축약 시도 (20자 초과인 경우)
+            # 제목 축약 시도 (30자 초과인 경우)
             logger.info(
                 f"[Story Task] [Book: {book_id}] Title: '{title}' too long "
                 f"({len(title)} chars), requesting AI shortening..."
@@ -238,7 +238,7 @@ async def _generate_story_phase(
                     settings.max_title_length,
                 )
             except ValueError as shorten_error:
-                # _shorten_title이 50자 초과로 실패한 경우
+                # _shorten_title이 100자 초과로 실패한 경우
                 logger.warning(
                     f"[Story Task] [Book: {book_id}] Attempt {attempt}/{max_retries}: "
                     f"Title shortening failed: {shorten_error}, skipping"
@@ -254,14 +254,14 @@ async def _generate_story_phase(
                 )
                 return (title, dialogues)
             elif len(title) <= max_fallback_length:
-                # 50자 이하: 후보에 추가
+                # 100자 이하: 후보에 추가
                 candidates.append((title, dialogues))
                 logger.info(
                     f"[Story Task] [Book: {book_id}] Added candidate: title='{title}' "
                     f"({len(title)} chars), total candidates: {len(candidates)}"
                 )
             else:
-                # 50자 초과: 후보에서 제외
+                # 100자 초과: 후보에서 제외
                 logger.warning(
                     f"[Story Task] [Book: {book_id}] Attempt {attempt}/{max_retries}: "
                     f"Title still too long after shortening ({len(title)} chars), skipping"
@@ -296,6 +296,7 @@ async def _generate_story_phase(
     )
     await _mark_book_failed(book_id, "Story generation failed", error_msg)
     return None
+
 
 async def _generate_emotion_phase(
     story_provider,
