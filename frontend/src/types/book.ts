@@ -49,6 +49,8 @@ export interface PageData {
   image_url?: string;
   image_prompt?: string;
   dialogues: Dialogue[];
+  video_url?: string; // 비디오 URL (있는 경우)
+  expires_at?: string; // URL 만료 시간 (ISO 8601, 비공개 콘텐츠)
 }
 
 /**

@@ -3,9 +3,10 @@ import { useRef, useState } from "react";
 
 interface AudioPlayerProps {
   src: string;
+  onError?: () => void; // 에러 발생 시 콜백
 }
 
-const AudioPlayer = ({ src }: AudioPlayerProps) => {
+const AudioPlayer = ({ src, onError }: AudioPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -36,6 +37,10 @@ const AudioPlayer = ({ src }: AudioPlayerProps) => {
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
+        onError={() => {
+          setIsPlaying(false);
+          onError?.();
+        }}
       />
       <button
         onClick={togglePlay}

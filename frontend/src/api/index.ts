@@ -149,3 +149,39 @@ export const toggleBookShare = async (
     is_shared: isShared,
   });
 };
+
+// 미디어 URL 갱신 응답 타입
+export interface RefreshMediaUrlsResponse {
+  page_id: string;
+  urls: {
+    video_url?: string;
+    image_url?: string;
+    audios?: Array<{
+      dialogue_id: string;
+      language_code: string;
+      audio_url: string;
+    }>;
+  };
+  expires_at: string; // ISO 8601 datetime (3시간 후)
+}
+
+/**
+ * 미디어 URL 갱신 (비공개 콘텐츠 전용)
+ *
+ * @throws {Error} 400 - 공개 콘텐츠는 갱신 불필요
+ * @throws {Error} 403 - 권한 없음
+ * @throws {Error} 404 - 책/페이지를 찾을 수 없음
+ */
+export const refreshMediaUrls = async (
+  bookId: string,
+  pageId: string
+): Promise<RefreshMediaUrlsResponse> => {
+  if (!bookId || !pageId) {
+    throw new Error("Book ID and Page ID are required");
+  }
+
+  const response = await apiClient.post<RefreshMediaUrlsResponse>(
+    `/media/books/${bookId}/pages/${pageId}/refresh-urls`
+  );
+  return response.data;
+};

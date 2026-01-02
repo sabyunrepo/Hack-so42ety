@@ -60,6 +60,8 @@ const Viewer: React.FC = () => {
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
   const [isShared, setIsShared] = useState<boolean>(false);
   const [isTogglingShare, setIsTogglingShare] = useState<boolean>(false);
+  const [mediaRetryCount, setMediaRetryCount] = useState<number>(0);
+  const MAX_MEDIA_RETRIES = 3;
 
   const bookRef = useRef<HTMLFlipBookRef | null>(null);
   const navigate = useNavigate();
@@ -172,17 +174,40 @@ const Viewer: React.FC = () => {
     }
   };
 
-  // Helper to check if url is video
-  const isVideo = (url?: string) => {
-    if (!url) return false;
-    // Presigned URL에는 쿼리 파라미터가 포함되므로 endsWith 대신 includes 사용
-    // 또는 URL 객체로 파싱하여 pathname 확인이 더 정확함
+  // 미디어 에러 핸들러 (비공개 콘텐츠의 URL 만료 시 책 다시 로드)
+  const handleMediaError = async () => {
+    // 공개 콘텐츠는 URL 갱신 불필요
+    if (isShared) {
+      console.error("Media load failed for public content");
+      return;
+    }
+
+    // 최대 재시도 횟수 확인
+    if (mediaRetryCount >= MAX_MEDIA_RETRIES) {
+      console.error("Max media retries reached");
+      setErrorMessage(
+        "미디어를 불러올 수 없습니다. 페이지를 새로고침해주세요."
+      );
+      return;
+    }
+
     try {
-      const urlObj = new URL(url);
-      return urlObj.pathname.toLowerCase().endsWith(".mp4");
-    } catch {
-      // URL 파싱 실패 시 단순 문자열 체크
-      return url.toLowerCase().includes(".mp4");
+      console.warn(
+        `Media URL may be expired, refreshing book... (Retry ${
+          mediaRetryCount + 1
+        }/${MAX_MEDIA_RETRIES})`
+      );
+      setMediaRetryCount((prev) => prev + 1);
+
+      // 책 전체를 다시 로드하여 최신 URL 받기
+      const data: BookData = await getStorybookById(bookId!);
+      setBook(data);
+      setIsShared(data.is_shared || false);
+
+      console.log("Book refreshed successfully with new URLs");
+    } catch (error) {
+      console.error("Failed to refresh book:", error);
+      setErrorMessage("미디어 URL을 갱신할 수 없습니다. 다시 시도해주세요.");
     }
   };
 
@@ -272,9 +297,7 @@ const Viewer: React.FC = () => {
               `}
             >
               <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span>
-                {isShared ? t("shareToggleOn") : t("shareToggleOff")}
-              </span>
+              <span>{isShared ? t("shareToggleOn") : t("shareToggleOff")}</span>
             </button>
           </div>
         )}
@@ -334,16 +357,15 @@ const Viewer: React.FC = () => {
             key={`image-${pageData.id}`}
             className="relative bg-white flex flex-col justify-center items-center p-5 shadow-2xl/30 "
           >
-            {isVideo(pageData.image_url) ? (
-              <video muted autoPlay loop className="h-full w-full object-cover">
-                <source src={`${pageData.image_url}`} type="video/mp4" />
-              </video>
-            ) : (
-              <img
-                src={`${pageData.image_url}`}
-                className="h-full w-full object-cover"
-              />
-            )}
+            <video
+              muted
+              autoPlay
+              loop
+              className="h-full w-full object-cover"
+              onError={handleMediaError}
+            >
+              <source src={`${pageData.image_url}`} type="video/mp4" />
+            </video>
             <div
               className="pointer-events-none absolute inset-y-0 right-0 w-[10%]"
               style={{
@@ -394,6 +416,7 @@ const Viewer: React.FC = () => {
                   />
                   <AudioPlayer
                     src={getDialogueAudioUrl(dialogue, "en") || ""}
+                    onError={handleMediaError}
                   />
                 </div>
               ))}
