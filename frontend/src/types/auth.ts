@@ -5,8 +5,8 @@ export interface User {
 
 export interface AuthResponse {
   user: User;
-  access_token: string;
-  refresh_token: string;
+  // Tokens are now stored in httpOnly cookies and not included in response body
+  // access_token and refresh_token removed for XSS protection
 }
 
 export interface LoginRequest {
