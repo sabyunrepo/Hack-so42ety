@@ -6,7 +6,7 @@ FastAPI Depends용 인증 의존성
 import hashlib
 import logging
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,20 +18,27 @@ from ..exceptions import AuthenticationException, ErrorCode
 
 logger = logging.getLogger(__name__)
 
-# HTTP Bearer 토큰 스킴
+# HTTP Bearer 토큰 스킴 (auto_error=False for optional auth)
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
     db: AsyncSession = Depends(get_db_readonly),
     cache_service: CacheService = Depends(get_cache_service),
 ) -> dict:
     """
     현재 인증된 사용자 정보 추출 (블랙리스트 확인 포함)
 
+    쿠키 우선, Authorization 헤더 폴백 방식:
+    1) 쿠키에서 access_token 추출 시도
+    2) 없으면 Authorization 헤더에서 추출 (마이그레이션 호환성)
+
     Args:
-        credentials: HTTP Authorization Bearer 토큰
+        request: FastAPI Request 객체 (쿠키에서 토큰 추출)
+        credentials: HTTP Authorization Bearer 토큰 (폴백용)
         db: 데이터베이스 세션
         cache_service: Redis 캐시 서비스
 
@@ -41,9 +48,27 @@ async def get_current_user(
     Raises:
         HTTPException: 토큰이 유효하지 않거나 만료된 경우
     """
-    token = credentials.credentials
+    # 1. Extract token from cookie (preferred) or fallback to Authorization header
+    token = request.cookies.get("access_token")
+    token_source = "cookie"
 
-    # 1. JWT 토큰 검증
+    if not token and credentials:
+        token = credentials.credentials
+        token_source = "header"
+
+    if not token:
+        logger.warning("❌ [AUTH] No access token found in cookie or header")
+        raise AuthenticationException(
+            error_code=ErrorCode.AUTH_TOKEN_INVALID,
+            message="Authentication credentials not provided"
+        )
+
+    logger.debug(
+        f"🔑 [AUTH] Access token extracted from {token_source}",
+        extra={"token_source": token_source, "token_length": len(token)}
+    )
+
+    # 2. JWT 토큰 검증
     payload = JWTManager.verify_token(token, token_type="access")
 
     if payload is None:
@@ -53,7 +78,7 @@ async def get_current_user(
             message="Invalid authentication credentials"
         )
 
-    # 2. 블랙리스트 확인 (로그아웃된 토큰)
+    # 3. 블랙리스트 확인 (로그아웃된 토큰)
     token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
     blacklist_key = f"blacklist:access:{token_hash}"
     is_blacklisted = await cache_service.get(blacklist_key)
@@ -78,7 +103,7 @@ async def get_current_user(
 
     logger.info(
         "✅ [AUTH] Access token validated",
-        extra={"user_id": user_id}
+        extra={"user_id": user_id, "token_source": token_source}
     )
 
     # 사용자 정보 반환 (DB 조회는 Repository에서 수행)
@@ -140,30 +165,41 @@ async def get_current_user_object(
 
 
 async def get_optional_user_object(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
     db: AsyncSession = Depends(get_db_readonly),
 ):
     """
     선택적 사용자 객체 반환 (인증되지 않은 경우 None)
-    
+
+    쿠키 우선, Authorization 헤더 폴백 방식:
+    1) 쿠키에서 access_token 추출 시도
+    2) 없으면 Authorization 헤더에서 추출 (마이그레이션 호환성)
+
     공개 파일 접근 시 사용
     """
-    if credentials is None:
+    # Extract token from cookie (preferred) or fallback to Authorization header
+    token = request.cookies.get("access_token")
+
+    if not token and credentials:
+        token = credentials.credentials
+
+    if not token:
         return None
-    
+
     try:
         # JWT 토큰 검증
-        payload = JWTManager.verify_token(credentials.credentials, token_type="access")
-        
+        payload = JWTManager.verify_token(token, token_type="access")
+
         # user_id 추출
         user_id: Optional[str] = payload.get("sub")
         if user_id is None:
             return None
-        
+
         # 사용자 객체 조회
         from backend.features.auth.repository import UserRepository
         import uuid
-        
+
         user_repo = UserRepository(db)
         try:
             user_uuid = uuid.UUID(user_id)
