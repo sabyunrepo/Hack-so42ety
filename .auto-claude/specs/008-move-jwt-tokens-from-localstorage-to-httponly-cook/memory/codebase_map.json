@@ -1,0 +1,25 @@
+{
+  "discovered_files": {
+    "backend/core/auth/dependencies.py": {
+      "description": "Auth dependencies use HTTPBearer security scheme to extract tokens from Authorization header. get_current_user() validates JWT and checks Redis blacklist. get_optional_user_object() returns None for unauthenticated requests.",
+      "category": "authentication",
+      "discovered_at": "2026-01-02T00:04:41.652772+00:00"
+    },
+    "backend/features/auth/service.py": {
+      "description": "AuthService handles login/register/refresh/logout with Redis-based token whitelist (refresh tokens) and blacklist (invalidated tokens). Implements RTR (Refresh Token Rotation) on token refresh.",
+      "category": "authentication",
+      "discovered_at": "2026-01-02T00:04:41.662951+00:00"
+    },
+    "frontend/src/api/client.ts": {
+      "description": "Axios client with request interceptor adding Authorization header from localStorage, and response interceptor handling 401 with automatic token refresh. Uses refresh token queue to prevent concurrent refresh calls.",
+      "category": "authentication",
+      "discovered_at": "2026-01-02T00:04:41.678666+00:00"
+    },
+    "frontend/src/components/AuthProvider.tsx": {
+      "description": "React AuthProvider storing tokens in localStorage (access_token, refresh_token, user). Provides login/register/googleLogin/logout functions. Checks localStorage on mount for existing session.",
+      "category": "authentication",
+      "discovered_at": "2026-01-02T00:04:41.689455+00:00"
+    }
+  },
+  "last_updated": "2026-01-02T00:04:41.689461+00:00"
+}

@@ -57,32 +57,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem("refresh_token");
-
-    if (!refreshToken) {
-      // Refresh Token이 없으면 로컬 클리어만
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user");
-      return;
-    }
+    // Tokens are now stored in httpOnly cookies and sent automatically via withCredentials: true
+    // No need to send refresh_token in the body or access_token in headers
     try {
-      await apiClient.post<AuthResponse>(
-        "/auth/logout",
-        {
-          refresh_token: localStorage.getItem("refresh_token"),
-        },
-        {
-          headers: {
-            Authorization: `Bearer${localStorage.getItem("access_token")}`,
-          },
-        }
-      );
+      await apiClient.post("/auth/logout");
     } catch (error) {
       console.error("❌ [LOGOUT] Logout request failed:", error);
     } finally {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      // Clear only user info from localStorage
+      // Tokens are cleared by the backend as httpOnly cookies
       localStorage.removeItem("user");
       setUser(null);
       window.location.href = "/login";

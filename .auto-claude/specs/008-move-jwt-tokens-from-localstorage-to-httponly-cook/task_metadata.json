@@ -1,0 +1,10 @@
+{
+  "sourceType": "ideation",
+  "ideationType": "security_hardening",
+  "ideaId": "sec-002",
+  "rationale": "XSS vulnerabilities are common in web applications. Storing authentication tokens in localStorage means any XSS vulnerability allows complete account takeover. httpOnly cookies cannot be accessed by JavaScript, providing defense in depth.",
+  "category": "security",
+  "securitySeverity": "high",
+  "impact": "high",
+  "priority": "high"
+}
