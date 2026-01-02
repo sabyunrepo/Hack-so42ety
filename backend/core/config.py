@@ -166,6 +166,43 @@ class Settings(BaseSettings):
     )
     cors_allow_headers: str = Field(default="*", env="CORS_ALLOW_HEADERS")
 
+    # ==================== Security Headers ====================
+    enable_security_headers: bool = Field(default=True, env="ENABLE_SECURITY_HEADERS")
+
+    # Content-Security-Policy 설정
+    csp_directives: str = Field(
+        default=(
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        ),
+        env="CSP_DIRECTIVES",
+    )
+
+    # Strict-Transport-Security 설정 (1년 = 31536000초)
+    hsts_max_age: int = Field(default=31536000, env="HSTS_MAX_AGE")
+    hsts_include_subdomains: bool = Field(default=True, env="HSTS_INCLUDE_SUBDOMAINS")
+    hsts_preload: bool = Field(default=False, env="HSTS_PRELOAD")
+
+    # X-Frame-Options 설정
+    x_frame_options: str = Field(default="DENY", env="X_FRAME_OPTIONS")
+
+    # Referrer-Policy 설정
+    referrer_policy: str = Field(
+        default="strict-origin-when-cross-origin", env="REFERRER_POLICY"
+    )
+
+    @property
+    def security_headers_strict_mode(self) -> bool:
+        """프로덕션 환경에서는 더 엄격한 보안 헤더 적용"""
+        return self.app_env == "prod"
+
     # ==================== Language Settings ====================
     supported_languages_str: str = Field(
         default="en,ko,zh,vi,ru,th",
