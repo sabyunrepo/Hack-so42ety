@@ -14,7 +14,7 @@ import sentry_sdk
 
 from .core.config import settings
 from .core.database import engine, Base
-from .core.middleware import setup_cors
+from .core.middleware import setup_cors, setup_security_headers
 from .core.middleware.auth import UserContextMiddleware
 from .core.events.redis_streams_bus import RedisStreamsEventBus
 from .core.dependencies import set_event_bus
@@ -326,6 +326,7 @@ AI 기반 맞춤형 동화책 생성 플랫폼 백엔드 API
 app.add_middleware(CorrelationIdMiddleware) # Request ID 추적
 app.add_middleware(UserContextMiddleware)
 setup_cors(app)
+setup_security_headers(app)  # 보안 헤더 추가 (XSS, 클릭재킹, MIME 스니핑 방지)
 
 
 # ==================== OpenAPI 커스터마이징 ====================
