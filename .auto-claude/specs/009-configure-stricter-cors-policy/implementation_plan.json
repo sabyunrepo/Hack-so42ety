@@ -1,0 +1,140 @@
+{
+  "feature": "Configure stricter CORS policy",
+  "description": "Replace the overly permissive 'allow_headers=*' CORS configuration with an explicit list of required headers, following the principle of least privilege for defense in depth.",
+  "created_at": "2026-01-01T10:48:08.705Z",
+  "updated_at": "2026-01-02T00:00:00.000Z",
+  "status": "in_progress",
+  "planStatus": "approved",
+  "workflow_type": "development",
+  "services_involved": [
+    "backend"
+  ],
+  "spec_file": "spec.md",
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Analysis and Configuration Update",
+      "description": "Analyze required headers and update the CORS configuration defaults",
+      "subtasks": [
+        {
+          "id": "1.1",
+          "title": "Update CORS allow_headers default in config.py",
+          "description": "Change cors_allow_headers default from '*' to explicit list: 'Content-Type,Authorization,Accept,X-Request-ID'. These are the headers required by the frontend for JSON API calls, authentication, content negotiation, and request correlation.",
+          "file": "backend/core/config.py",
+          "status": "completed",
+          "acceptance_criteria": [
+            "Default value for cors_allow_headers is an explicit list of required headers",
+            "Headers include: Content-Type, Authorization, Accept, X-Request-ID",
+            "Wildcard '*' is no longer the default"
+          ],
+          "notes": "Successfully changed cors_allow_headers default from '*' to explicit list 'Content-Type,Authorization,Accept,X-Request-ID' in backend/core/config.py. The configuration now follows the principle of least privilege for better security.",
+          "updated_at": "2026-01-02T06:08:26.164658+00:00"
+        },
+        {
+          "id": "1.2",
+          "title": "Update .env.example with CORS headers documentation",
+          "description": "Add CORS_ALLOW_HEADERS to .env.example with documentation explaining available headers and when to add custom headers.",
+          "file": "backend/.env.example",
+          "status": "completed",
+          "acceptance_criteria": [
+            "CORS_ALLOW_HEADERS is documented in .env.example",
+            "Default value matches config.py",
+            "Comment explains the purpose and how to extend"
+          ],
+          "notes": "Successfully added CORS_ALLOW_HEADERS to backend/.env.example with comprehensive documentation. The configuration includes:\n- Default value matching config.py: Content-Type,Authorization,Accept,X-Request-ID\n- Detailed comments explaining each header's purpose\n- Guidance on when to add custom headers\n- Security note warning against using '*' wildcard\nThe documentation follows the existing .env.example patterns and provides clear guidance for developers on extending CORS headers when needed.",
+          "updated_at": "2026-01-02T06:09:34.067702+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-2",
+      "name": "Middleware Verification",
+      "description": "Verify and update the CORS middleware to properly handle the explicit header list",
+      "subtasks": [
+        {
+          "id": "2.1",
+          "title": "Review and update CORS middleware",
+          "description": "Verify the setup_cors function in cors.py properly parses the comma-separated header list and applies it correctly to CORSMiddleware. Ensure proper documentation is added.",
+          "file": "backend/core/middleware/cors.py",
+          "status": "completed",
+          "acceptance_criteria": [
+            "Middleware correctly splits header string into list",
+            "Wildcard handling is preserved for backward compatibility",
+            "Proper documentation added for the header configuration"
+          ],
+          "notes": "Successfully verified and enhanced the setup_cors function in cors.py:\n\nImplementation verified:\n- The function correctly splits comma-separated header strings into a list using .split(\",\")\n- Wildcard \"*\" handling is properly implemented for backward compatibility\n- Enhanced documentation with comprehensive docstring explaining:\n  - CORS configuration from environment variables\n  - Header parsing logic (comma-separated \u2192 list)\n  - Default values following least privilege principle\n  - Wildcard support with security warning\n  - How to customize headers via CORS_ALLOW_HEADERS env variable\n  - Explanation of expose_headers\n\nCode improvements:\n- Extracted header parsing to parsed_headers variable for better readability\n- Added inline comments explaining the wildcard handling logic\n- Maintained existing functionality while improving code clarity\n\nAll acceptance criteria met:\n\u2705 Middleware correctly splits header string into list\n\u2705 Wildcard handling preserved for backward compatibility  \n\u2705 Proper documentation added for header configuration",
+          "updated_at": "2026-01-02T06:11:22.927592+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-3",
+      "name": "Testing",
+      "description": "Add tests to verify CORS configuration works correctly",
+      "subtasks": [
+        {
+          "id": "3.1",
+          "title": "Create CORS configuration tests",
+          "description": "Add unit tests to verify CORS headers configuration is correctly parsed and applied. Test both default configuration and custom header lists.",
+          "file": "backend/tests/unit/test_cors_config.py",
+          "status": "completed",
+          "acceptance_criteria": [
+            "Test verifies default allowed headers list",
+            "Test verifies comma-separated parsing works",
+            "Test verifies wildcard handling still works",
+            "Test verifies headers are correctly passed to middleware"
+          ],
+          "notes": "Successfully created comprehensive unit tests for CORS configuration in backend/tests/unit/test_cors_config.py:\n\nTest Coverage:\n1. Default Headers Test: Verifies cors_allow_headers default is explicit list, not wildcard '*'\n2. Comma-Separated Parsing: Tests splitting \"Content-Type,Authorization,Accept,X-Request-ID\" into list\n3. Wildcard Handling: Ensures backward compatibility with '*' configuration\n4. Custom Headers: Tests parsing of custom header lists\n5. Middleware Integration: Verifies setup_cors correctly applies parsed headers to CORSMiddleware\n6. Edge Cases: Tests empty strings, spaces in headers, single header parsing\n\nMiddleware Tests (using mocks):\n- test_setup_cors_with_default_headers: Verifies default headers are parsed and applied\n- test_setup_cors_with_wildcard: Ensures wildcard still works for backward compatibility\n- test_setup_cors_with_custom_headers: Tests custom header configuration\n- test_setup_cors_expose_headers: Verifies Content-Disposition is exposed for file downloads\n- test_setup_cors_methods_parsing: Tests HTTP methods parsing\n\nAll acceptance criteria met:\n\u2713 Test verifies default allowed headers list (not wildcard)\n\u2713 Test verifies comma-separated parsing works correctly\n\u2713 Test verifies wildcard handling still works for backward compatibility\n\u2713 Test verifies headers are correctly passed to middleware\n\nThe tests follow existing patterns from test_jwt_manager.py and use proper mocking for isolated unit testing. Tests can be run with: make test-unit or pytest tests/unit/test_cors_config.py",
+          "updated_at": "2026-01-02T06:13:57.135102+00:00"
+        },
+        {
+          "id": "3.2",
+          "title": "Create CORS integration test",
+          "description": "Add integration test that verifies preflight OPTIONS requests return correct Access-Control-Allow-Headers.",
+          "file": "backend/tests/integration/test_cors_policy.py",
+          "status": "completed",
+          "acceptance_criteria": [
+            "Test sends preflight request with Origin header",
+            "Test verifies allowed headers in response",
+            "Test verifies behavior with different header configurations",
+            "Test covers both authenticated and public endpoints"
+          ],
+          "notes": "Successfully implemented comprehensive CORS integration tests in backend/tests/integration/test_cors_policy.py.\n\nTest Coverage:\n1. TestCORSPreflightRequests: Preflight OPTIONS request verification\n   - test_preflight_request_default_headers: Verifies default headers (Content-Type, Authorization, Accept, X-Request-ID) are returned\n   - test_preflight_request_public_endpoint: Tests public endpoints like /auth/login\n   - test_preflight_request_authenticated_endpoint: Tests authenticated endpoints like /books with Authorization header\n   - test_preflight_request_with_x_request_id: Validates X-Request-ID header support\n   - test_preflight_request_expose_headers: Verifies Content-Disposition is exposed for file downloads\n   - test_actual_request_after_preflight: Tests complete preflight + actual request flow\n\n2. TestCORSWithCustomConfiguration: Custom header configuration tests\n   - test_preflight_with_custom_headers: Verifies all configured headers are allowed\n   - test_preflight_rejects_unlisted_headers: Ensures server returns configured headers (not wildcard) when unlisted headers are requested\n\n3. TestCORSOriginValidation: Origin security validation\n   - test_preflight_with_allowed_origin: Validates localhost:5173 origin is allowed\n   - test_preflight_with_disallowed_origin: Ensures disallowed origins (e.g., evil.com) don't get CORS headers\n\n4. TestCORSMethodsAndCredentials: HTTP methods and credentials support\n   - test_preflight_allowed_methods: Verifies GET, POST, PUT, DELETE, OPTIONS are allowed\n   - test_preflight_credentials_support: Confirms credentials=true for auth/cookies support\n\nAll acceptance criteria met:\n\u2705 Test sends preflight request with Origin header\n\u2705 Test verifies allowed headers in response (Content-Type, Authorization, Accept, X-Request-ID)\n\u2705 Test verifies behavior with different header configurations (default, custom, wildcard handling)\n\u2705 Test covers both authenticated (/books) and public (/auth/register, /auth/login) endpoints\n\nThe tests use the httpx AsyncClient fixture with proper async/await patterns, matching the existing test suite conventions. Tests verify that:\n- Access-Control-Allow-Origin matches the requesting origin\n- Access-Control-Allow-Headers contains the configured explicit list (not wildcard)\n- Access-Control-Allow-Methods includes standard HTTP methods\n- Access-Control-Allow-Credentials is set to \"true\"\n- Access-Control-Expose-Headers includes Content-Disposition for file downloads\n\nSecurity verification: Tests confirm that the CORS configuration follows the principle of least privilege by using explicit header lists instead of wildcard '*', preventing potential CORS-related attack vectors.",
+          "updated_at": "2026-01-02T10:02:56.425023+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-4",
+      "name": "Documentation and Final Verification",
+      "description": "Update documentation and perform final verification",
+      "subtasks": [
+        {
+          "id": "4.1",
+          "title": "Update build-progress.txt with summary",
+          "description": "Document the changes made and their security implications in build-progress.txt",
+          "file": ".auto-claude/specs/009-configure-stricter-cors-policy/build-progress.txt",
+          "status": "pending",
+          "acceptance_criteria": [
+            "Summary of changes documented",
+            "Security improvement explained",
+            "Testing results recorded"
+          ]
+        }
+      ]
+    }
+  ],
+  "final_acceptance": [
+    "Default CORS allow_headers no longer uses wildcard '*'",
+    "Only required headers (Content-Type, Authorization, Accept, X-Request-ID) are allowed by default",
+    "Configuration is documented and environment variable can override defaults",
+    "Unit and integration tests pass",
+    "No breaking changes to existing frontend functionality"
+  ],
+  "qa_signoff": {
+    "status": "pending",
+    "tests_passed": "",
+    "issues": ""
+  },
+  "last_updated": "2026-01-02T10:02:56.425033+00:00"
+}
