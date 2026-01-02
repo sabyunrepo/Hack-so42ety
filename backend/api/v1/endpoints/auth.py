@@ -64,7 +64,7 @@ def get_auth_service_write(
 
 @router.post(
     "/register",
-    response_model=AuthResponse,
+    response_model=AuthResponseCookie,
     status_code=status.HTTP_201_CREATED,
     responses={
         201: {"description": "회원가입 성공"},
@@ -73,6 +73,7 @@ def get_auth_service_write(
 )
 async def register(
     request: UserRegisterRequest,
+    response: Response,
     auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
@@ -80,19 +81,26 @@ async def register(
 
     Args:
         request: 회원가입 요청 (email, password)
+        response: FastAPI Response 객체 (쿠키 설정용)
         auth_service: 인증 서비스
 
     Returns:
-        AuthResponse: 토큰 + 사용자 정보
+        AuthResponseCookie: 사용자 정보 (토큰은 httpOnly 쿠키에 저장)
     """
     user, access_token, refresh_token = await auth_service.register(
         email=request.email,
         password=request.password,
     )
 
-    return AuthResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
+    # Set tokens as httpOnly cookies
+    set_auth_cookies(response, access_token, refresh_token)
+
+    logger.info(
+        "✅ [ENDPOINT] Registration successful - tokens set in httpOnly cookies",
+        extra={"user_id": str(user.id), "email": user.email}
+    )
+
+    return AuthResponseCookie(
         token_type="bearer",
         user=UserResponse(
             id=str(user.id),
