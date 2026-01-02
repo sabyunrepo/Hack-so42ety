@@ -22,14 +22,15 @@ class TestBookCreationFlow:
         })
         assert response.status_code == 201
         
-        # 2. 로그인
+        # 2. 로그인 (토큰이 httpOnly 쿠키로 자동 설정됨)
         response = await client.post("/api/v1/auth/login", json={
             "email": email,
             "password": password
         })
         assert response.status_code == 200
-        token = response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
+        # 토큰은 쿠키로 설정되므로 응답 본문에 없음
+        assert "access_token" in response.cookies
+        # httpx AsyncClient는 쿠키를 자동으로 유지하므로 headers 불필요
         
         # 3. 동화책 생성 요청
         # Mocking AI Providers is necessary here unless we want to call real APIs (costly/slow)
@@ -73,12 +74,13 @@ class TestBookCreationFlow:
              patch("backend.infrastructure.ai.factory.AIProviderFactory.get_image_provider", return_value=mock_image_provider), \
              patch("backend.infrastructure.ai.factory.AIProviderFactory.get_tts_provider", return_value=mock_tts_provider):
              
+            # 쿠키가 자동으로 전송되므로 headers 불필요
             response = await client.post("/api/v1/storybook/create", json={
                 "prompt": "A toaster in space",
                 "num_pages": 2,
                 "target_age": "5-7",
                 "theme": "sci-fi"
-            }, headers=headers)
+            })
             
             assert response.status_code == 201
             book_data = response.json()
@@ -88,24 +90,24 @@ class TestBookCreationFlow:
             assert len(book_data["pages"][0]["dialogues"]) > 0
             book_id = book_data["id"]
             
-            # 4. 동화책 목록 조회
-            response = await client.get("/api/v1/storybook/books", headers=headers)
+            # 4. 동화책 목록 조회 (쿠키 자동 전송)
+            response = await client.get("/api/v1/storybook/books")
             assert response.status_code == 200
             books = response.json()
             assert len(books) == 1
             assert books[0]["id"] == book_id
-            
-            # 5. 동화책 상세 조회
-            response = await client.get(f"/api/v1/storybook/books/{book_id}", headers=headers)
+
+            # 5. 동화책 상세 조회 (쿠키 자동 전송)
+            response = await client.get(f"/api/v1/storybook/books/{book_id}")
             assert response.status_code == 200
             book_detail = response.json()
             assert book_detail["id"] == book_id
             assert len(book_detail["pages"]) == 2
-            
-            # 6. 동화책 삭제
-            response = await client.delete(f"/api/v1/storybook/books/{book_id}", headers=headers)
+
+            # 6. 동화책 삭제 (쿠키 자동 전송)
+            response = await client.delete(f"/api/v1/storybook/books/{book_id}")
             assert response.status_code == 204
-            
-            # 7. 삭제 확인
-            response = await client.get(f"/api/v1/storybook/books/{book_id}", headers=headers)
+
+            # 7. 삭제 확인 (쿠키 자동 전송)
+            response = await client.get(f"/api/v1/storybook/books/{book_id}")
             assert response.status_code == 404

@@ -67,6 +67,33 @@ class Settings(BaseSettings):
         default=7, env="JWT_REFRESH_TOKEN_EXPIRE_DAYS"
     )
 
+    # ==================== Cookie Configuration ====================
+    cookie_domain: Optional[str] = Field(
+        default=None,
+        env="COOKIE_DOMAIN",
+        description="Cookie domain (None for same-origin, or specific domain for subdomain sharing)",
+    )
+    cookie_secure: bool = Field(
+        default=False,
+        env="COOKIE_SECURE",
+        description="HTTPS-only cookies (should be True in production)",
+    )
+    cookie_samesite: str = Field(
+        default="lax",
+        env="COOKIE_SAMESITE",
+        description="SameSite policy: strict, lax, or none",
+    )
+    cookie_path: str = Field(
+        default="/",
+        env="COOKIE_PATH",
+        description="Cookie path (default: /)",
+    )
+    cookie_httponly: bool = Field(
+        default=True,
+        env="COOKIE_HTTPONLY",
+        description="HttpOnly flag to prevent JavaScript access (should be True for security)",
+    )
+
     # ==================== Google OAuth ====================
     google_oauth_client_id: Optional[str] = Field(
         default=None, env="GOOGLE_OAUTH_CLIENT_ID"
@@ -318,6 +345,16 @@ class Settings(BaseSettings):
         if v not in allowed_envs:
             raise ValueError(f"APP_ENV must be one of {allowed_envs}")
         return v
+
+    @field_validator("cookie_samesite")
+    @classmethod
+    def validate_cookie_samesite(cls, v: str) -> str:
+        """Cookie SameSite 값 검증"""
+        allowed_values = ["strict", "lax", "none"]
+        v_lower = v.lower()
+        if v_lower not in allowed_values:
+            raise ValueError(f"COOKIE_SAMESITE must be one of {allowed_values}")
+        return v_lower
 
 
 # 싱글톤 인스턴스

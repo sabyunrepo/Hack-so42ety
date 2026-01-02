@@ -87,14 +87,14 @@ class TestFileCaching:
         )
         await db_session.commit()
 
-        # 로그인
+        # 로그인 (토큰이 httpOnly 쿠키로 자동 설정됨)
         login_response = await client.post(
             "/api/v1/auth/login",
             json={"email": "private_cache@example.com", "password": "password123"},
         )
         assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
+        # 토큰은 쿠키로 설정되므로 응답 본문에 없음
+        assert "access_token" in login_response.cookies
 
         # 2. 비공개 책 생성
         book_repo = BookRepository(db_session)
@@ -118,11 +118,8 @@ class TestFileCaching:
             content_type="image/png"
         )
 
-        # 4. 첫 번째 요청 (인증된 사용자)
-        response1 = await client.get(
-            f"/api/v1/files/{file_path}",
-            headers=headers
-        )
+        # 4. 첫 번째 요청 (인증된 사용자, 쿠키 자동 전송)
+        response1 = await client.get(f"/api/v1/files/{file_path}")
         assert response1.status_code == 200
         assert response1.headers.get("X-Cache") == "MISS"  # 비공개 파일은 캐싱 안 함
         assert "Cache-Control" in response1.headers

@@ -14,32 +14,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing token and user data
-    const token = localStorage.getItem("access_token");
-    const storedUser = localStorage.getItem("user");
+    // Validate auth status on mount by calling /auth/me
+    // Since tokens are stored in httpOnly cookies, we can't check their existence from JavaScript
+    // Instead, we call the backend to validate the authentication status
+    const validateAuth = async () => {
+      try {
+        // Call /auth/me to validate the httpOnly cookie-based authentication
+        // The access_token cookie will be sent automatically via withCredentials: true
+        const response = await apiClient.get<User>("/auth/me");
 
-    if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+        // If successful, set user state and sync to localStorage
+        setUser(response.data);
+        localStorage.setItem("user", JSON.stringify(response.data));
+      } catch (error: any) {
+        // Handle 401 (unauthenticated) or any other auth failure
+        // Clear user state and localStorage
+        setUser(null);
+        localStorage.removeItem("user");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    validateAuth();
   }, []);
 
   const login = async (data: LoginRequest) => {
     const response = await apiClient.post<AuthResponse>("/auth/login", data);
-    const { user, access_token, refresh_token } = response.data;
+    const { user } = response.data;
 
-    localStorage.setItem("access_token", access_token);
-    localStorage.setItem("refresh_token", refresh_token);
+    // Tokens are now set as httpOnly cookies by the backend
+    // Only store user info in localStorage for quick access
     localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
   };
 
   const register = async (data: RegisterRequest) => {
     const response = await apiClient.post<AuthResponse>("/auth/register", data);
-    const { user, access_token, refresh_token } = response.data;
+    const { user } = response.data;
 
-    localStorage.setItem("access_token", access_token);
-    localStorage.setItem("refresh_token", refresh_token);
+    // Tokens are now set as httpOnly cookies by the backend
+    // Only store user info in localStorage for quick access
     localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
   };
@@ -48,41 +63,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const response = await apiClient.post<AuthResponse>("/auth/google", {
       token,
     });
-    const { user, access_token, refresh_token } = response.data;
+    const { user } = response.data;
 
-    localStorage.setItem("access_token", access_token);
-    localStorage.setItem("refresh_token", refresh_token);
+    // Tokens are now set as httpOnly cookies by the backend
+    // Only store user info in localStorage for quick access
     localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem("refresh_token");
-
-    if (!refreshToken) {
-      // Refresh Token이 없으면 로컬 클리어만
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user");
-      return;
-    }
+    // Tokens are now stored in httpOnly cookies and sent automatically via withCredentials: true
+    // No need to send refresh_token in the body or access_token in headers
     try {
-      await apiClient.post<AuthResponse>(
-        "/auth/logout",
-        {
-          refresh_token: localStorage.getItem("refresh_token"),
-        },
-        {
-          headers: {
-            Authorization: `Bearer${localStorage.getItem("access_token")}`,
-          },
-        }
-      );
+      await apiClient.post("/auth/logout");
     } catch (error) {
       console.error("❌ [LOGOUT] Logout request failed:", error);
     } finally {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      // Clear only user info from localStorage
+      // Tokens are cleared by the backend as httpOnly cookies
       localStorage.removeItem("user");
       setUser(null);
       window.location.href = "/login";
