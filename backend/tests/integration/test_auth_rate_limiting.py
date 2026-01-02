@@ -26,8 +26,7 @@ class TestLoginRateLimiting:
 
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
-        await rate_limiter.reset_limit("auth:login:test")
+        await rate_limiter.reset_limit("auth:login:127.0.0.1")
 
         # 로그인 시도 (정확히 제한 수까지 시도)
         login_payload = {"email": "ratelimit@example.com", "password": "password123"}
@@ -70,8 +69,7 @@ class TestLoginRateLimiting:
 
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
-        await rate_limiter.reset_limit("auth:login:test")
+        await rate_limiter.reset_limit("auth:login:127.0.0.1")
 
         # 로그인 요청
         response = await client.post(
@@ -104,8 +102,7 @@ class TestLoginRateLimiting:
 
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
-        await rate_limiter.reset_limit("auth:login:test")
+        await rate_limiter.reset_limit("auth:login:127.0.0.1")
 
         # 제한까지 요청
         login_payload = {"email": "reset@example.com", "password": "password123"}
@@ -118,7 +115,7 @@ class TestLoginRateLimiting:
         assert response.status_code == 429
 
         # 수동으로 속도 제한 리셋 (실제 시간 대기 대신)
-        await rate_limiter.reset_limit("auth:login:test")
+        await rate_limiter.reset_limit("auth:login:127.0.0.1")
 
         # 리셋 후 다시 요청 가능
         response = await client.post("/api/v1/auth/login", json=login_payload)
@@ -134,8 +131,7 @@ class TestRegisterRateLimiting:
         """회원가입 엔드포인트 - 속도 제한 초과 시 429 응답 테스트"""
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
-        await rate_limiter.reset_limit("auth:register:test")
+        await rate_limiter.reset_limit("auth:register:127.0.0.1")
 
         # 제한 내 요청
         for i in range(settings.auth_register_rate_limit):
@@ -164,8 +160,7 @@ class TestRegisterRateLimiting:
         """회원가입 엔드포인트 - Rate limit 헤더 존재 확인"""
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
-        await rate_limiter.reset_limit("auth:register:test")
+        await rate_limiter.reset_limit("auth:register:127.0.0.1")
 
         response = await client.post(
             "/api/v1/auth/register",
@@ -193,8 +188,7 @@ class TestGoogleOAuthRateLimiting:
 
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
-        await rate_limiter.reset_limit("auth:google:test")
+        await rate_limiter.reset_limit("auth:google:127.0.0.1")
 
         # Mock Google token verification
         mock_user_info = {
@@ -236,8 +230,7 @@ class TestGoogleOAuthRateLimiting:
 
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
-        await rate_limiter.reset_limit("auth:google:test")
+        await rate_limiter.reset_limit("auth:google:127.0.0.1")
 
         mock_user_info = {
             "sub": "google_456",
@@ -281,8 +274,7 @@ class TestRefreshTokenRateLimiting:
 
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
-        await rate_limiter.reset_limit("auth:refresh:test")
+        await rate_limiter.reset_limit("auth:refresh:127.0.0.1")
 
         # 제한 내 요청
         for i in range(settings.auth_refresh_rate_limit):
@@ -320,8 +312,7 @@ class TestRefreshTokenRateLimiting:
 
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
-        await rate_limiter.reset_limit("auth:refresh:test")
+        await rate_limiter.reset_limit("auth:refresh:127.0.0.1")
 
         response = await client.post(
             "/api/v1/auth/refresh",
@@ -354,7 +345,6 @@ class TestRateLimitIpIsolation:
 
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
         await rate_limiter.reset_limit("auth:login:192.168.1.1")
         await rate_limiter.reset_limit("auth:login:192.168.1.2")
 
@@ -402,7 +392,6 @@ class TestRateLimitIpIsolation:
 
         # 속도 제한 초기화
         rate_limiter = get_rate_limiter()
-        await rate_limiter.connect()
         await rate_limiter.reset_limit("auth:login:10.0.0.1")
 
         login_payload = {"email": "realip@example.com", "password": "password123"}
