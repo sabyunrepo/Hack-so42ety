@@ -11,6 +11,7 @@ from typing import Optional, Dict, Any, Literal
 import httpx
 
 from ..base import VideoGenerationProvider, ImageGenerationProvider
+from ..utils import detect_and_validate_image
 from ....core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ IMAGE_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         "reference_key": "inputs.referenceImages",  # 중첩 구조 (API 요구사항)
         "provider_settings": None,
         "output_type": ["dataURI", "URL"],
-        "output_format": "PNG",
+        "output_format": "WEBP",
         "include_cost": True,
         "output_quality": 85,
     },
@@ -56,7 +57,7 @@ IMAGE_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         "reference_key": "inputs.referenceImages",  # 중첩 구조
         "provider_settings": None,
         "output_type": ["dataURI", "URL"],
-        "output_format": "PNG",
+        "output_format": "WEBP",
         "include_cost": True,
         "output_quality": 85,
     },
@@ -66,7 +67,7 @@ IMAGE_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         "reference_key": "inputs.referenceImages",  # 중첩 구조
         "provider_settings": {"openai": {"quality": "auto", "background": "opaque"}},
         "output_type": ["dataURI", "URL"],
-        "output_format": "PNG",
+        "output_format": "WEBP",
         "include_cost": True,
         "output_quality": 85,
     },
@@ -76,7 +77,7 @@ IMAGE_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         "reference_key": "inputs.referenceImages",
         "provider_settings": {"openai": {"quality": "low", "background": "opaque"}},
         "output_type": ["dataURI", "URL"],
-        "output_format": "PNG",
+        "output_format": "WEBP",
         "include_cost": True,
         "output_quality": 85,
     },
@@ -304,7 +305,13 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         _ = (strength, cfg_scale, steps, style, quality, background)
 
         task_uuid = str(uuid.uuid4())
-        image_base64 = base64.b64encode(image_data).decode("utf-8")
+        logger.info(f"[Image Task] Processing input image for Runware API...")
+        processed_image, mime_type = detect_and_validate_image(image_data)
+        image_base64 = base64.b64encode(processed_image).decode("utf-8")
+        logger.info(
+            f"[Image Task] Image prepared: mime_type={mime_type}, "
+            f"base64_length={len(image_base64)}"
+        )
         result = None
 
         model = settings.runware_img2img_model
@@ -329,10 +336,18 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
         # 참조 이미지 설정 (모델별 중첩/최상위 구조)
         if config["reference_key"] == "inputs.referenceImages":
             payload[0]["inputs"] = {
-                "referenceImages": [f"data:image/png;base64,{image_base64}"]
+                "referenceImages": [f"data:{mime_type};base64,{image_base64}"]
             }
+            logger.info(
+                f"[Image Task] Applied referenceImage to inputs.referenceImages "
+                f"with data:{mime_type};base64,..."
+            )
         else:
-            payload[0]["referenceImages"] = [f"data:image/png;base64,{image_base64}"]
+            payload[0]["referenceImages"] = [f"data:{mime_type};base64,{image_base64}"]
+            logger.info(
+                f"[Image Task] Applied referenceImage to referenceImages "
+                f"with data:{mime_type};base64,..."
+            )
 
         # 프로바이더별 설정
         if config.get("provider_settings"):
@@ -634,10 +649,19 @@ class RunwareProvider(VideoGenerationProvider, ImageGenerationProvider):
                 f"[Video Task] Mode: Image-to-Video (existing image UUID: {image_uuid})"
             )
         elif image_data is not None:
+            logger.info("[Video Task] Processing input image for video generation...")
+            processed_image, mime_type = detect_and_validate_image(image_data)
+            encoded = base64.b64encode(processed_image).decode("utf-8")
+            logger.info(
+                f"[Video Task] Image prepared: mime_type={mime_type}, "
+                f"base64_length={len(encoded)}"
+            )
             payload[0]["frameImages"] = [
-                {"inputImage": f"data:image/png;base64,{image_data}", "frame": "first"}
+                {"inputImage": f"data:{mime_type};base64,{encoded}", "frame": "first"}
             ]
-            logger.info("[Video Task] Mode: Image-to-Video (frameImages included)")
+            logger.info(
+                f"[Video Task] Applied frameImages with data:{mime_type};base64,..."
+            )
         else:
             # 이미지가 없는 경우: Text-to-Video
             logger.info("[Video Task] Mode: Text-to-Video (no frameImages)")
