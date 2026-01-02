@@ -14,14 +14,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing user data in localStorage
-    // Tokens are now stored in httpOnly cookies and not accessible via JavaScript
-    const storedUser = localStorage.getItem("user");
+    // Validate auth status on mount by calling /auth/me
+    // Since tokens are stored in httpOnly cookies, we can't check their existence from JavaScript
+    // Instead, we call the backend to validate the authentication status
+    const validateAuth = async () => {
+      try {
+        // Call /auth/me to validate the httpOnly cookie-based authentication
+        // The access_token cookie will be sent automatically via withCredentials: true
+        const response = await apiClient.get<User>("/auth/me");
 
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+        // If successful, set user state and sync to localStorage
+        setUser(response.data);
+        localStorage.setItem("user", JSON.stringify(response.data));
+      } catch (error: any) {
+        // Handle 401 (unauthenticated) or any other auth failure
+        // Clear user state and localStorage
+        setUser(null);
+        localStorage.removeItem("user");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    validateAuth();
   }, []);
 
   const login = async (data: LoginRequest) => {
