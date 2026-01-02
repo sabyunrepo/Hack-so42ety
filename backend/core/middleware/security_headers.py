@@ -4,7 +4,7 @@ Security Headers Middleware
 """
 
 from typing import Optional
-from fastapi import Request
+from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..config import settings
@@ -56,3 +56,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = settings.referrer_policy
 
         return response
+
+
+def setup_security_headers(app: FastAPI) -> None:
+    """
+    보안 헤더 미들웨어 설정
+
+    Args:
+        app: FastAPI 애플리케이션 인스턴스
+    """
+    app.add_middleware(SecurityHeadersMiddleware)
