@@ -4,7 +4,7 @@ Auth API Endpoints (v1)
 """
 
 import logging
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +19,7 @@ from backend.core.auth.jwt_manager import JWTManager
 from backend.core.auth.providers.credentials import CredentialsAuthProvider
 from backend.core.auth.providers.google_oauth import GoogleOAuthProvider
 from backend.core.auth.cookies import set_auth_cookies
-from backend.core.exceptions import NotFoundException, ErrorCode
+from backend.core.exceptions import NotFoundException, AuthenticationException, ErrorCode
 from backend.features.auth.schemas import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -29,6 +29,7 @@ from backend.features.auth.schemas import (
     AuthResponse,
     AuthResponseCookie,
     TokenResponse,
+    TokenResponseCookie,
     UserResponse,
     LogoutResponse,
     ErrorResponse,
@@ -211,42 +212,55 @@ async def google_oauth(
 
 @router.post(
     "/refresh",
-    response_model=TokenResponse,
+    response_model=TokenResponseCookie,
     responses={
         200: {"description": "토큰 갱신 성공"},
         401: {"model": ErrorResponse, "description": "Refresh Token 검증 실패"},
     },
 )
 async def refresh(
-    request: RefreshTokenRequest,
+    request: Request,
+    response: Response,
     auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
     Access Token 갱신
 
     Args:
-        request: 토큰 갱신 요청 (Refresh Token)
+        request: FastAPI Request 객체 (쿠키에서 refresh_token 추출)
+        response: FastAPI Response 객체 (쿠키 설정용)
         auth_service: 인증 서비스
 
     Returns:
-        TokenResponse: 새로운 Access Token
+        TokenResponseCookie: 토큰 갱신 성공 메시지 (토큰은 httpOnly 쿠키에 저장)
     """
+    # Read refresh_token from cookie
+    refresh_token = request.cookies.get("refresh_token")
+
+    if not refresh_token:
+        raise AuthenticationException(
+            error_code=ErrorCode.AUTH_003,
+            message="Refresh token not found in cookies"
+        )
+
     logger.info(
         "🔄 [ENDPOINT] /auth/refresh called",
-        extra={"refresh_token_length": len(request.refresh_token)}
+        extra={"refresh_token_length": len(refresh_token)}
     )
 
     try:
         access_token, new_refresh_token = await auth_service.refresh_access_token(
-            refresh_token=request.refresh_token
+            refresh_token=refresh_token
         )
 
-        logger.info("✅ [ENDPOINT] Token refresh successful")
+        # Set new tokens as httpOnly cookies
+        set_auth_cookies(response, access_token, new_refresh_token)
 
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=new_refresh_token,
+        logger.info("✅ [ENDPOINT] Token refresh successful - tokens set in httpOnly cookies")
+
+        return TokenResponseCookie(
             token_type="bearer",
+            message="Token refreshed successfully",
         )
     except Exception as e:
         logger.error(f"❌ [ENDPOINT] Token refresh failed: {str(e)}", exc_info=True)
