@@ -4,7 +4,7 @@ Auth API Endpoints (v1)
 """
 
 import logging
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from backend.core.dependencies import get_cache_service
 from backend.core.auth.jwt_manager import JWTManager
 from backend.core.auth.providers.credentials import CredentialsAuthProvider
 from backend.core.auth.providers.google_oauth import GoogleOAuthProvider
+from backend.core.auth.cookies import set_auth_cookies
 from backend.core.exceptions import NotFoundException, ErrorCode
 from backend.features.auth.schemas import (
     UserRegisterRequest,
@@ -26,6 +27,7 @@ from backend.features.auth.schemas import (
     RefreshTokenRequest,
     LogoutRequest,
     AuthResponse,
+    AuthResponseCookie,
     TokenResponse,
     UserResponse,
     LogoutResponse,
@@ -104,7 +106,7 @@ async def register(
 
 @router.post(
     "/login",
-    response_model=AuthResponse,
+    response_model=AuthResponseCookie,
     responses={
         200: {"description": "로그인 성공"},
         401: {"model": ErrorResponse, "description": "인증 실패"},
@@ -112,6 +114,7 @@ async def register(
 )
 async def login(
     request: UserLoginRequest,
+    response: Response,
     auth_service: AuthService = Depends(get_auth_service_write),
 ):
     """
@@ -119,19 +122,26 @@ async def login(
 
     Args:
         request: 로그인 요청 (email, password)
+        response: FastAPI Response 객체 (쿠키 설정용)
         auth_service: 인증 서비스
 
     Returns:
-        AuthResponse: 토큰 + 사용자 정보
+        AuthResponseCookie: 사용자 정보 (토큰은 httpOnly 쿠키에 저장)
     """
     user, access_token, refresh_token = await auth_service.login(
         email=request.email,
         password=request.password,
     )
 
-    return AuthResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
+    # Set tokens as httpOnly cookies
+    set_auth_cookies(response, access_token, refresh_token)
+
+    logger.info(
+        "✅ [ENDPOINT] Login successful - tokens set in httpOnly cookies",
+        extra={"user_id": str(user.id), "email": user.email}
+    )
+
+    return AuthResponseCookie(
         token_type="bearer",
         user=UserResponse(
             id=str(user.id),
