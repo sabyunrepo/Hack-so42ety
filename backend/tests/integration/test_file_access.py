@@ -96,14 +96,14 @@ class TestFileAccessAPI:
         )
         await db_session.commit()
 
-        # 로그인
+        # 로그인 (토큰이 httpOnly 쿠키로 자동 설정됨)
         login_response = await client.post(
             "/api/v1/auth/login",
             json={"email": "owner@example.com", "password": "password123"},
         )
         assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
+        # 토큰은 쿠키로 설정되므로 응답 본문에 없음
+        assert "access_token" in login_response.cookies
 
         # 2. 비공개 책 생성
         book_repo = BookRepository(db_session)
@@ -118,13 +118,10 @@ class TestFileAccessAPI:
 
         # 3. 테스트 파일 경로 생성
         file_path = f"users/{user.id}/books/{book.id}/images/page_1.png"
-        
-        # 4. 파일 접근 시도 (소유자) - 404는 가능하지만 403은 아니어야 함
-        response = await client.get(
-            f"/api/v1/files/{file_path}",
-            headers=headers
-        )
-        
+
+        # 4. 파일 접근 시도 (소유자, 쿠키 자동 전송) - 404는 가능하지만 403은 아니어야 함
+        response = await client.get(f"/api/v1/files/{file_path}")
+
         assert response.status_code != 403  # 권한 문제는 없어야 함
         assert response.status_code in [200, 404]  # 파일 없음은 404
 
@@ -146,14 +143,14 @@ class TestFileAccessAPI:
         )
         await db_session.commit()
 
-        # 다른 사용자로 로그인
+        # 다른 사용자로 로그인 (토큰이 httpOnly 쿠키로 자동 설정됨)
         login_response = await client.post(
             "/api/v1/auth/login",
             json={"email": "other@example.com", "password": "password123"},
         )
         assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
+        # 토큰은 쿠키로 설정되므로 응답 본문에 없음
+        assert "access_token" in login_response.cookies
 
         # 3. 소유자의 비공개 책 생성
         book_repo = BookRepository(db_session)
@@ -168,13 +165,10 @@ class TestFileAccessAPI:
 
         # 4. 테스트 파일 경로 생성
         file_path = f"users/{owner.id}/books/{book.id}/images/page_1.png"
-        
-        # 5. 파일 접근 시도 (다른 사용자) - 403이어야 함
-        response = await client.get(
-            f"/api/v1/files/{file_path}",
-            headers=headers
-        )
-        
+
+        # 5. 파일 접근 시도 (다른 사용자, 쿠키 자동 전송) - 403이어야 함
+        response = await client.get(f"/api/v1/files/{file_path}")
+
         assert response.status_code == 403
         assert "denied" in response.json()["detail"].lower() or "access" in response.json()["detail"].lower()
 

@@ -4,7 +4,7 @@ Auth Flow Integration Tests
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, Cookies
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.features.auth.models import User
@@ -23,11 +23,18 @@ class TestAuthRegistrationFlow:
 
         assert response.status_code == 201
         data = response.json()
-        assert "access_token" in data
-        assert "refresh_token" in data
+        # 토큰은 httpOnly 쿠키에 저장되므로 응답 본문에 없음
+        assert "access_token" not in data
+        assert "refresh_token" not in data
         assert data["token_type"] == "bearer"
         assert data["user"]["email"] == "newuser@example.com"
         assert data["user"]["is_active"] is True
+
+        # httpOnly 쿠키 확인
+        assert "access_token" in response.cookies
+        assert "refresh_token" in response.cookies
+        assert response.cookies["access_token"] is not None
+        assert response.cookies["refresh_token"] is not None
 
         # DB에 실제 생성되었는지 확인
         user_repo = UserRepository(db_session)
@@ -86,9 +93,14 @@ class TestAuthLoginFlow:
 
         assert response.status_code == 200
         data = response.json()
-        assert "access_token" in data
-        assert "refresh_token" in data
+        # 토큰은 httpOnly 쿠키에 저장되므로 응답 본문에 없음
+        assert "access_token" not in data
+        assert "refresh_token" not in data
         assert data["user"]["email"] == "logintest@example.com"
+
+        # httpOnly 쿠키 확인
+        assert "access_token" in response.cookies
+        assert "refresh_token" in response.cookies
 
     @pytest.mark.asyncio
     async def test_login_wrong_password(
@@ -174,8 +186,14 @@ class TestAuthGoogleOAuthFlow:
 
         assert response.status_code == 200
         data = response.json()
-        assert "access_token" in data
+        # 토큰은 httpOnly 쿠키에 저장되므로 응답 본문에 없음
+        assert "access_token" not in data
+        assert "refresh_token" not in data
         assert data["user"]["email"] == "newgoogle@gmail.com"
+
+        # httpOnly 쿠키 확인
+        assert "access_token" in response.cookies
+        assert "refresh_token" in response.cookies
 
         # DB에 생성되었는지 확인
         user_repo = UserRepository(db_session)
@@ -244,29 +262,36 @@ class TestAuthRefreshTokenFlow:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         """Refresh Token으로 Access Token 갱신"""
-        # 회원가입으로 토큰 획득
+        # 회원가입으로 토큰 획득 (쿠키로 설정됨)
         register_response = await client.post(
             "/api/v1/auth/register",
             json={"email": "refresh@example.com", "password": "password123"},
         )
-        refresh_token = register_response.json()["refresh_token"]
+        # 쿠키 확인
+        assert "refresh_token" in register_response.cookies
 
-        # Refresh Token으로 갱신
-        response = await client.post(
-            "/api/v1/auth/refresh", json={"refresh_token": refresh_token}
-        )
+        # Refresh Token으로 갱신 (쿠키가 자동으로 전송됨)
+        # httpx AsyncClient는 자동으로 쿠키를 유지하므로 별도 설정 불필요
+        response = await client.post("/api/v1/auth/refresh", json={})
 
         assert response.status_code == 200
         data = response.json()
-        assert "access_token" in data
+        # 토큰은 httpOnly 쿠키에 저장되므로 응답 본문에 없음
+        assert "access_token" not in data
+        assert "refresh_token" not in data
         assert data["token_type"] == "bearer"
+
+        # 새로운 쿠키 확인
+        assert "access_token" in response.cookies
+        assert "refresh_token" in response.cookies
 
     @pytest.mark.asyncio
     async def test_refresh_token_invalid(self, client: AsyncClient):
         """잘못된 Refresh Token 테스트"""
-        response = await client.post(
-            "/api/v1/auth/refresh", json={"refresh_token": "invalid_token"}
-        )
+        # 잘못된 쿠키 설정
+        client.cookies.set("refresh_token", "invalid_token")
+
+        response = await client.post("/api/v1/auth/refresh", json={})
 
         assert response.status_code == 401
         assert "invalid" in response.json()["detail"].lower()
@@ -281,11 +306,11 @@ class TestAuthRefreshTokenFlow:
             "/api/v1/auth/register",
             json={"email": "wrongtype@example.com", "password": "password123"},
         )
-        access_token = register_response.json()["access_token"]
+        # access_token 쿠키를 refresh_token 쿠키 위치에 설정
+        access_token = register_response.cookies.get("access_token")
 
         # Access Token으로 갱신 시도
-        response = await client.post(
-            "/api/v1/auth/refresh", json={"refresh_token": access_token}
-        )
+        client.cookies.set("refresh_token", access_token)
+        response = await client.post("/api/v1/auth/refresh", json={})
 
         assert response.status_code == 401

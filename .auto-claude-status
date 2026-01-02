@@ -3,7 +3,7 @@
   "spec": "008-move-jwt-tokens-from-localstorage-to-httponly-cook",
   "state": "building",
   "subtasks": {
-    "completed": 16,
+    "completed": 17,
     "total": 18,
     "in_progress": 1,
     "failed": 0
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 1012,
+    "number": 1013,
     "started_at": "2026-01-02T09:00:44.658113"
   },
-  "last_update": "2026-01-02T14:08:19.343146"
+  "last_update": "2026-01-02T14:14:24.686095"
 }
