@@ -20,16 +20,21 @@ logger = logging.getLogger(__name__)
 class RedisStreamsEventBus(EventBus):
     """Redis Streams 기반 이벤트 버스"""
     
-    def __init__(self, redis_url: str = None, consumer_group: str = "cache-service"):
+    def __init__(self, redis_url: str = None, redis_client: aioredis.Redis = None, consumer_group: str = "cache-service"):
         self.redis_url = redis_url or settings.redis_url
         self.consumer_group = consumer_group
-        self.redis: Optional[aioredis.Redis] = None
+        self.redis: Optional[aioredis.Redis] = redis_client
         self.handlers: Dict[EventType, List[Callable]] = {}
         self._running = False
         self._task: Optional[asyncio.Task] = None
+        self._own_connection = redis_client is None  # 직접 연결을 생성했는지 여부
+
     
     async def connect(self):
-        """Redis 연결"""
+        """Redis 연결 (직접 연결이 없을 경우)"""
+        if self.redis:
+            return
+
         self.redis = await aioredis.from_url(
             self.redis_url,
             encoding="utf-8",
@@ -172,8 +177,9 @@ class RedisStreamsEventBus(EventBus):
             except asyncio.CancelledError:
                 pass
         
-        if self.redis:
+        if self.redis and self._own_connection:
             await self.redis.close()
+            self.redis = None
         
         logger.info("Event bus stopped")
 

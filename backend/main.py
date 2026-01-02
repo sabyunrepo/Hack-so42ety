@@ -17,8 +17,10 @@ from .core.database import engine, Base
 from .core.middleware import setup_cors
 from .core.middleware.auth import UserContextMiddleware
 from .core.events.redis_streams_bus import RedisStreamsEventBus
+
 from .core.dependencies import set_event_bus
 from .core.cache.config import initialize_cache
+from .core.redis import get_redis_manager
 from .core.tasks.voice_sync import sync_voice_status_periodically
 from .core.logging import configure_logging, get_logger
 from backend.features.tts.producer import TTSProducer
@@ -94,8 +96,14 @@ async def lifespan(app: FastAPI):
     # Event Bus 시작
     global voice_sync_task
     try:
+        # 1. Redis 연결 초기화
+        redis_manager = get_redis_manager()
+        await redis_manager.connect()
+        print("✓ Redis Manager connected")
+
+        # 2. Event Bus 시작 (공유된 Redis 클라이언트 사용)
         event_bus = RedisStreamsEventBus(
-            redis_url=settings.redis_url,
+            redis_client=redis_manager.client,  # 클라이언트 주입
             consumer_group="cache-service"
         )
         await event_bus.start()
@@ -161,6 +169,14 @@ async def lifespan(app: FastAPI):
             print("✓ Event Bus stopped")
         except Exception as e:
             print(f"⚠ Event Bus stop error: {e}")
+
+    # Redis 연결 종료
+    try:
+        redis_manager = get_redis_manager()
+        await redis_manager.disconnect()
+        print("✓ Redis Manager disconnected")
+    except Exception as e:
+        print(f"⚠ Redis Manager disconnect error: {e}")
 
     # TTS Worker 중지
     if tts_worker:

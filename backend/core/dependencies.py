@@ -13,7 +13,7 @@ from backend.infrastructure.ai.factory import AIProviderFactory
 from backend.core.events.redis_streams_bus import RedisStreamsEventBus
 from backend.core.cache.service import CacheService
 from backend.core.database.session import get_db
-from backend.core.rate_limiter import get_rate_limiter, RateLimiterService
+from backend.core.rate_limiter import get_rate_limiter
 from backend.core.exceptions import RateLimitExceededException, ErrorCode
 
 # 전역 Event Bus 참조 (main.py의 lifespan에서 설정)
@@ -195,9 +195,7 @@ def create_rate_limit_dependency(
         # Rate limiter 인스턴스 가져오기
         rate_limiter = get_rate_limiter()
 
-        # Redis 연결 확인
-        if not rate_limiter._connected:
-            await rate_limiter.connect()
+
 
         # 속도 제한 키 생성 (endpoint:ip)
         rate_limit_key = f"{endpoint}:{client_ip}"

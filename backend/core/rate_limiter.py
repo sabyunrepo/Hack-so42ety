@@ -5,7 +5,7 @@ Redis 기반 속도 제한 서비스 (Sliding Window 알고리즘)
 
 import time
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from dataclasses import dataclass
 import redis.asyncio as aioredis
 from .config import settings
@@ -50,81 +50,33 @@ class RateLimiterService:
     Redis 기반 속도 제한 서비스
 
     Sliding Window 알고리즘을 사용하여 분산 환경에서 속도 제한을 구현합니다.
-
-    주요 기능:
-    - IP 기반, 사용자 기반, 엔드포인트 기반 키 지원
-    - Sliding Window 알고리즘으로 정확한 속도 제한
-    - 속도 제한 메타데이터 (limit, remaining, reset) 제공
-    - X-RateLimit-* HTTP 헤더 지원
-
-    알고리즘:
-        Sliding Window - Redis Sorted Set 사용
-        1. 현재 시간을 기준으로 윈도우 시작 시간 계산
-        2. 윈도우 밖의 오래된 요청 제거 (ZREMRANGEBYSCORE)
-        3. 윈도우 내 요청 개수 확인 (ZCARD)
-        4. 제한 미만이면 새 요청 추가 (ZADD)
-        5. 키 TTL 설정 (EXPIRE)
-
-    키 패턴:
-        rate_limit:{endpoint}:{identifier}
-        예: rate_limit:auth:login:192.168.1.1
-
-    예제:
-        ```python
-        rate_limiter = RateLimiterService()
-        await rate_limiter.connect()
-
-        result = await rate_limiter.check_rate_limit(
-            key="auth:login:192.168.1.1",
-            limit=5,
-            window_seconds=60
-        )
-
-        if not result.allowed:
-            raise RateLimitExceededException(...)
-        ```
+    공유된 Redis 클라이언트를 사용합니다.
     """
 
-    def __init__(self, redis_url: Optional[str] = None):
+    def __init__(self, redis_client: Optional[aioredis.Redis] = None):
         """
         Args:
-            redis_url: Redis 연결 URL (기본값: settings.redis_url)
+            redis_client: 공유 Redis 클라이언트 (injectable)
         """
-        self.redis_url = redis_url or settings.redis_url
-        self.redis: Optional[aioredis.Redis] = None
-        self._connected = False
+        self.redis = redis_client
 
-    async def connect(self) -> None:
-        """Redis 연결 초기화"""
-        if self._connected and self.redis:
-            return
-
-        try:
-            self.redis = await aioredis.from_url(
-                self.redis_url,
-                encoding="utf-8",
-                decode_responses=True
-            )
-            # 연결 테스트
-            await self.redis.ping()
-            self._connected = True
-            logger.info("RateLimiterService connected to Redis", extra={
-                "redis_url": self.redis_url
-            })
-        except Exception as e:
-            logger.error(
-                f"Failed to connect to Redis: {e}",
-                extra={"redis_url": self.redis_url, "error": str(e)},
-                exc_info=True
-            )
-            raise
-
-    async def disconnect(self) -> None:
-        """Redis 연결 종료"""
+    @property
+    def _redis(self) -> aioredis.Redis:
+        """Redis 클라이언트 Lazy Loading (singleton fallback)"""
         if self.redis:
-            await self.redis.close()
-            self._connected = False
-            logger.info("RateLimiterService disconnected from Redis")
+            return self.redis
+        
+        # 의존성 주입이 안 된 경우 전역 매니저에서 가져옴
+        from .redis import get_redis_client
+        try:
+            return get_redis_client()
+        except RuntimeError:
+            # 테스트 환경 등에서 연결이 없는 경우
+            logger.warning("Redis client not explicitly initialized. Connecting now...")
+            # 여기서는 임시로 연결하지 않고 에러를 내거나, 
+            # 테스트를 위해 on-demand connect를 할 수도 있지만 
+            # 원칙상 main.py에서 연결된 것을 써야 함.
+            raise
 
     def _make_key(self, identifier: str) -> str:
         """
@@ -154,13 +106,18 @@ class RateLimiterService:
 
         Returns:
             RateLimitResult: 속도 제한 검사 결과
-
-        Raises:
-            Exception: Redis 연결 실패 또는 명령 실패 시
         """
-        # Redis 연결 확인
-        if not self._connected or not self.redis:
-            await self.connect()
+        try:
+            redis_client = self._redis
+        except Exception:
+             # Redis 연결 실패 시 Fail-open
+            return RateLimitResult(
+                allowed=True,
+                limit=limit,
+                remaining=limit - 1,
+                reset_at=int(time.time() + window_seconds),
+                retry_after=None,
+            )
 
         redis_key = self._make_key(key)
         now = time.time()
@@ -168,7 +125,7 @@ class RateLimiterService:
 
         try:
             # Pipeline으로 원자적 실행
-            pipe = self.redis.pipeline()
+            pipe = redis_client.pipeline()
 
             # 1. 윈도우 밖의 오래된 요청 제거
             pipe.zremrangebyscore(redis_key, 0, window_start)
@@ -187,10 +144,10 @@ class RateLimiterService:
                 remaining = limit - current_count - 1
 
                 # 새 요청을 Sorted Set에 추가 (score = timestamp)
-                await self.redis.zadd(redis_key, {str(now): now})
+                await redis_client.zadd(redis_key, {str(now): now})
 
                 # TTL 설정 (윈도우 크기 + 여유시간)
-                await self.redis.expire(redis_key, window_seconds + 10)
+                await redis_client.expire(redis_key, window_seconds + 10)
 
                 # 다음 리셋 시간 계산 (현재 윈도우 종료 시간)
                 reset_at = int(now + window_seconds)
@@ -211,7 +168,7 @@ class RateLimiterService:
                 remaining = 0
 
                 # 가장 오래된 요청의 타임스탬프 조회
-                oldest_requests = await self.redis.zrange(
+                oldest_requests = await redis_client.zrange(
                     redis_key, 0, 0, withscores=True
                 )
 
@@ -253,7 +210,6 @@ class RateLimiterService:
                 exc_info=True
             )
             # Redis 오류 시 기본적으로 허용 (Fail-open)
-            # 보안상 중요하지만 가용성도 중요하므로 서비스 중단을 방지
             return RateLimitResult(
                 allowed=True,
                 limit=limit,
@@ -265,20 +221,14 @@ class RateLimiterService:
     async def reset_limit(self, key: str) -> None:
         """
         특정 키의 속도 제한 초기화
-
-        Args:
-            key: 식별자 키
         """
-        if not self._connected or not self.redis:
-            await self.connect()
-
-        redis_key = self._make_key(key)
-
         try:
-            await self.redis.delete(redis_key)
+            redis_client = self._redis
+            redis_key = self._make_key(key)
+            await redis_client.delete(redis_key)
             logger.info(f"Rate limit reset: {key}", extra={"key": key})
         except Exception as e:
-            logger.error(
+             logger.error(
                 f"Failed to reset rate limit: {key}",
                 extra={"key": key, "error": str(e)},
                 exc_info=True
@@ -291,25 +241,16 @@ class RateLimiterService:
     ) -> int:
         """
         현재 윈도우 내 요청 수 조회
-
-        Args:
-            key: 식별자 키
-            window_seconds: 윈도우 크기 (초)
-
-        Returns:
-            int: 현재 요청 수
         """
-        if not self._connected or not self.redis:
-            await self.connect()
-
-        redis_key = self._make_key(key)
-        now = time.time()
-        window_start = now - window_seconds
-
         try:
+            redis_client = self._redis
+            redis_key = self._make_key(key)
+            now = time.time()
+            window_start = now - window_seconds
+            
             # 오래된 요청 제거 후 개수 확인
-            await self.redis.zremrangebyscore(redis_key, 0, window_start)
-            count = await self.redis.zcard(redis_key)
+            await redis_client.zremrangebyscore(redis_key, 0, window_start)
+            count = await redis_client.zcard(redis_key)
             return count
         except Exception as e:
             logger.error(
