@@ -178,25 +178,38 @@ async def get_optional_user_object(
 
     공개 파일 접근 시 사용
     """
-    # Extract token from cookie (preferred) or fallback to Authorization header
+    # 1. Extract token from cookie (preferred) or fallback to Authorization header
     token = request.cookies.get("access_token")
+    token_source = "cookie"
 
     if not token and credentials:
         token = credentials.credentials
+        token_source = "header"
 
     if not token:
+        logger.debug("🔓 [AUTH] No access token found, allowing unauthenticated access")
         return None
 
+    logger.debug(
+        f"🔑 [AUTH] Optional access token extracted from {token_source}",
+        extra={"token_source": token_source, "token_length": len(token)}
+    )
+
     try:
-        # JWT 토큰 검증
+        # 2. JWT 토큰 검증
         payload = JWTManager.verify_token(token, token_type="access")
 
-        # user_id 추출
-        user_id: Optional[str] = payload.get("sub")
-        if user_id is None:
+        if payload is None:
+            logger.debug("⚠️ [AUTH] Invalid optional access token, allowing unauthenticated access")
             return None
 
-        # 사용자 객체 조회
+        # 3. user_id 추출
+        user_id: Optional[str] = payload.get("sub")
+        if user_id is None:
+            logger.debug("⚠️ [AUTH] No user_id in token payload, allowing unauthenticated access")
+            return None
+
+        # 4. 사용자 객체 조회
         from backend.features.auth.repository import UserRepository
         import uuid
 
@@ -204,10 +217,24 @@ async def get_optional_user_object(
         try:
             user_uuid = uuid.UUID(user_id)
             user = await user_repo.get(user_uuid)
+            if user:
+                logger.debug(
+                    "✅ [AUTH] Optional access token validated",
+                    extra={"user_id": user_id, "token_source": token_source}
+                )
+            else:
+                logger.debug(
+                    "⚠️ [AUTH] User not found for optional token",
+                    extra={"user_id": user_id}
+                )
             return user
         except ValueError:
+            logger.debug("⚠️ [AUTH] Invalid user ID format in optional token")
             return None
-    except Exception:
+    except Exception as e:
         # 인증 실패(만료, 위조 등) 시 None 반환 (공개 파일 접근 허용)
         # TokenExpiredException, InvalidTokenException 등 모든 예외 무시
+        logger.debug(
+            f"⚠️ [AUTH] Optional token validation failed: {type(e).__name__}, allowing unauthenticated access"
+        )
         return None
