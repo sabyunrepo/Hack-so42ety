@@ -35,6 +35,30 @@ class AbstractStorageService(ABC):
         pass
 
     @abstractmethod
+    def get_url(
+        self,
+        path: str,
+        expires_in: Optional[int] = None,
+        bypass_cdn: bool = False,
+        is_shared: bool = True,
+        content_type: str = 'default'
+    ) -> str:
+        """
+        파일 접근 URL 반환 (공개/비공개 구분)
+
+        Args:
+            path: 파일 경로
+            expires_in: 만료 시간 (초)
+            bypass_cdn: CDN을 거치지 않고 Backend API URL 반환 여부
+            is_shared: 공개 여부 (True: 공개, False: 비공개)
+            content_type: 콘텐츠 타입 ('video', 'audio', 'image', 'metadata', 'default')
+
+        Returns:
+            str: 접근 URL
+        """
+        pass
+
+    @abstractmethod
     async def get(self, path: str) -> bytes:
         """
         파일 조회
@@ -70,18 +94,5 @@ class AbstractStorageService(ABC):
 
         Returns:
             bool: 존재 여부
-        """
-        pass
-
-    @abstractmethod
-    def get_url(self, path: str) -> str:
-        """
-        파일 접근 URL 반환
-
-        Args:
-            path: 파일 경로
-
-        Returns:
-            str: 접근 URL
         """
         pass

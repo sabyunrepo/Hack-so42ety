@@ -153,24 +153,46 @@ class S3StorageService(AbstractStorageService):
         except ClientError:
             return False
 
-    def get_url(self, path: str, expires_in: Optional[int] = None) -> str:
+    def get_url(
+        self,
+        path: str,
+        expires_in: Optional[int] = None,
+        bypass_cdn: bool = False,
+        is_shared: bool = True,
+        content_type: str = 'default'
+    ) -> str:
         """
-        Pre-signed URL 생성
-        
+        Pre-signed URL 생성 (공개/비공개 구분, R2 호환)
+
         S3 버킷을 private으로 설정하고 Pre-signed URL로 임시 접근 권한 부여
-        
+
         Args:
-            path: 파일 경로 (예: "/api/v1/files/shared/books/{id}/videos/page_1.mp4" 또는 "shared/books/{id}/videos/page_1.mp4")
+            path: 파일 경로
             expires_in: URL 만료 시간 (초). None이면 settings에서 가져옴
-        
+            bypass_cdn: S3에서는 CDN을 사용하지 않으므로 무시됨 (호환성 유지)
+            is_shared: 공개 여부 (S3에서는 모두 Pre-signed URL 사용)
+            content_type: 콘텐츠 타입 (만료 시간 결정용)
+
         Returns:
             str: Pre-signed URL (만료 시간 포함)
         """
         key = self._normalize_key(path)
-        
+
+        # 콘텐츠 타입별 만료 시간 (R2와 동일한 전략)
         if expires_in is None:
-            expires_in = settings.aws_s3_presigned_url_expiration
-        
+            if not is_shared:
+                expiration_times = {
+                    'video': 21600,      # 6시간
+                    'audio': 10800,      # 3시간
+                    'image': 86400,      # 24시간
+                    'metadata': 3600,    # 1시간
+                    'default': 3600
+                }
+                expires_in = expiration_times.get(content_type, 3600)
+            else:
+                # 공개 파일도 Pre-signed URL (S3 특성)
+                expires_in = settings.aws_s3_presigned_url_expiration
+
         try:
             presigned_url = self.s3_client.generate_presigned_url(
                 'get_object',

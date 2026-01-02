@@ -254,8 +254,6 @@ class TaskRunner:
         # Wait for all tasks to complete
         # 각 task는 자신의 의존성을 내부에서 await하므로 순서가 보장됨
         await asyncio.gather(*self.futures.values(), return_exceptions=True)
-
-
         return self.results
 
     def get_result(self, task_id: str) -> Optional[TaskResult]:
@@ -388,12 +386,36 @@ async def create_storybook_dag(
     # DAG 실행 (백그라운드)
     all_task_ids = [t_story, t_image, t_tts, t_video, t_finalize]
 
-    # 백그라운드 실행
-    asyncio.create_task(
-        runner.execute_dag(all_task_ids), name=f"storybook_dag_{book_id}"
-    )
+    # 백그라운드 실행 + 실패 시 상태 업데이트
+    async def _run_dag():
+        from backend.core.database.session import AsyncSessionLocal
+        from backend.features.storybook.repository import BookRepository
+        from backend.features.storybook.models import BookStatus
 
-    # Task IDs 반환
+        results = await runner.execute_dag(all_task_ids)
+
+        # 실패한 task가 있으면 Book 상태 업데이트
+        failed = [
+            runner.tasks[tid].name
+            for tid, r in results.items()
+            if r.status == TaskStatus.FAILED
+        ]
+        if failed:
+            logger.error(f"[TaskRunner] Failed tasks: {failed}")
+            async with AsyncSessionLocal() as session:
+                repo = BookRepository(session)
+                book = await repo.get(book_id)
+                if book and book.status == BookStatus.CREATING:
+                    await repo.update(
+                        book_id,
+                        status=BookStatus.FAILED,
+                        pipeline_stage="failed",
+                        error_message=f"Tasks failed: {', '.join(failed)}",
+                    )
+                    await session.commit()
+                    logger.error(f"[TaskRunner] Failed tasks: {failed}")
+
+    asyncio.create_task(_run_dag(), name=f"storybook_dag_{book_id}")
     return {
         "execution_id": execution_id,
         "story_task": t_story,

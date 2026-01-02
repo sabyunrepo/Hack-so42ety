@@ -1,0 +1,25 @@
+name = "signed-url-validator"
+main = "src/index.js"
+compatibility_date = "2025-12-31"
+
+# Workers 요금제
+# Free: 일일 100,000개 요청, 요청당 10ms CPU
+# Paid: $5/월 + 종량제
+
+# 환경 변수 (선택사항)
+[vars]
+# CDN_DOMAIN = "https://cdn.moriai.kr"
+
+# R2 바인딩
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "moriai-storybook-prod"
+
+# Route 설정
+routes = [
+  { pattern = "cdn.moriai.kr/*", zone_name = "moriai.kr" }
+]
+
+# 로그 레벨
+[observability]
+enabled = true

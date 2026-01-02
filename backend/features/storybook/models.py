@@ -1,8 +1,3 @@
-"""
-Book Domain Models
-동화책 관련 ORM 모델 (Book, Page, Dialogue)
-"""
-
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -16,7 +11,6 @@ from backend.core.database.base import Base
 class BookStatus:
     CREATING = "creating"
     COMPLETED = "completed"
-    PARTIALLY_COMPLETED = "partially_completed"
     FAILED = "failed"
     DRAFT = "draft"
 
