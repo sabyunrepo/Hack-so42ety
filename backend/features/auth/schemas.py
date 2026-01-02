@@ -146,6 +146,42 @@ class AuthResponse(BaseModel):
         }
 
 
+class AuthResponseCookie(BaseModel):
+    """인증 응답 (쿠키 기반, 사용자 정보만 포함)"""
+
+    user: UserResponse = Field(..., description="사용자 정보")
+    token_type: str = Field(default="bearer", description="토큰 타입 (토큰은 httpOnly 쿠키에 저장됨)", example="bearer")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user": {
+                    "id": "123e4567-e89b-12d3-a456-426614174000",
+                    "email": "user@example.com",
+                    "oauth_provider": None,
+                    "is_active": True,
+                    "created_at": "2024-11-30T12:00:00Z"
+                },
+                "token_type": "bearer"
+            }
+        }
+
+
+class TokenResponseCookie(BaseModel):
+    """토큰 응답 (쿠키 기반, 토큰은 httpOnly 쿠키에 저장됨)"""
+
+    token_type: str = Field(default="bearer", description="토큰 타입 (토큰은 httpOnly 쿠키에 저장됨)", example="bearer")
+    message: str = Field(default="Token refreshed successfully", description="응답 메시지", example="Token refreshed successfully")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "token_type": "bearer",
+                "message": "Token refreshed successfully"
+            }
+        }
+
+
 class LogoutResponse(BaseModel):
     """로그아웃 응답"""
 
