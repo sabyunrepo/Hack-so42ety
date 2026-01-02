@@ -164,7 +164,10 @@ class Settings(BaseSettings):
     cors_allow_methods: str = Field(
         default="GET,POST,PUT,DELETE,OPTIONS", env="CORS_ALLOW_METHODS"
     )
-    cors_allow_headers: str = Field(default="*", env="CORS_ALLOW_HEADERS")
+    cors_allow_headers: str = Field(
+        default="Content-Type,Authorization,Accept,X-Request-ID",
+        env="CORS_ALLOW_HEADERS",
+    )
 
     # ==================== Language Settings ====================
     supported_languages_str: str = Field(
