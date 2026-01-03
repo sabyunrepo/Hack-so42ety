@@ -95,6 +95,34 @@ export default function Bookshelf() {
     fetchBooks();
   }, []);
 
+  const hasCreatingBooks = useMemo(
+    () => books.some((book) => book.status === "creating"),
+    [books]
+  );
+  // 폴링 로직
+  useEffect(() => {
+    if (!hasCreatingBooks) {
+      return;
+    }
+
+    const fetchBooks = async () => {
+      try {
+        const data = await getAllStorybooks();
+        setBooks(data);
+      } catch (err) {
+        console.error("폴링 중 에러:", err);
+      }
+    };
+
+    // 3분마다 확인
+    const pollInterval = setInterval(fetchBooks, 180000);
+
+    // 컴포넌트가 언마운트 될 때 정리
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [hasCreatingBooks]); //  boolean 값만 감지
+
   // 책 클릭 핸들러
   const handleBookClick = (bookId: string) => {
     navigate(`/book/${bookId}`);
