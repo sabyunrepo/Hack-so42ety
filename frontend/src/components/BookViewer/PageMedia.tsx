@@ -11,20 +11,25 @@ interface PageMediaProps {
 }
 
 const PageMedia = React.memo(
-  ({
-    bookId,
-    pageId,
-    imageUrl,
-    expiresAt,
-    isShared,
-  }: PageMediaProps) => {
-    const { urls } = useMediaUrl({
+  ({ bookId, pageId, imageUrl, expiresAt, isShared }: PageMediaProps) => {
+    const { urls, refreshUrls } = useMediaUrl({
       bookId,
       pageId,
       initialUrls: { video_url: imageUrl },
       expiresAt,
       isShared,
     });
+
+    const handleError = async () => {
+      if (!isShared) {
+        console.warn("Background video failed to load, attempting refresh...");
+        try {
+          await refreshUrls();
+        } catch (err) {
+          console.error("Failed to recover video:", err);
+        }
+      }
+    };
 
     return (
       <div className="relative w-full h-full bg-white flex flex-col justify-center items-center p-5">
@@ -33,6 +38,7 @@ const PageMedia = React.memo(
           muted
           autoPlay
           loop
+          onError={handleError} // ← 추가
           className="h-full w-full object-cover"
         >
           <source src={urls.video_url} type="video/mp4" />

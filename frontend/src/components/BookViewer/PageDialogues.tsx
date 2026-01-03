@@ -1,35 +1,58 @@
-import React from "react";
+import React, { useMemo } from "react";
 import ClickableText from "../ClickableText";
 import AudioPlayer from "../AudioPlayer";
 import PageShadowOverlay from "./PageShadowOverlay";
 import type { Dialogue, DialogueAudio } from "../../types/book";
 import { getDialogueText, getDialogueAudioUrl } from "../../types/book";
+import { useMediaUrl } from "../../hooks/useMediaUrl";
 
 interface PageDialoguesProps {
   dialogues: Dialogue[];
   bookId: string;
+  pageId: string; //  추가 필요
   languageCode?: string;
-  onAudioError?: () => void;
-  refreshedAudios?: DialogueAudio[]; // useMediaUrl에서 갱신된 오디오 URL
+  isShared: boolean;
 }
 
 const PageDialogues = React.memo(
   ({
     dialogues,
     bookId,
+    pageId,
     languageCode = "en",
-    onAudioError,
-    refreshedAudios,
+    isShared,
   }: PageDialoguesProps) => {
-    // 갱신된 오디오 URL 찾기 (dialogue ID와 language code로 매칭)
+    // 초기 오디오 URL 목록 생성
+    const initialAudios = useMemo(() => {
+      const audios: DialogueAudio[] = [];
+      dialogues.forEach((dialogue) => {
+        dialogue.audios.forEach((audio) => {
+          audios.push({
+            language_code: audio.language_code,
+            voice_id: audio.voice_id,
+            audio_url: audio.audio_url,
+          });
+        });
+      });
+      return audios;
+    }, [dialogues]);
+
+    // useMediaUrl 훅 사용
+    const { urls, refreshUrls } = useMediaUrl({
+      bookId,
+      pageId,
+      initialUrls: { audios: initialAudios },
+      isShared,
+    });
+
+    // 갱신된 오디오 URL 찾기
     const getRefreshedAudioUrl = (dialogue: Dialogue): string | undefined => {
-      if (!refreshedAudios || refreshedAudios.length === 0) {
-        // refreshedAudios가 없으면 기존 dialogue의 audio 사용
+      if (!urls.audios || urls.audios.length === 0) {
+        // urls.audios가 없으면 기존 dialogue의 audio 사용
         return getDialogueAudioUrl(dialogue, languageCode);
       }
 
-      // refreshedAudios에서 해당 dialogue의 audio 찾기
-      // dialogue.audios의 첫 번째 audio와 같은 voice_id를 가진 것을 찾음
+      // dialogue에서 해당 언어의 original audio 찾기
       const originalAudio = dialogue.audios.find(
         (a) => a.language_code === languageCode
       );
@@ -38,12 +61,28 @@ const PageDialogues = React.memo(
         return getDialogueAudioUrl(dialogue, languageCode);
       }
 
-      // refreshedAudios에서 같은 language_code를 가진 audio 찾기
-      const refreshedAudio = refreshedAudios.find(
-        (a) => a.language_code === languageCode && a.voice_id === originalAudio.voice_id
+      // urls.audios에서 같은 language_code와 voice_id를 가진 audio 찾기
+      const refreshedAudio = urls.audios.find(
+        (a) =>
+          a.language_code === languageCode &&
+          a.voice_id === originalAudio.voice_id
       );
 
-      return refreshedAudio?.audio_url || getDialogueAudioUrl(dialogue, languageCode);
+      return (
+        refreshedAudio?.audio_url || getDialogueAudioUrl(dialogue, languageCode)
+      );
+    };
+
+    // 오디오 에러 처리 개선
+    const handleAudioError = async () => {
+      if (!isShared) {
+        console.warn("Audio failed to load, attempting refresh...");
+        try {
+          await refreshUrls();
+        } catch (err) {
+          console.error("Failed to refresh audio URLs:", err);
+        }
+      }
     };
 
     return (
@@ -66,7 +105,7 @@ const PageDialogues = React.memo(
               />
               <AudioPlayer
                 src={getRefreshedAudioUrl(dialogue) || ""}
-                onError={onAudioError}
+                onError={handleAudioError}
               />
             </div>
           ))}

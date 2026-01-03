@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import { ShareModal } from "../components/Modal";
 // --- 타입 정의 ---
 
-// 5. react-pageflip 라이브러리의 ref가 노출하는 API 타입
+// react-pageflip 라이브러리의 ref가 노출하는 API 타입
 interface PageFlipApi {
   flipNext: () => void;
   flipPrev: () => void;
@@ -172,28 +172,6 @@ const Viewer: React.FC = () => {
     }
   };
 
-  // 미디어 에러 핸들러 (비공개 콘텐츠의 URL 만료 시 책 다시 로드)
-  const handleMediaError = async () => {
-    // 공개 콘텐츠는 URL 갱신 불필요
-    if (isShared) {
-      console.error("Media load failed for public content");
-      return;
-    }
-
-    try {
-      console.warn("Media URL may be expired, refreshing book...");
-
-      // 책 전체를 다시 로드하여 최신 URL 받기
-      const data: BookData = await getStorybookById(bookId!);
-      setBook(data);
-      setIsShared(data.is_shared || false);
-
-      console.log("Book refreshed successfully with new URLs");
-    } catch (error) {
-      console.error("Failed to refresh book:", error);
-      setErrorMessage("미디어 URL을 갱신할 수 없습니다. 다시 시도해주세요.");
-    }
-  };
 
   // Calculate total pages (cover + content pages + back cover)
   const totalPages = book ? book.pages.length * 2 + 2 : 0;
@@ -342,7 +320,7 @@ const Viewer: React.FC = () => {
               bookId={bookId!}
               pageId={pageData.id}
               imageUrl={pageData.image_url}
-              // expiresAt={book.expires_at}
+              expiresAt={pageData.expires_at}
               isShared={isShared}
             />
           </Page>,
@@ -352,8 +330,8 @@ const Viewer: React.FC = () => {
             <PageDialogues
               dialogues={pageData.dialogues}
               bookId={bookId!}
-              languageCode="en"
-              onAudioError={handleMediaError}
+              pageId={pageData.id}
+              isShared={isShared}
             />
           </Page>,
         ])}
