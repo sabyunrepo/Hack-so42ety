@@ -62,7 +62,7 @@ export default function Settings() {
     };
 
     runCheck(); // 정의된 runCheck 함수 실행
-  }, []);
+  }, [t]);
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;

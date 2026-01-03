@@ -5,10 +5,10 @@ import HTMLFlipBook from "react-pageflip";
 import { X, Share2 } from "lucide-react";
 import MoriAI_Icon from "../assets/MoriAI_Icon.svg";
 import { getStorybookById, toggleBookShare } from "../api/index";
-import ClickableText from "../components/ClickableText";
-import AudioPlayer from "../components/AudioPlayer";
-import type { BookData, PageData, Dialogue } from "../types/book";
-import { getDialogueText, getDialogueAudioUrl } from "../types/book";
+import PageMedia from "../components/BookViewer/PageMedia";
+import PageDialogues from "../components/BookViewer/PageDialogues";
+import BookCover from "../components/BookViewer/BookCover";
+import type { BookData, PageData } from "../types/book";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 import { usePostHog } from "@posthog/react";
 import { useTranslation } from "react-i18next";
@@ -60,8 +60,6 @@ const Viewer: React.FC = () => {
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
   const [isShared, setIsShared] = useState<boolean>(false);
   const [isTogglingShare, setIsTogglingShare] = useState<boolean>(false);
-  const [mediaRetryCount, setMediaRetryCount] = useState<number>(0);
-  const MAX_MEDIA_RETRIES = 3;
 
   const bookRef = useRef<HTMLFlipBookRef | null>(null);
   const navigate = useNavigate();
@@ -182,22 +180,8 @@ const Viewer: React.FC = () => {
       return;
     }
 
-    // 최대 재시도 횟수 확인
-    if (mediaRetryCount >= MAX_MEDIA_RETRIES) {
-      console.error("Max media retries reached");
-      setErrorMessage(
-        "미디어를 불러올 수 없습니다. 페이지를 새로고침해주세요."
-      );
-      return;
-    }
-
     try {
-      console.warn(
-        `Media URL may be expired, refreshing book... (Retry ${
-          mediaRetryCount + 1
-        }/${MAX_MEDIA_RETRIES})`
-      );
-      setMediaRetryCount((prev) => prev + 1);
+      console.warn("Media URL may be expired, refreshing book...");
 
       // 책 전체를 다시 로드하여 최신 URL 받기
       const data: BookData = await getStorybookById(bookId!);
@@ -343,96 +327,48 @@ const Viewer: React.FC = () => {
           className="demoPage border bg-white shadow-2xl/30"
           data-density="hard"
         >
-          <img
-            src={book.cover_image}
-            alt={t("coverAlt")}
-            className="w-full h-full object-cover"
+          <BookCover
+            type="front"
+            coverImage={book.cover_image}
+            altText={t("coverAlt")}
           />
         </Page>
 
         {/* 책 내용 */}
         {book.pages.map((pageData: PageData) => [
-          // 이미지 (오른쪽 접힌 부분 효과)
-          <Page
-            key={`image-${pageData.id}`}
-            className="relative bg-white flex flex-col justify-center items-center p-5 shadow-2xl/30 "
-          >
-            <video
-              muted
-              autoPlay
-              loop
-              className="h-full w-full object-cover"
-              onError={handleMediaError}
-            >
-              <source src={`${pageData.image_url}`} type="video/mp4" />
-            </video>
-            <div
-              className="pointer-events-none absolute inset-y-0 right-0 w-[10%]"
-              style={{
-                background:
-                  "linear-gradient(to left, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 20%, rgba(0,0,0,0.1) 60%, transparent 100%)",
-              }}
-            ></div>
-            <div
-              className="pointer-events-none absolute inset-y-0 left-0 w-[15%]"
-              style={{
-                background:
-                  "linear-gradient(to right, rgba(0,0,0,0.1) 20%, transparent 100%)",
-              }}
-            ></div>
+          // 이미지/비디오 페이지 (오른쪽)
+          <Page key={`image-${pageData.id}`} className="shadow-2xl/30">
+            <PageMedia
+              bookId={bookId!}
+              pageId={pageData.id}
+              imageUrl={pageData.image_url}
+              // expiresAt={book.expires_at}
+              isShared={isShared}
+            />
           </Page>,
 
-          // 글자 (왼쪽 접힌 부분 효과)
-          <Page
-            key={`text-${pageData.id}`}
-            className="relative w-full h-full bg-white flex flex-col justify-center items-center p-10 shadow-2xl/30 "
-          >
-            <div
-              className="pointer-events-none absolute inset-y-0 left-0 w-[15%]"
-              style={{
-                background:
-                  "linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 20%, rgba(0,0,0,0.1) 60%, transparent 100%)",
-              }}
-            ></div>
-            <div
-              className="pointer-events-none absolute inset-y-0 right-0 w-[10%]"
-              style={{
-                background:
-                  "linear-gradient(to left, rgba(0,0,0,0.1) 20%, transparent 100%)",
-              }}
-            ></div>
-            <div className=" w-full h-full flex flex-col justify-center items-start">
-              {pageData.dialogues.map((dialogue: Dialogue) => (
-                <div
-                  key={dialogue.id}
-                  className="relative w-full mb-5 flex items-center justify-start "
-                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                  onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                  onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
-                >
-                  <ClickableText
-                    text={getDialogueText(dialogue, "en")}
-                    book_id={bookId!}
-                  />
-                  <AudioPlayer
-                    src={getDialogueAudioUrl(dialogue, "en") || ""}
-                    onError={handleMediaError}
-                  />
-                </div>
-              ))}
-            </div>
+          // 대화문 페이지 (왼쪽)
+          <Page key={`text-${pageData.id}`} className="shadow-2xl/30">
+            <PageDialogues
+              dialogues={pageData.dialogues}
+              bookId={bookId!}
+              languageCode="en"
+              onAudioError={handleMediaError}
+            />
           </Page>,
         ])}
 
         {/* 마지막 페이지: 뒷면 커버 */}
-        <Page
-          className="demoPage bg-[#f2bf27] relative w-full min-h-[200px] shadow-2xl/30"
-          data-density="hard"
-        >
-          <img
-            src={MoriAI_Icon}
-            alt="MoriAI Logo"
-            className="h-17 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+        <Page className="demoPage shadow-2xl/30" data-density="hard">
+          <BookCover
+            type="back"
+            backCoverContent={
+              <img
+                src={MoriAI_Icon}
+                alt="MoriAI Logo"
+                className="h-17 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              />
+            }
           />
         </Page>
       </HTMLFlipBook>
