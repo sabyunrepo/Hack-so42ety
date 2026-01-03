@@ -27,7 +27,7 @@
     },
     "success": {
       "title": "Tạo truyện tranh",
-      "message": "Mất khoảng 10 phút để hoàn tất."
+      "message": "Quá trình tạo có thể mất từ 3 đến 5 phút."
     },
     "error": {
       "title": "Đã xảy ra lỗi",

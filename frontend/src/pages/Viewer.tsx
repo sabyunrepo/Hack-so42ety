@@ -5,17 +5,17 @@ import HTMLFlipBook from "react-pageflip";
 import { X, Share2 } from "lucide-react";
 import MoriAI_Icon from "../assets/MoriAI_Icon.svg";
 import { getStorybookById, toggleBookShare } from "../api/index";
-import ClickableText from "../components/ClickableText";
-import AudioPlayer from "../components/AudioPlayer";
-import type { BookData, PageData, Dialogue } from "../types/book";
-import { getDialogueText, getDialogueAudioUrl } from "../types/book";
+import PageMedia from "../components/BookViewer/PageMedia";
+import PageDialogues from "../components/BookViewer/PageDialogues";
+import BookCover from "../components/BookViewer/BookCover";
+import type { BookData, PageData } from "../types/book";
 import { getUserFriendlyErrorMessage } from "../utils/errorHandler";
 import { usePostHog } from "@posthog/react";
 import { useTranslation } from "react-i18next";
 import { ShareModal } from "../components/Modal";
 // --- 타입 정의 ---
 
-// 5. react-pageflip 라이브러리의 ref가 노출하는 API 타입
+// react-pageflip 라이브러리의 ref가 노출하는 API 타입
 interface PageFlipApi {
   flipNext: () => void;
   flipPrev: () => void;
@@ -172,19 +172,6 @@ const Viewer: React.FC = () => {
     }
   };
 
-  // Helper to check if url is video
-  const isVideo = (url?: string) => {
-    if (!url) return false;
-    // Presigned URL에는 쿼리 파라미터가 포함되므로 endsWith 대신 includes 사용
-    // 또는 URL 객체로 파싱하여 pathname 확인이 더 정확함
-    try {
-      const urlObj = new URL(url);
-      return urlObj.pathname.toLowerCase().endsWith(".mp4");
-    } catch {
-      // URL 파싱 실패 시 단순 문자열 체크
-      return url.toLowerCase().includes(".mp4");
-    }
-  };
 
   // Calculate total pages (cover + content pages + back cover)
   const totalPages = book ? book.pages.length * 2 + 2 : 0;
@@ -272,9 +259,7 @@ const Viewer: React.FC = () => {
               `}
             >
               <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span>
-                {isShared ? t("shareToggleOn") : t("shareToggleOff")}
-              </span>
+              <span>{isShared ? t("shareToggleOn") : t("shareToggleOff")}</span>
             </button>
           </div>
         )}
@@ -320,96 +305,48 @@ const Viewer: React.FC = () => {
           className="demoPage border bg-white shadow-2xl/30"
           data-density="hard"
         >
-          <img
-            src={book.cover_image}
-            alt={t("coverAlt")}
-            className="w-full h-full object-cover"
+          <BookCover
+            type="front"
+            coverImage={book.cover_image}
+            altText={t("coverAlt")}
           />
         </Page>
 
         {/* 책 내용 */}
         {book.pages.map((pageData: PageData) => [
-          // 이미지 (오른쪽 접힌 부분 효과)
-          <Page
-            key={`image-${pageData.id}`}
-            className="relative bg-white flex flex-col justify-center items-center p-5 shadow-2xl/30 "
-          >
-            {isVideo(pageData.image_url) ? (
-              <video muted autoPlay loop className="h-full w-full object-cover">
-                <source src={`${pageData.image_url}`} type="video/mp4" />
-              </video>
-            ) : (
-              <img
-                src={`${pageData.image_url}`}
-                className="h-full w-full object-cover"
-              />
-            )}
-            <div
-              className="pointer-events-none absolute inset-y-0 right-0 w-[10%]"
-              style={{
-                background:
-                  "linear-gradient(to left, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 20%, rgba(0,0,0,0.1) 60%, transparent 100%)",
-              }}
-            ></div>
-            <div
-              className="pointer-events-none absolute inset-y-0 left-0 w-[15%]"
-              style={{
-                background:
-                  "linear-gradient(to right, rgba(0,0,0,0.1) 20%, transparent 100%)",
-              }}
-            ></div>
+          // 이미지/비디오 페이지 (오른쪽)
+          <Page key={`image-${pageData.id}`} className="shadow-2xl/30">
+            <PageMedia
+              bookId={bookId!}
+              pageId={pageData.id}
+              imageUrl={pageData.image_url}
+              expiresAt={pageData.expires_at}
+              isShared={isShared}
+            />
           </Page>,
 
-          // 글자 (왼쪽 접힌 부분 효과)
-          <Page
-            key={`text-${pageData.id}`}
-            className="relative w-full h-full bg-white flex flex-col justify-center items-center p-10 shadow-2xl/30 "
-          >
-            <div
-              className="pointer-events-none absolute inset-y-0 left-0 w-[15%]"
-              style={{
-                background:
-                  "linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 20%, rgba(0,0,0,0.1) 60%, transparent 100%)",
-              }}
-            ></div>
-            <div
-              className="pointer-events-none absolute inset-y-0 right-0 w-[10%]"
-              style={{
-                background:
-                  "linear-gradient(to left, rgba(0,0,0,0.1) 20%, transparent 100%)",
-              }}
-            ></div>
-            <div className=" w-full h-full flex flex-col justify-center items-start">
-              {pageData.dialogues.map((dialogue: Dialogue) => (
-                <div
-                  key={dialogue.id}
-                  className="relative w-full mb-5 flex items-center justify-start "
-                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                  onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                  onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
-                >
-                  <ClickableText
-                    text={getDialogueText(dialogue, "en")}
-                    book_id={bookId!}
-                  />
-                  <AudioPlayer
-                    src={getDialogueAudioUrl(dialogue, "en") || ""}
-                  />
-                </div>
-              ))}
-            </div>
+          // 대화문 페이지 (왼쪽)
+          <Page key={`text-${pageData.id}`} className="shadow-2xl/30">
+            <PageDialogues
+              dialogues={pageData.dialogues}
+              bookId={bookId!}
+              pageId={pageData.id}
+              isShared={isShared}
+            />
           </Page>,
         ])}
 
         {/* 마지막 페이지: 뒷면 커버 */}
-        <Page
-          className="demoPage bg-[#f2bf27] relative w-full min-h-[200px] shadow-2xl/30"
-          data-density="hard"
-        >
-          <img
-            src={MoriAI_Icon}
-            alt="MoriAI Logo"
-            className="h-17 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+        <Page className="demoPage shadow-2xl/30" data-density="hard">
+          <BookCover
+            type="back"
+            backCoverContent={
+              <img
+                src={MoriAI_Icon}
+                alt="MoriAI Logo"
+                className="h-17 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              />
+            }
           />
         </Page>
       </HTMLFlipBook>

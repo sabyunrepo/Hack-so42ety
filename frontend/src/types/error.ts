@@ -13,7 +13,7 @@ export interface BackendError {
   timestamp: string;         // ISO 8601 형식
   request_id: string;        // UUID
   path: string;              // API 경로
-  details?: Record<string, any> | null;  // 추가 상세 정보
+  details?: Record<string, unknown> | null;  // 추가 상세 정보
 }
 
 /**

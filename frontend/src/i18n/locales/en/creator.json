@@ -27,7 +27,7 @@
     },
     "success": {
       "title": "Book Creation",
-      "message": "It will take about 10 minutes to complete."
+      "message": "It may take 3 to 5 minutes to complete."
     },
     "error": {
       "title": "Error",
