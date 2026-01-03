@@ -184,6 +184,7 @@ class BookOrchestratorService:
         """사용자의 책 목록 조회 (목록용, 페이지 제외)"""
         return await self.book_repo.get_user_books_summary(user_id)
 
+    @log_process(step='Get Storybook', desc='동화책 상세 조회')
     async def get_book(self, book_id: uuid.UUID, user_id: uuid.UUID = None) -> Book:
         """책 상세 조회"""
         book = await self.book_repo.get_with_pages(book_id)
@@ -204,6 +205,7 @@ class BookOrchestratorService:
 
         return book
 
+    @log_process(step='Update Book Sharing', desc='동화책 공유 상태 변경')
     async def update_book_sharing(
         self, book_id: uuid.UUID, is_shared: bool, user_id: uuid.UUID
     ) -> Book:
@@ -237,6 +239,7 @@ class BookOrchestratorService:
         # Reload with pages for response schema
         return await self.book_repo.get_with_pages(book_id)
 
+    @log_process(step='Delete Storybook', desc='동화책 삭제 처리')
     async def delete_book(self, book_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """책 삭제"""
         # 본인 책인지 확인 로직은 Repository나 Service 레벨에서 수행

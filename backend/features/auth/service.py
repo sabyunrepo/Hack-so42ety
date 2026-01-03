@@ -15,6 +15,7 @@ from ...core.auth.providers.credentials import CredentialsAuthProvider
 from ...core.auth.providers.google_oauth import GoogleOAuthProvider
 from ...core.cache.service import CacheService
 from ...core.config import settings
+from ...core.utils.trace import log_process
 from .models import User
 from .repository import UserRepository
 from .exceptions import (
@@ -64,6 +65,7 @@ class AuthService:
         """토큰 해시 생성 (Redis 키용)"""
         return hashlib.sha256(token.encode()).hexdigest()[:16]
 
+    @log_process(step='User Registration', desc='새 사용자 회원가입')
     async def register(self, email: str, password: str) -> Tuple[User, str, str]:
         """
         회원가입
@@ -109,6 +111,7 @@ class AuthService:
 
         return user, access_token, refresh_token
 
+    @log_process(step='User Login', desc='사용자 로그인 처리')
     async def login(self, email: str, password: str) -> Tuple[User, str, str]:
         """
         로그인
@@ -156,6 +159,7 @@ class AuthService:
 
         return user, access_token, refresh_token
 
+    @log_process(step='Google OAuth Login', desc='Google OAuth 로그인 처리')
     async def google_oauth_login(self, google_token: str) -> Tuple[User, str, str]:
         """
         Google OAuth 로그인
@@ -202,6 +206,7 @@ class AuthService:
 
         return user, access_token, refresh_token
 
+    @log_process(step='Token Refresh', desc='Access Token 갱신 (RTR)')
     async def refresh_access_token(self, refresh_token: str) -> Tuple[str, str]:
         """
         Access Token 갱신 (RTR 적용)
@@ -281,6 +286,7 @@ class AuthService:
 
         return access_token, new_refresh_token
 
+    @log_process(step='User Logout', desc='사용자 로그아웃 처리')
     async def logout(self, user_id: str, access_token: str, refresh_token: str) -> None:
         """
         로그아웃 - 토큰 무효화
