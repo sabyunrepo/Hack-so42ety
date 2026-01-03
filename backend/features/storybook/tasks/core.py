@@ -796,8 +796,8 @@ async def generate_image_task(
             image_bytes = response.content
 
         # Save to storage
-        file_name = f"{base_path}/images/page_{idx + 1}.png"
-        await storage_service.save(image_bytes, file_name, content_type="image/png")
+        file_name = f"{base_path}/images/page_{idx + 1}.webp"
+        await storage_service.save(image_bytes, file_name, content_type="image/webp")
 
         logger.info(
             f"[Image Task] [Book: {book_id}] Page {idx + 1}: "
